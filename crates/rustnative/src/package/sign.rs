@@ -111,15 +111,16 @@ pub fn sign(signtool: &Path, signing: &Signing, package: &Path) -> Result<()> {
 mod tests {
     use super::*;
 
-    fn certificate() -> PathBuf {
-        let path = std::env::temp_dir().join(format!("rustnative-sign-{}.pfx", std::process::id()));
+    fn certificate(test: &str) -> PathBuf {
+        let path =
+            std::env::temp_dir().join(format!("rustnative-sign-{test}-{}.pfx", std::process::id()));
         std::fs::write(&path, b"not a real certificate").expect("a scratch file");
         path
     }
 
     #[test]
     fn the_arguments_ask_for_a_sha256_signature_and_never_show_the_password() {
-        let certificate = certificate();
+        let certificate = certificate("arguments");
         // SAFETY: this test reads the variable back itself, on this thread,
         // and removes it immediately.
         unsafe { std::env::set_var("RUSTNATIVE_TEST_PFX_PASSWORD", "hunter2") };
@@ -144,7 +145,7 @@ mod tests {
 
     #[test]
     fn an_unset_password_variable_is_reported_before_anything_runs() {
-        let certificate = certificate();
+        let certificate = certificate("unset-password");
         let signing = Signing {
             certificate: certificate.clone(),
             password_env: Some("RUSTNATIVE_TEST_NO_SUCH_VARIABLE".to_owned()),
