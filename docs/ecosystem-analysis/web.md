@@ -754,7 +754,7 @@ archetype, in [`concepts-app.md`](concepts-app.md),
 
 **What we must ship.**
 
-- `X-DATA-1` `[X]` An asynchronous data layer in `framework-core`: typed
+- `X-DATA-1` `[X]` An asynchronous data layer in `rustnative-core`: typed
   queries keyed by identity, declared cache lifetimes, deduplication,
   background revalidation, retries with backoff, pagination and infinite
   scrolling, optimistic updates with rollback, and invalidation that composes

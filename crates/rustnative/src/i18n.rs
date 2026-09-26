@@ -125,8 +125,8 @@ fn read(path: &Path) -> Result<String> {
     })
 }
 
-fn parse(path: &Path, text: &str) -> Result<framework_i18n::Bundle> {
-    framework_i18n::parse(text).map_err(|errors| {
+fn parse(path: &Path, text: &str) -> Result<rustnative_i18n::Bundle> {
+    rustnative_i18n::parse(text).map_err(|errors| {
         Error::Usage(
             errors
                 .iter()
@@ -151,7 +151,7 @@ fn all_uses(root: &Path, known: &BTreeSet<String>) -> Result<BTreeMap<String, Ve
 }
 
 /// Message `id`'s entry as written in `text` (its lines, comment excluded).
-fn entry_text(text: &str, message: &framework_i18n::Message) -> String {
+fn entry_text(text: &str, message: &rustnative_i18n::Message) -> String {
     let lines: Vec<&str> = text.lines().collect();
     let start = message.line - 1;
     let mut end = start + 1;
@@ -371,7 +371,7 @@ mod tests {
     #[test]
     fn an_entry_is_copied_with_its_selector() {
         let text = "# c\ninbox = { $n ->\n    [one] One\n   *[other] Many\n}\nnext = Next\n";
-        let bundle = framework_i18n::parse(text).unwrap();
+        let bundle = rustnative_i18n::parse(text).unwrap();
         assert_eq!(
             entry_text(text, &bundle.messages["inbox"]),
             "inbox = { $n ->\n    [one] One\n   *[other] Many\n}"

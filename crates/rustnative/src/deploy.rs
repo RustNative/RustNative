@@ -4,7 +4,7 @@ use std::io::{Read, Write};
 use std::net::TcpStream;
 use std::path::{Path, PathBuf};
 
-use framework_server::deploy::container::{self, Service};
+use rustnative_server::deploy::container::{self, Service};
 
 use crate::error::{Error, Result};
 use crate::project::Project;
@@ -179,7 +179,7 @@ pub fn run(here: &Path, command: DeployCommand) -> Result<()> {
                 let runtime =
                     tokio::runtime::Runtime::new().map_err(io("start the runtime".into()))?;
                 runtime.block_on(async {
-                    let adapter = framework_server::deploy::LocalAdapter::default();
+                    let adapter = rustnative_server::deploy::LocalAdapter::default();
                     let proxy = tokio::net::TcpListener::bind(("0.0.0.0", port))
                         .await
                         .map_err(io(format!("listen on {port}")))?;

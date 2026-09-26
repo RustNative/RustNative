@@ -31,8 +31,8 @@
 use std::process::ExitCode;
 use std::time::{Duration, Instant};
 
-use framework_core::perf;
-use framework_core::{
+use rustnative_core::perf;
+use rustnative_core::{
     AnimatedProperty, Component, ComponentContext, ComponentTree, Event, LayoutEngine, LayoutStyle,
     Node, NodeId, Size, SizeMode, Transition, TreeDiff, TreeSnapshot, Window,
 };
@@ -229,21 +229,21 @@ fn compile() -> Value {
 }
 ",
     );
-    let options = framework_markup::CompileOptions {
+    let options = rustnative_markup::CompileOptions {
         source_path: "bench.rsx".into(),
         src_root: ".".into(),
         wrapper: None,
     };
     let compile = median(9, || {
         let started = Instant::now();
-        let compiled = framework_markup::compile(&source, &options);
+        let compiled = rustnative_markup::compile(&source, &options);
         let elapsed = started.elapsed();
         assert!(compiled.is_ok(), "the bench markup compiles");
         elapsed
     });
     #[allow(clippy::cast_precision_loss, reason = "a line count")]
     let lines = source.lines().count() as f64;
-    let vocabulary = framework_style::Vocabulary::defaults();
+    let vocabulary = rustnative_style::Vocabulary::defaults();
     let classes =
         "flex items-center gap-2 px-4 py-2 rounded-lg bg-blue-500 hover:bg-blue-600 text-white";
     let resolve = median(101, || {
@@ -260,7 +260,7 @@ fn compile() -> Value {
 }
 
 fn headless() -> Value {
-    use framework_headless::{HeadlessApp, Query};
+    use rustnative_headless::{HeadlessApp, Query};
     let launch = median(11, || {
         let started = Instant::now();
         let app = HeadlessApp::launch(Window::new(TITLE, Size::new(480, 720)), || Screen::new(()));
@@ -286,14 +286,14 @@ fn headless() -> Value {
     for character in "amber falcon".chars() {
         typed.push(character);
         let started = Instant::now();
-        filter.application_mut().dispatch(framework_core::Event::TextChanged {
-            target: framework_core::NodeId::from_key("query"),
+        filter.application_mut().dispatch(rustnative_core::Event::TextChanged {
+            target: rustnative_core::NodeId::from_key("query"),
             value: typed.clone(),
         });
         keystrokes.push(started.elapsed());
     }
     filter.settle();
-    let keystroke = framework_core::perf::percentile(&keystrokes, 50).unwrap_or_default();
+    let keystroke = rustnative_core::perf::percentile(&keystrokes, 50).unwrap_or_default();
     json!({
         "launch_ms": millis(launch),
         "input_latency_ms": millis(latency),
@@ -305,9 +305,9 @@ fn headless() -> Value {
 mod native {
     use std::time::{Duration, Instant};
 
-    use framework_core::perf::{self, StartupPhase};
-    use framework_core::{Application, Component, Platform, Size, Window, WindowId};
-    use framework_windows::WindowsPlatform;
+    use rustnative_core::perf::{self, StartupPhase};
+    use rustnative_core::{Application, Component, Platform, Size, Window, WindowId};
+    use rustnative_windows::WindowsPlatform;
     use serde_json::{Value, json};
     use windows_sys::Win32::Foundation::{HWND, LPARAM};
     use windows_sys::Win32::System::ProcessStatus::{
@@ -329,7 +329,7 @@ mod native {
     }
 
     fn close() {
-        if let Some(hwnd) = framework_windows::native_window_handle(WindowId::PRIMARY) {
+        if let Some(hwnd) = rustnative_windows::native_window_handle(WindowId::PRIMARY) {
             // SAFETY: posting to a window of this process; a stale handle
             // makes the post fail harmlessly.
             unsafe { PostMessageW(hwnd as HWND, WM_CLOSE, 0, 0) };
@@ -419,7 +419,7 @@ mod native {
         run(super::Screen::new(()), || {
             wait_for(StartupPhase::Interactive);
             let window =
-                framework_windows::native_window_handle(WindowId::PRIMARY).unwrap_or(0) as HWND;
+                rustnative_windows::native_window_handle(WindowId::PRIMARY).unwrap_or(0) as HWND;
             let button = find_button(window, "Increment").expect("the bench screen's button");
             let mut latencies = Vec::new();
             for _ in 0..31 {
@@ -452,7 +452,7 @@ mod native {
         run(filter_demo::App::new(()), || {
             wait_for(StartupPhase::Interactive);
             let window =
-                framework_windows::native_window_handle(WindowId::PRIMARY).unwrap_or(0) as HWND;
+                rustnative_windows::native_window_handle(WindowId::PRIMARY).unwrap_or(0) as HWND;
             let edit = find_child(window, "edit", None).expect("the query field");
             let mut latencies = Vec::new();
             for character in "amber falcon".encode_utf16() {

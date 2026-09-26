@@ -125,7 +125,7 @@ fn component(name: &str, key: &str, markup: bool, route: Option<&str>) -> String
     format!(
         "//! The `{name}` {kind}.
 
-use framework_core::{{Component, Event, Node}};
+use rustnative_core::{{Component, Event, Node}};
 
 {route}/// {name}.
 pub struct {name} {{
@@ -177,8 +177,8 @@ fn the_router_sends_its_route_here() {{
     format!(
         "//! `{name}`: it renders, on the headless backend.
 
-use framework_core::{{Component, Size, Window}};
-use framework_headless::{{HeadlessApp, Query}};
+use rustnative_core::{{Component, Size, Window}};
+use rustnative_headless::{{HeadlessApp, Query}};
 use {crate_name}::{module}::{name};
 
 #[test]
@@ -280,8 +280,8 @@ fn add_route(lib: &str, name: &str, route: &str) -> String {
 /// # Errors
 ///
 /// A route pattern that does not parse.
-pub fn router() -> Result<framework_core::navigation::Router, framework_core::navigation::RouteError> {
-    Ok(framework_core::navigation::Router::new())
+pub fn router() -> Result<rustnative_core::navigation::Router, rustnative_core::navigation::RouteError> {
+    Ok(rustnative_core::navigation::Router::new())
         // rustnative:routes
 }
 ",
@@ -335,7 +335,7 @@ pub fn run(here: &Path, what: &Generate) -> Result<()> {
         }
         (_, true) => (
             root.join("src").join(format!("{module}.rsx")),
-            format!("framework_core::rsx_mod!(pub {module});"),
+            format!("rustnative_core::rsx_mod!(pub {module});"),
         ),
     };
     let test = root.join("tests").join(format!("{module}.rs"));
@@ -362,7 +362,7 @@ pub fn run(here: &Path, what: &Generate) -> Result<()> {
 mod tests {
     use super::*;
 
-    const LIB: &str = "//! App.\n\nuse framework_core::preview::{Preview, PreviewMatrix};\n\npub mod existing;\n\npub fn previews() -> Vec<Preview> {\n    vec![Preview::component::<App>(\"app\", ())]\n}\n";
+    const LIB: &str = "//! App.\n\nuse rustnative_core::preview::{Preview, PreviewMatrix};\n\npub mod existing;\n\npub fn previews() -> Vec<Preview> {\n    vec![Preview::component::<App>(\"app\", ())]\n}\n";
 
     #[test]
     fn names_and_registrations_land_where_the_project_declares_things() {

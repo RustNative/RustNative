@@ -7,7 +7,7 @@
 //! An application installs it without touching the framework:
 //!
 //! ```
-//! use framework_core::Services;
+//! use rustnative_core::Services;
 //! use package_battery::{BatteryPackage, BatteryService};
 //!
 //! let services = Services::default().install(&BatteryPackage, "headless").unwrap();
@@ -15,8 +15,8 @@
 //! assert!(battery.status().percent.is_none_or(|percent| percent <= 100));
 //! ```
 
-use framework_core::grant::ScopedServices;
-use framework_core::package::{CapabilityPackage, PackageManifest};
+use rustnative_core::grant::ScopedServices;
+use rustnative_core::package::{CapabilityPackage, PackageManifest};
 
 /// The machine's power, as a portable answer.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

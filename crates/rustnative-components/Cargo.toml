@@ -1,0 +1,25 @@
+[package]
+name = "rustnative-components"
+version = "0.1.0"
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+description = "The component library for Rust Native: headless behaviours, composite components, and charts, each usable from both syntaxes"
+repository.workspace = true
+homepage.workspace = true
+readme.workspace = true
+keywords = ["gui", "components", "charts", "accessibility", "framework"]
+categories = ["gui"]
+include = ["src/**", "Cargo.toml", "build.rs", "rustnative.toml", "components.css"]
+
+[lints]
+workspace = true
+
+[dependencies]
+rustnative-core.workspace = true
+
+[build-dependencies]
+rustnative-build.workspace = true
+
+[dev-dependencies]
+rustnative-headless.workspace = true

@@ -1,0 +1,5 @@
+error: `shadow-md` sets `box-shadow`, which the Windows backend cannot realize: GDI child windows cannot cast shadows, and drawing one would mean owner-drawing the control (its capability table, `rustnative_style::WINDOWS`)
+ --> tests/style_ui_windows/unrealizable_on_windows.rs:7:45
+  |
+7 |     let _ = rsx! { <Column key="card" class="shadow-md"></Column> };
+  |                                             ^^^^^^^^^^^

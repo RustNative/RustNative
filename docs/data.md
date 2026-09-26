@@ -2,12 +2,12 @@
 
 `PLAN.md` Milestone 47. The worked example is `examples/data-demo`, a task
 board over an in-process server. Its tests run it on the headless backend;
-`framework-windows`'s `native::data_integration` runs the same machinery on
+`rustnative-windows`'s `native::data_integration` runs the same machinery on
 native controls.
 
-The pieces every component can use are in `framework-core`: shared state,
+The pieces every component can use are in `rustnative-core`: shared state,
 error boundaries, supervision, and streams. The data layer is in
-`framework-data`.
+`rustnative-data`.
 
 ## Shared state
 
@@ -32,7 +32,7 @@ let count = context.select(&cart, |cart| cart.items.len());
   only when the input changes by value. Use it inside a selector.
 - `Store::inspectable` stores are listed by `rustnative inspect stores`,
   with their values.
-- `History<T>` (in `framework-data`) gives undo and redo. It can fold a run
+- `History<T>` (in `rustnative-data`) gives undo and redo. It can fold a run
   of changes (typing, say) into one step. Bind it to `CommandId::UNDO` and
   `CommandId::REDO`.
 

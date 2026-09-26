@@ -11,7 +11,7 @@ use std::net::SocketAddr;
 use std::path::{Path, PathBuf};
 
 use clap::{Subcommand, ValueEnum};
-use framework_core::inspect::{
+use rustnative_core::inspect::{
     Endpoint, OverlayMode, PROTOCOL_VERSION, Recording, Reply, Request, endpoint_directory,
     send_request,
 };

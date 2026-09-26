@@ -12,7 +12,7 @@ The framework shows these as capability-guarded nodes.
 ## Using one
 
 ```rust
-use framework_core::{HostContent, LayoutStyle, Node, host_content};
+use rustnative_core::{HostContent, LayoutStyle, Node, host_content};
 
 let capabilities = platform.capabilities();
 let video = HostContent::Media { source: "intro.mp4".into() };
@@ -52,7 +52,7 @@ rsx! { <Foreign key="intro" kind={video.kind()} /> }
 
 ## Adding another kind
 
-1. Add a variant to `framework_core::HostContent`, with its capability and
+1. Add a variant to `rustnative_core::HostContent`, with its capability and
    its kind prefix.
 2. In each backend:
    - realize the kind in its foreign-object path (on Windows,
@@ -63,4 +63,4 @@ rsx! { <Foreign key="intro" kind={video.kind()} /> }
    `native_host_content_is_the_hosts_player_or_the_stated_fallback`.
 
 An application's own content does not need a variant. It registers a
-factory for a kind of its own with `framework_windows::register_foreign`.
+factory for a kind of its own with `rustnative_windows::register_foreign`.

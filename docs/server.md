@@ -1,13 +1,13 @@
 # The server application model
 
-`PLAN.md` Milestone 49. `framework-server` is built on the same contracts
+`PLAN.md` Milestone 49. `rustnative-server` is built on the same contracts
 as the client:
 
-- Routes are `framework_core::Route` patterns.
+- Routes are `rustnative_core::Route` patterns.
 - Work runs in a `RequestScope`, cancelled when the response is sent, just
   as a component's tasks are cancelled when it unmounts.
 - Typed server functions and server-only components are defined in
-  `framework-core`, so the Windows application calls the server with the
+  `rustnative-core`, so the Windows application calls the server with the
   same types it answers with.
 - The application is a `tower::Service` over `http` types (`C37`). It is
   served by `hyper`, or mounted inside an existing service.
@@ -95,12 +95,12 @@ rustnative db squash baseline
 - **Server functions.** A `ServerFn` in a shared crate has a path, an input
   type, and an output type.
   - The server serves it with `server_fn` or `server_fn_with`.
-  - A client calls it with `framework_core::server_fn::call` over any
+  - A client calls it with `rustnative_core::server_fn::call` over any
     `HttpService`: `WinHttp` on Windows, or `InProcess` in tests.
 - **Server-only components** (`C05`). A `ServerComponentDef` has a name
   and its props, which must be serializable.
   - Its rendering exists only in the server (`server_component`).
-  - Its output is a `framework_core::wire::WireNode`. The client turns it
+  - Its output is a `rustnative_core::wire::WireNode`. The client turns it
     back into a `Node` and merges it with the ordinary reconciler.
   - Server-only code is out of the client's reach: the shared crate does
     not depend on the server crate, so reaching for it is a compile error.

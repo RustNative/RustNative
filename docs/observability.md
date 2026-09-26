@@ -9,8 +9,8 @@
 
 ## Traces, logs, and metrics
 
-`framework-observe` follows OpenTelemetry's model (`C70`) and its semantic
-conventions (`framework_observe::conventions`).
+`rustnative-observe` follows OpenTelemetry's model (`C70`) and its semantic
+conventions (`rustnative_observe::conventions`).
 
 ```rust
 let tracer = Tracer::new("notes", vec![Box::new(StdoutExporter)]);
@@ -21,7 +21,7 @@ tracer.log(Level::Info, "loaded", &[("rows", 12.into())], Some(span.context()));
 - **One trace across the boundary.** `TracedHttp` wraps any
   `HttpService`. It traces each request as a client span and sends its
   context as `traceparent`. On the server,
-  `framework_observe::server::middleware(tracer)` makes each request a
+  `rustnative_observe::server::middleware(tracer)` makes each request a
   server span that continues that trace. A handler takes `RequestSpan` to
   start child spans.
 - **Exporters.**
@@ -45,7 +45,7 @@ Nothing leaves the machine unless the person agrees
 
 ## Crash reports
 
-On Windows, `framework_windows::crash::install(app_id, version)` writes a
+On Windows, `rustnative_windows::crash::install(app_id, version)` writes a
 report to `%LOCALAPPDATA%\<id>\crashes\` for a panic or an unhandled
 exception. Each report holds:
 
@@ -72,7 +72,7 @@ third-party package, a plug-in) only what its `GrantSet` covers (`C68`).
 
 ## The isolated worker
 
-`framework_windows::isolated::IsolatedWorker` runs untrusted or fragile
+`rustnative_windows::isolated::IsolatedWorker` runs untrusted or fragile
 work in a sandboxed child process (`C67`).
 
 - **The channel.** Messages are typed, one JSON message per line over
@@ -83,7 +83,7 @@ work in a sandboxed child process (`C67`).
   clipboard, other windows, and system settings. It also ends the worker
   when its owner drops it.
 - **Crashes.** A crash shows as the end of the channel. Restart the
-  worker with `framework_durable::supervise`.
+  worker with `rustnative_durable::supervise`.
 
 ## Power loss
 
@@ -94,7 +94,7 @@ middle of saving, and every value left behind is whole.
 
 ## Industrial services
 
-`framework_core::industrial` defines `PrintService` and `SerialService`.
+`rustnative_core::industrial` defines `PrintService` and `SerialService`.
 Windows implements them with the spooler (`WindowsPrinting`, which can also
 print to a file through a document writer) and COM ports
 (`WindowsSerial`).

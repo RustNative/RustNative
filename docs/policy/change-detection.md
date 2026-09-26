@@ -20,7 +20,7 @@ may have changed, and renders that one.
   - a preference it read;
   - a container size class it read.
 - **The rules in full.** `docs/invalidation.md` has the exact table. It is
-  tested by `crates/framework-core/tests/invalidation.rs` against the
+  tested by `crates/rustnative-core/tests/invalidation.rs` against the
   render log, so a render nobody asked for fails a test.
 - **What this adds up to.** It is setter-triggered invalidation where the
   setter is the message. Ownership adds something that JavaScript

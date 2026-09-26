@@ -48,10 +48,10 @@ fn the_translator_workflow_reads_both_syntaxes() {
     // A literal in a builder call and one in markup.
     let lib = root.join("src/lib.rs");
     let mut text = std::fs::read_to_string(&lib).unwrap();
-    text.push_str("\npub fn stray() -> framework_core::Node {\n    framework_core::Node::label(\"k\", \"Forgotten text\")\n}\n");
-    text.push_str("\npub fn marked() -> framework_core::Node {\n    framework_core::rsx! { <Label key=\"m\" text=\"Also forgotten\" /> }\n}\n");
+    text.push_str("\npub fn stray() -> rustnative_core::Node {\n    rustnative_core::Node::label(\"k\", \"Forgotten text\")\n}\n");
+    text.push_str("\npub fn marked() -> rustnative_core::Node {\n    rustnative_core::rsx! { <Label key=\"m\" text=\"Also forgotten\" /> }\n}\n");
     text.push_str(
-        "\npub fn fresh() -> framework_core::i18n::Message {\n    messages::brand_new()\n}\n",
+        "\npub fn fresh() -> rustnative_core::i18n::Message {\n    messages::brand_new()\n}\n",
     );
     std::fs::write(&lib, text).unwrap();
     let lint = rustnative(&root, &["i18n", "lint"]);

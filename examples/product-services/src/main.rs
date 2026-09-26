@@ -3,10 +3,10 @@
 #[cfg(windows)]
 use std::sync::Arc;
 
-use framework_core::product::Flags;
-use framework_core::{Application, Component, Platform, Services, Size, Window};
-use framework_windows::WindowsPlatform;
 use product_services::Product;
+use rustnative_core::product::Flags;
+use rustnative_core::{Application, Component, Platform, Services, Size, Window};
+use rustnative_windows::WindowsPlatform;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Remote configuration would be fetched with `Flags::refresh`; locally,
@@ -14,11 +14,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let services = Services::default().with_flags(Flags::new());
     #[cfg(windows)]
     let services = services
-        .with_secure_storage(Arc::new(framework_windows::WindowsSecureStorage::new(
+        .with_secure_storage(Arc::new(rustnative_windows::WindowsSecureStorage::new(
             "dev.rustnative.product-services",
         )))
-        .with_push(Arc::new(framework_windows::WindowsPush))
-        .with_commerce(Arc::new(framework_windows::WindowsStore));
+        .with_push(Arc::new(rustnative_windows::WindowsPush))
+        .with_commerce(Arc::new(rustnative_windows::WindowsStore));
     let mut application = Application::with_services(
         Product::new(()),
         Window::new("Product services", Size::new(480, 320)),

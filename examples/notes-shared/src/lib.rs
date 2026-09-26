@@ -11,12 +11,12 @@
 //! a compile error, not a runtime one:
 //!
 //! ```compile_fail
-//! use framework_server::db::Db;
+//! use rustnative_server::db::Db;
 //! ```
 
-use framework_core::api_schema::{ApiSchema, object};
-use framework_core::server_fn::{ServerComponentDef, ServerFn};
-use framework_core::{AccessibilityInfo, AccessibilityRole, Node};
+use rustnative_core::api_schema::{ApiSchema, object};
+use rustnative_core::server_fn::{ServerComponentDef, ServerFn};
+use rustnative_core::{AccessibilityInfo, AccessibilityRole, Node};
 use serde::{Deserialize, Serialize};
 
 /// A note.

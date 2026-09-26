@@ -10,7 +10,7 @@
 //!   signed if a certificate is given.
 //!
 //! What goes *into* the executable — its icon, version, and manifest — is
-//! not here: that is `framework-build`, which the application's own
+//! not here: that is `rustnative-build`, which the application's own
 //! `build.rs` runs, so an executable carries its resources however it was
 //! built, not only when it was packaged.
 

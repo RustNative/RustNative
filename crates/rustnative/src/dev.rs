@@ -39,7 +39,7 @@ use std::path::{Path, PathBuf};
 use std::process::{Child, Command};
 use std::time::{Duration, Instant, SystemTime};
 
-use framework_core::inspect::{Endpoint, Reply, Request, endpoint_directory, send_request};
+use rustnative_core::inspect::{Endpoint, Reply, Request, endpoint_directory, send_request};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
@@ -77,13 +77,13 @@ pub enum Change {
 /// Token values are left out of it, unless the theme is `inline`, whose
 /// values are folded in at build time.
 fn shape(css: &str) -> Option<Vec<String>> {
-    let sheet = framework_style::sheet::parse(css).ok()?;
+    let sheet = rustnative_style::sheet::parse(css).ok()?;
     Some(
         sheet
             .items
             .iter()
             .map(|item| match item {
-                framework_style::sheet::Item::Theme { inline: false, tokens } => {
+                rustnative_style::sheet::Item::Theme { inline: false, tokens } => {
                     let names: Vec<&str> = tokens.iter().map(|token| token.name.as_str()).collect();
                     format!("theme {names:?}")
                 }
@@ -324,8 +324,8 @@ impl Host {
                         cause,
                     })?;
                 let mut process = Command::new(&running)
-                    .env(framework_core::inspect::INSPECT_VARIABLE, "1")
-                    .env(framework_core::dev::DEV_VARIABLE, "1")
+                    .env(rustnative_core::inspect::INSPECT_VARIABLE, "1")
+                    .env(rustnative_core::dev::DEV_VARIABLE, "1")
                     .envs(resources.iter().map(|(key, value)| (key.as_str(), value.as_str())))
                     .spawn()
                     .map_err(|cause| Error::Io {
@@ -639,7 +639,7 @@ pub fn agent(listen: SocketAddr, max_deployments: Option<usize>) -> Result<()> {
     let addr = listener
         .local_addr()
         .map_err(|cause| Error::Io { what: "read the agent's address".into(), cause })?;
-    let token = framework_core::inspect::new_token()
+    let token = rustnative_core::inspect::new_token()
         .map_err(|cause| Error::Io { what: "generate the agent's token".into(), cause })?;
     println!("rustnative dev-agent listening on {addr} token {token}");
     let _ = std::io::stdout().flush();
@@ -711,8 +711,8 @@ fn serve_deployment(
     let bind = SocketAddr::new(listen.ip(), 0);
     let child = Command::new(&path)
         .args(&header.args)
-        .env(framework_core::inspect::INSPECT_VARIABLE, bind.to_string())
-        .env(framework_core::dev::DEV_VARIABLE, "1")
+        .env(rustnative_core::inspect::INSPECT_VARIABLE, bind.to_string())
+        .env(rustnative_core::dev::DEV_VARIABLE, "1")
         .spawn();
     let mut child = match child {
         Ok(child) => child,

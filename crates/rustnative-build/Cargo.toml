@@ -1,0 +1,27 @@
+[package]
+name = "rustnative-build"
+version = "0.1.0"
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+description = "Build-script support for Rust Native applications: icons, manifests, and version resources"
+repository.workspace = true
+homepage.workspace = true
+readme.workspace = true
+keywords = ["gui", "windows", "build-dependencies", "resources", "manifest"]
+categories = ["development-tools::build-utils", "gui"]
+
+[lints]
+workspace = true
+
+[dependencies]
+rustnative-markup.workspace = true
+# The message catalogues `compile_messages` checks and types (Milestone 46).
+rustnative-i18n.workspace = true
+rustnative-style = { workspace = true, features = ["tokens"] }
+quote = "1"
+# Content hashes and subresource-integrity digests for embedded assets
+# (Milestone 50).
+sha2 = "0.10"
+serde = { version = "1", features = ["derive"] }
+toml = "1"

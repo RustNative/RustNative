@@ -1,0 +1,29 @@
+[package]
+name = "rustnative-style"
+version = "0.1.0"
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+description = "The style spellings of Rust Native: the declaration vocabulary, the utility classes above it, the app.css theme file, and each backend's capability table"
+repository.workspace = true
+homepage.workspace = true
+readme.workspace = true
+keywords = ["gui", "style", "css", "tailwind", "framework"]
+categories = ["gui"]
+include = ["src/**", "vendor/**", "Cargo.toml", "VENDORED.md"]
+
+[lints]
+workspace = true
+
+[dependencies]
+rustnative-types.workspace = true
+# The W3C Design Tokens files `design_tokens` imports (Milestone 48).
+serde_json = "1"
+proc-macro2 = { version = "1", optional = true }
+quote = { version = "1", optional = true }
+
+[features]
+default = []
+# Emits a model value as the Rust expression that constructs it — what the
+# `classes!`/`styles!` macros and `rustnative_build::compile_styles` write.
+tokens = ["dep:proc-macro2", "dep:quote"]

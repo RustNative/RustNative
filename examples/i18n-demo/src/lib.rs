@@ -1,13 +1,15 @@
 //! Milestone 46's example: one screen in English, Arabic, and Polish,
 //! switched at runtime. The messages are typed functions generated from
-//! `locales/*.ftl` (`framework_build::compile_messages`), so a missing
+//! `locales/*.ftl` (`rustnative_build::compile_messages`), so a missing
 //! argument is a compile error. The Arabic screen is laid out right to
 //! left, and the total is formatted by the host for each locale.
 
-use framework_core::i18n::Message;
-use framework_core::{Component, ComponentContext, Event, LayoutStyle, Locale, Node, NodeId, keys};
+use rustnative_core::i18n::Message;
+use rustnative_core::{
+    Component, ComponentContext, Event, LayoutStyle, Locale, Node, NodeId, keys,
+};
 
-framework_core::messages_mod!();
+rustnative_core::messages_mod!();
 
 /// The locales the example ships, with the name each is shown by.
 pub const LOCALES: [(&str, &str); 4] =
@@ -104,7 +106,7 @@ impl Component for Inbox {
                 ),
             ],
             LayoutStyle::new().direction(locale.direction()),
-            framework_core::ColumnStyle::new(),
+            rustnative_core::ColumnStyle::new(),
         )
     }
 }

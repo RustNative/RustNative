@@ -15,9 +15,9 @@ categories.workspace = true
 workspace = true
 
 [dependencies]
-framework-core.workspace = true
-framework-windows.workspace = true
+rustnative-core.workspace = true
+rustnative-windows.workspace = true
 serde_json = "1"
 
 [build-dependencies]
-framework-build.workspace = true
+rustnative-build.workspace = true

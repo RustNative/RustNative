@@ -2,11 +2,11 @@ name: CI
 
 # This workflow closes the standards audit's P1.17 finding: before it
 # existed, nothing in this repository's history had ever actually compiled
-# `framework-windows`'s `native` module — it is `#[cfg(windows)]`-gated, and
+# `rustnative-windows`'s `native` module — it is `#[cfg(windows)]`-gated, and
 # every prior development/review pass ran on Linux, where that module is
 # simply excluded from the build. `cargo check`/`cargo test` on Linux only
-# ever validated `framework-core` and the small `#[cfg(windows)]`-free
-# surface of `framework-windows` (errors, the `Platform` trait impl
+# ever validated `rustnative-core` and the small `#[cfg(windows)]`-free
+# surface of `rustnative-windows` (errors, the `Platform` trait impl
 # signature, service traits). `test-windows` (a real Windows runner) and
 # `windows-cross-wine` (a fast, Linux-hosted signal using this repository's
 # own `tools/windows-cross-test.sh`) are what actually build and test the
@@ -68,7 +68,7 @@ jobs:
         run: cargo check --workspace --all-targets
 
   no-std:
-    # The roadmap's no_std-capable core subset: `framework-types` must build
+    # The roadmap's no_std-capable core subset: `rustnative-types` must build
     # for a bare-metal target with neither `std` nor `alloc`.
     name: no_std value types (thumbv7em-none-eabihf)
     runs-on: ubuntu-latest
@@ -77,8 +77,8 @@ jobs:
       - uses: dtolnay/rust-toolchain@stable
         with:
           targets: thumbv7em-none-eabihf
-      - name: cargo build framework-types (bare metal)
-        run: cargo build -p framework-types --target thumbv7em-none-eabihf
+      - name: cargo build rustnative-types (bare metal)
+        run: cargo build -p rustnative-types --target thumbv7em-none-eabihf
 
   headless:
     # Milestone 45: the application layer's component, interaction, golden,
@@ -91,10 +91,10 @@ jobs:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
-      - name: cargo test -p framework-headless
-        run: cargo test -p framework-headless
-      - name: cargo test -p framework-headless (one core)
-        run: taskset -c 0 cargo test -p framework-headless -- --test-threads=1
+      - name: cargo test -p rustnative-headless
+        run: cargo test -p rustnative-headless
+      - name: cargo test -p rustnative-headless (one core)
+        run: taskset -c 0 cargo test -p rustnative-headless -- --test-threads=1
 
   budgets:
     # Milestone 42: each shipped target's budget file, enforced. A
@@ -139,7 +139,7 @@ jobs:
   #   name: Windows cross-compile + Wine (ubuntu, fast signal)
   #   runs-on: ubuntu-latest
   #   # Complements `test-windows` below rather than replacing it: this job
-  #   # proves `framework-windows`'s native module compiles, links, and
+  #   # proves `rustnative-windows`'s native module compiles, links, and
   #   # behaves plausibly under Wine on every push/PR, using only Ubuntu
   #   # runner minutes and without waiting on the (often busier)
   #   # `windows-latest` runner queue — see `tools/windows-cross-test.sh` for

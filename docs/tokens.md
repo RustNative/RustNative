@@ -89,7 +89,7 @@ reference palette, which makes goldens identical on every machine.
 
 ## The component library's roles
 
-`framework-components` writes every style against roles, never against
+`rustnative-components` writes every style against roles, never against
 brand values:
 
 - `accent` and `on-accent`
@@ -97,11 +97,11 @@ brand values:
 - `surface` and `on-surface`
 - `muted`, `border`, and `subtle`
 
-Its defaults are in `crates/framework-components/components.css`. The
+Its defaults are in `crates/rustnative-components/components.css`. The
 accent, surface, text, border, and muted roles follow the host. Danger is a
 brand value.
 
-An application's theme passes through `framework_components::with_roles`.
+An application's theme passes through `rustnative_components::with_roles`.
 Where the application defines a role, its own value is kept. Where it does
 not, the library's default is used. An imported token set therefore
 restyles the whole library.

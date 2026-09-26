@@ -40,7 +40,7 @@ the headless ones under `taskset -c 0`).
 
 ### Startup (Windows)
 
-The startup phases come from the `framework_core::perf` phase model
+The startup phases come from the `rustnative_core::perf` phase model
 (`C62`). Each is measured from the process's creation time
 (`GetProcessTimes`). The screen is a form: a heading, a counter, and forty
 labelled text fields, 125 native controls in all.
@@ -77,7 +77,7 @@ labelled text fields, 125 native controls in all.
 | `tree_diff_us_1k_nodes` | diffing two thousand-label trees that differ in ten |
 | `layout_us_1k_nodes` | laying out a thousand labels |
 | `render_us_1k_nodes` | an event re-rendering a component of a thousand rows |
-| `rsx_compile_ms_per_kloc` | lowering about a thousand lines of `.rsx` with `framework_markup::compile`: the markup's build-time cost |
+| `rsx_compile_ms_per_kloc` | lowering about a thousand lines of `.rsx` with `rustnative_markup::compile`: the markup's build-time cost |
 | `class_resolve_us` | resolving a nine-class string against the default vocabulary: the style spelling's build-time cost |
 
 ### Build time (`--build-times`)

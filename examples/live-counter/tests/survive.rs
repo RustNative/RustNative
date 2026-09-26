@@ -11,10 +11,10 @@
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 
-use framework_core::{Component, Services, Size, Theme, Window};
-use framework_headless::{HeadlessApp, Query};
-use framework_sync::live::{LiveClient, LiveServer, RemoteView};
 use live_counter::CounterApp;
+use rustnative_core::{Component, Services, Size, Theme, Window};
+use rustnative_headless::{HeadlessApp, Query};
+use rustnative_sync::live::{LiveClient, LiveServer, RemoteView};
 
 fn text(app: &HeadlessApp, key: &str) -> String {
     app.find(&Query::key(key)).map(|node| node.text.clone().unwrap_or_default()).unwrap_or_default()

@@ -19,7 +19,7 @@ numbers differ enormously and averaging them would hide the real position.
 
 | Capability | Score | Evidence | Gap |
 | --- | --- | --- | --- |
-| Compiled, no runtime floor, deterministic destruction | **Met** | Rust throughout; `framework-core` has no platform dependency (2.4) | — |
+| Compiled, no runtime floor, deterministic destruction | **Met** | Rust throughout; `rustnative-core` has no platform dependency (2.4) | — |
 | Declared startup / memory / size budgets | **Absent** | Performance listed as "measure and eventually optimize" (section 9) | `X-L0-1`, `X-L0-3` |
 | `no_std`-capable core profile | **Planned** | Named in Milestone 37 and the long-range roadmap | `E-K-1` |
 | Foreign-boundary ownership rules documented per backend | **Partial** | Windows confines raw handles; rule stated but not generalized | `X-L0-5` |
@@ -66,7 +66,7 @@ numbers differ enormously and averaging them would hide the real position.
 | Design-token pipeline | **Absent** | — | `X-L3-7` / `X-UI-2` |
 | Typed style spelling (properties, overrides, state variants) | **Met** (Windows) | Milestone 21; `VisualStyle`, `ComponentStyle`, resolved before realization (2.14) | — |
 | Utility-class style spelling at equal vocabulary | **Planned** | 2.14; Milestone 58 | `X-L3-12` |
-| Declaration vocabulary without a cascade | **Planned** | 2.14; Milestone 58 `framework-style` | `X-L3-13` |
+| Declaration vocabulary without a cascade | **Planned** | 2.14; Milestone 58 `rustnative-style` | `X-L3-13` |
 | Tokens resolved at resolution time (runtime theme switch, no rebuild) | **Partial** | Theme resolution exists; declarations and token references do not | `X-L3-14` |
 | Per-backend style capability table | **Planned** | Milestone 58; Windows silently ignores border colour and radius today (`BUILD_STATUS.md`) | `X-L3-15` |
 | Documented unit mapping per host, with rounding | **Partial** | 2.11 states the conversion boundary; no table, no conformance case | `X-L3-16` |

@@ -48,9 +48,9 @@ fn io(what: String) -> impl FnOnce(std::io::Error) -> Error {
 pub fn generate(root: &Path, kit: Kit) -> Result<()> {
     let cargo =
         std::fs::read_to_string(root.join("Cargo.toml")).map_err(io("read Cargo.toml".into()))?;
-    if !cargo.contains("framework-server") {
+    if !cargo.contains("rustnative-server") {
         return Err(Error::Usage(
-            "the kits are written on the server application model: add `framework-server` to the project's \
+            "the kits are written on the server application model: add `rustnative-server` to the project's \
              dependencies first (`PLAN.md` Milestone 49)"
                 .into(),
         ));

@@ -7,7 +7,7 @@
 #
 # # Why this exists
 #
-# `framework-windows`'s `native` module is `#[cfg(windows)]`-gated, so a
+# `rustnative-windows`'s `native` module is `#[cfg(windows)]`-gated, so a
 # plain `cargo check --workspace` on Linux excludes it entirely — it has
 # never, in this project's history, been compiled by anything running on a
 # non-Windows host. `cargo check --target x86_64-pc-windows-gnu` doesn't
@@ -149,8 +149,8 @@ RUSTC_BOOTSTRAP=1 cargo build \
     -Z build-std=core,alloc,std,panic_abort,test \
     --target "$TARGET" --workspace --all-targets
 
-echo "== Running framework-core and framework-windows test binaries under Wine =="
-for crate in framework_core framework_windows; do
+echo "== Running rustnative-core and rustnative-windows test binaries under Wine =="
+for crate in rustnative_core rustnative_windows; do
     exe="$(find "target/$TARGET/debug/deps" -maxdepth 1 -name "${crate}-*.exe" \
         ! -name "*.d" | sort | tail -1)"
     if [[ -z "$exe" ]]; then

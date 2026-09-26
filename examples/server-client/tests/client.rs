@@ -12,17 +12,17 @@
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 
-use framework_core::server_fn::call;
-use framework_core::{Component, Services, Size, Theme, Window};
-use framework_headless::{HeadlessApp, Query};
-use framework_server::db::Db;
-use framework_server::jobs::Jobs;
-use framework_server::local::InProcess;
 use notes_shared::{CreateNote, Credentials, ListNotes, NewNote, SignIn};
+use rustnative_core::server_fn::call;
+use rustnative_core::{Component, Services, Size, Theme, Window};
+use rustnative_headless::{HeadlessApp, Query};
+use rustnative_server::db::Db;
+use rustnative_server::jobs::Jobs;
+use rustnative_server::local::InProcess;
 use server_client::{Connection, NotesClient};
 use server_demo::{IndexNote, app, database};
 
-fn server(name: &str) -> (framework_server::AppService, Jobs) {
+fn server(name: &str) -> (rustnative_server::AppService, Jobs) {
     let db = Db::memory(name, 2).unwrap();
     database(&db).unwrap();
     let jobs = Jobs::new(db.clone()).unwrap().register::<IndexNote>();
@@ -81,7 +81,7 @@ fn the_client_signs_in_writes_and_shows_the_servers_answer() {
 #[cfg(windows)]
 #[test]
 fn windows_http_calls_the_server_over_a_socket() {
-    use framework_windows::WinHttp;
+    use rustnative_windows::WinHttp;
 
     let runtime = tokio::runtime::Builder::new_multi_thread().enable_all().build().unwrap();
     let (service, _) = {

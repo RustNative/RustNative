@@ -2,6 +2,6 @@
 //! resources (`rustnative.toml`).
 
 fn main() {
-    framework_build::compile_messages();
-    framework_build::embed_resources();
+    rustnative_build::compile_messages();
+    rustnative_build::embed_resources();
 }

@@ -10,7 +10,7 @@ After it is deployed, it updates.
 
 ## The adapter contract
 
-`framework_server::deploy::DeploymentAdapter` covers:
+`rustnative_server::deploy::DeploymentAdapter` covers:
 
 - `deploy` of an immutable `Revision`, which starts as a preview with no
   traffic;
@@ -36,7 +36,7 @@ rustnative deploy local status
 ```
 
 - **The proxy.** The `TrafficSplitter` is a reverse proxy built on
-  `framework-server`. It sends each client to a revision by a stable hash
+  `rustnative-server`. It sends each client to a revision by a stable hash
   of the client's address, so a client stays on its revision. It marks
   each response with `x-served-by`.
 - **Moving traffic.** Promotions and rollbacks move traffic without
@@ -69,7 +69,7 @@ rustnative deploy export systemd
 
 ## Single artifact
 
-A build script calls `framework_build::embed_assets("assets")`, and the
+A build script calls `rustnative_build::embed_assets("assets")`, and the
 server serves the result with `ServerApp::assets(ASSETS)`.
 
 - **Names.** Each file is named by its content hash and served with

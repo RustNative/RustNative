@@ -63,13 +63,13 @@ impl FrameworkSource {
     fn dependencies(&self) -> String {
         match self {
             Self::Published(version) => {
-                format!("framework-core = \"{version}\"\nframework-windows = \"{version}\"\n")
+                format!("rustnative-core = \"{version}\"\nrustnative-windows = \"{version}\"\n")
             }
             Self::Path(path) => {
                 let path = normalized(path);
                 format!(
-                    "framework-core = {{ path = \"{path}/crates/framework-core\" }}\n\
-                     framework-windows = {{ path = \"{path}/crates/framework-windows\" }}\n"
+                    "rustnative-core = {{ path = \"{path}/crates/rustnative-core\" }}\n\
+                     rustnative-windows = {{ path = \"{path}/crates/rustnative-windows\" }}\n"
                 )
             }
         }
@@ -79,10 +79,12 @@ impl FrameworkSource {
     /// golden tests.
     fn dev_dependencies(&self) -> String {
         match self {
-            Self::Published(version) => format!("framework-headless = \"{version}\"\n"),
+            Self::Published(version) => format!("rustnative-headless = \"{version}\"\n"),
             Self::Path(path) => {
                 let path = normalized(path);
-                format!("framework-headless = {{ path = \"{path}/crates/framework-headless\" }}\n")
+                format!(
+                    "rustnative-headless = {{ path = \"{path}/crates/rustnative-headless\" }}\n"
+                )
             }
         }
     }
@@ -91,10 +93,10 @@ impl FrameworkSource {
     /// information, and application manifest into the executable.
     fn build_dependencies(&self) -> String {
         match self {
-            Self::Published(version) => format!("framework-build = \"{version}\"\n"),
+            Self::Published(version) => format!("rustnative-build = \"{version}\"\n"),
             Self::Path(path) => {
                 let path = normalized(path);
-                format!("framework-build = {{ path = \"{path}/crates/framework-build\" }}\n")
+                format!("rustnative-build = {{ path = \"{path}/crates/rustnative-build\" }}\n")
             }
         }
     }
@@ -219,8 +221,11 @@ mod tests {
         }
         let manifest = std::fs::read_to_string(root.join("Cargo.toml")).unwrap();
         assert!(manifest.contains("name = \"demo-app\""));
-        assert!(manifest.contains("framework-windows = \"0.1\""));
-        assert!(manifest.contains("[build-dependencies]\nframework-build = \"0.1\""), "{manifest}");
+        assert!(manifest.contains("rustnative-windows = \"0.1\""));
+        assert!(
+            manifest.contains("[build-dependencies]\nrustnative-build = \"0.1\""),
+            "{manifest}"
+        );
         let lib = std::fs::read_to_string(root.join("src/lib.rs")).unwrap();
         assert!(lib.contains("com.example.demoapp"), "the app id reaches the source");
         let main = std::fs::read_to_string(root.join("src/main.rs")).unwrap();
@@ -246,7 +251,7 @@ mod tests {
         .expect("created");
         let manifest = std::fs::read_to_string(root.join("Cargo.toml")).unwrap();
         assert!(
-            manifest.contains("path = \"C:/work/RustNative/crates/framework-core\""),
+            manifest.contains("path = \"C:/work/RustNative/crates/rustnative-core\""),
             "{manifest}"
         );
     }

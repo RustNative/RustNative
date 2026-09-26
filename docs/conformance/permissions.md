@@ -1,9 +1,9 @@
 # Permission mapping per host (Milestone 39)
 
 The portable states are `NotAsked`, `Granted`, `Limited`, `Denied`, and
-`PermanentlyDenied` (`framework_core::permission`).
+`PermanentlyDenied` (`rustnative_core::permission`).
 
-## Windows (`framework_windows::WindowsPermissions`)
+## Windows (`rustnative_windows::WindowsPermissions`)
 
 Windows gates camera, microphone, and location for desktop applications
 through the privacy consent store, and never prompts an unpackaged

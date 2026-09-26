@@ -18,8 +18,8 @@ workspace = true
 # Milestone 52: the one-stack span, one application for a desktop and a
 # device.
 [dependencies]
-framework-core.workspace = true
-framework-windows.workspace = true
+rustnative-core.workspace = true
+rustnative-windows.workspace = true
 
 [dev-dependencies]
-framework-headless.workspace = true
+rustnative-headless.workspace = true

@@ -10,9 +10,9 @@
 use std::time::Duration;
 
 use device_desired::{Cloud, Config, Hardware, device_session};
-use framework_sync::Clock;
-use framework_sync::bus::Broker;
-use framework_sync::device::DeviceAgent;
+use rustnative_sync::Clock;
+use rustnative_sync::bus::Broker;
+use rustnative_sync::device::DeviceAgent;
 
 fn config(interval: u32, channel: &str) -> Config {
     Config { interval, channel: channel.into() }
@@ -22,7 +22,7 @@ fn config(interval: u32, channel: &str) -> Config {
 async fn the_device_converges_after_being_offline() {
     let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
     let address = listener.local_addr().unwrap().to_string();
-    tokio::spawn(framework_sync::mqtt::serve(Broker::new(), listener));
+    tokio::spawn(rustnative_sync::mqtt::serve(Broker::new(), listener));
 
     let clock = Clock::new(1);
     let mut agent = DeviceAgent::new(config(60, "stable"), clock.now());

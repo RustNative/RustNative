@@ -20,7 +20,7 @@ use serde_json::{Value, json};
 /// The description.
 #[must_use]
 pub fn description() -> Value {
-    let elements: Vec<Value> = framework_markup::table::element_table()
+    let elements: Vec<Value> = rustnative_markup::table::element_table()
         .into_iter()
         .map(|element| {
             json!({
@@ -38,7 +38,7 @@ pub fn description() -> Value {
         })
         .collect();
 
-    let vocabulary = framework_style::vocabulary::Vocabulary::defaults();
+    let vocabulary = rustnative_style::vocabulary::Vocabulary::defaults();
     let mut utilities: Vec<Value> = vocabulary
         .class_names()
         .into_iter()
@@ -55,7 +55,7 @@ pub fn description() -> Value {
     utilities.sort_by(|a, b| a["class"].as_str().cmp(&b["class"].as_str()));
 
     json!({
-        "framework": framework_core::package::FRAMEWORK_VERSION,
+        "framework": rustnative_core::package::FRAMEWORK_VERSION,
         "syntaxes": {
             "builder": "Node::<constructor>(key, …) with with_* modifiers",
             "markup": "rsx! bodies and .rsx files; each element lowers to the constructor named here",
@@ -63,11 +63,11 @@ pub fn description() -> Value {
         "elements": elements,
         "utilities": utilities,
         "variants": vocabulary.variant_names(),
-        "capabilities": framework_core::capability::Capability::ALL.iter().map(|capability| format!("{capability:?}")).collect::<Vec<_>>(),
-        "events": framework_core::event::EVENT_NAMES,
+        "capabilities": rustnative_core::capability::Capability::ALL.iter().map(|capability| format!("{capability:?}")).collect::<Vec<_>>(),
+        "events": rustnative_core::event::EVENT_NAMES,
         "services": SERVICES,
         "component": {
-            "trait": "framework_core::Component",
+            "trait": "rustnative_core::Component",
             "types": ["Props: PartialEq + Clone", "Message"],
             "methods": [
                 "fn new(props: Self::Props) -> Self",

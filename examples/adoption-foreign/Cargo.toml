@@ -16,6 +16,6 @@ publish = false
 workspace = true
 
 [dependencies]
-framework-core.workspace = true
-framework-windows.workspace = true
+rustnative-core.workspace = true
+rustnative-windows.workspace = true
 windows-sys.workspace = true

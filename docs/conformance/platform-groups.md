@@ -14,7 +14,7 @@ second member is written; the crate is created when that member is.
 Rules:
 
 - a group is defined by what its hosts *agree on*, not by market;
-- the group crate depends on `framework-core` only; members depend on it;
+- the group crate depends on `rustnative-core` only; members depend on it;
 - a backend never depends on another backend.
 
 No group crate exists yet: Windows is the only native backend, and a

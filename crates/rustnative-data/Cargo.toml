@@ -1,0 +1,25 @@
+[package]
+name = "rustnative-data"
+version = "0.1.0"
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+description = "The application data layer for Rust Native: queries with caching and revalidation, mutations with offline queueing, forms, migrations, state machines, and HTTP interceptors"
+repository.workspace = true
+homepage.workspace = true
+readme.workspace = true
+keywords = ["gui", "data", "cache", "forms", "framework"]
+categories = ["gui", "caching"]
+
+[lints]
+workspace = true
+
+[dependencies]
+rustnative-core.workspace = true
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+async-trait.workspace = true
+parking_lot.workspace = true
+
+[dev-dependencies]
+tokio = { workspace = true, features = ["macros"] }

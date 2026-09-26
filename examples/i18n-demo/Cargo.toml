@@ -18,11 +18,11 @@ workspace = true
 # Milestone 46's example: English, Arabic (right to left), and Polish
 # (plural-rich), switched at runtime.
 [dependencies]
-framework-core.workspace = true
-framework-windows.workspace = true
+rustnative-core.workspace = true
+rustnative-windows.workspace = true
 
 [dev-dependencies]
-framework-headless.workspace = true
+rustnative-headless.workspace = true
 
 [build-dependencies]
-framework-build.workspace = true
+rustnative-build.workspace = true

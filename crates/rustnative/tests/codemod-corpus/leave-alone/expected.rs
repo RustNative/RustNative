@@ -1,4 +1,4 @@
-use framework_core::EdgeInsets;
+use rustnative_core::EdgeInsets;
 
 struct Margins {
     left: i32,

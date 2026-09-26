@@ -6,7 +6,7 @@ Tooling keeps these promises.
 
 ## What is covered
 
-The public API of every published `framework-*` crate:
+The public API of every published `rustnative-*` crate:
 
 - types, functions, and traits;
 - the markup syntax (`rsx!` and `.rsx`);

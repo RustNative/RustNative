@@ -1,4 +1,4 @@
-# Native Rust Framework — Master Development Plan
+# RustNative — Master Development Plan
 
 ## 1. Vision
 
@@ -114,9 +114,9 @@ Every adapter therefore follows the same shape:
 ```text
 Rust application
     ↓
-framework-core
+rustnative-core
     ↓
-framework-<platform>        framework-web        framework-tui
+rustnative-<platform>        rustnative-web        rustnative-tui
     ↓                           ↓                     ↓
 native OS APIs             HTML + generated JS    terminal I/O
                            (+ opt-in WASM)
@@ -134,7 +134,7 @@ The framework must also explicitly account for each host's constraints, and desi
 
 ### 2.4 Platform-independent core, platform-specific adapters
 
-`framework-core` must never depend on Windows, macOS, Android, iOS, GTK, AppKit, UIKit, WinUI, JNI, Objective-C, browser/DOM bindings, terminal or terminfo libraries, or other platform APIs.
+`rustnative-core` must never depend on Windows, macOS, Android, iOS, GTK, AppKit, UIKit, WinUI, JNI, Objective-C, browser/DOM bindings, terminal or terminfo libraries, or other platform APIs.
 
 Platform crates implement the contracts exposed by the core. When a host needs something the contracts cannot express, the contract is widened portably — as `Executor` was, when the scheduler was found hard-wired to one Tokio runtime — rather than an `#[cfg]` for that host being added to the core.
 
@@ -175,7 +175,7 @@ The tree 2.8 describes has two spellings, and both are first-class ways to write
 
 The markup syntax has one grammar and two carriers:
 
-- **`.rsx` files.** A `.rsx` file is Rust with one more kind of expression: an element. Markup is written directly wherever an expression is valid — a `let` initializer, a return value, a closure body, a match arm, an argument — with no wrapper around it. This is the same arrangement as markup-extended source files elsewhere, and it has the same mechanics: the host language's compiler does not accept the extension, so a compile step lowers the file to plain Rust before `rustc` sees it (`framework_build::compile_rsx()`, run from the build script).
+- **`.rsx` files.** A `.rsx` file is Rust with one more kind of expression: an element. Markup is written directly wherever an expression is valid — a `let` initializer, a return value, a closure body, a match arm, an argument — with no wrapper around it. This is the same arrangement as markup-extended source files elsewhere, and it has the same mechanics: the host language's compiler does not accept the extension, so a compile step lowers the file to plain Rust before `rustc` sees it (`rustnative_build::compile_rsx()`, run from the build script).
 - **The `rsx!` macro.** The same markup, delimited, inside any `.rs` file. It needs no build step, so it is how markup appears in a crate that has none, in a `.rs` module that wants one markup-shaped subtree, and in runnable documentation examples, which `rustdoc` compiles as plain Rust.
 
 ```text
@@ -264,8 +264,8 @@ The following milestones are implemented in the current codebase. The current pr
 Implemented:
 
 - Cargo workspace;
-- `framework-core` crate;
-- `framework-windows` crate;
+- `rustnative-core` crate;
+- `rustnative-windows` crate;
 - example application crate;
 - `Platform` abstraction;
 - native Win32 window creation;
@@ -667,7 +667,7 @@ Implemented:
 
 Implemented:
 
-- portable payloads in `framework-core::input`: `PointerEvent` (mouse,
+- portable payloads in `rustnative-core::input`: `PointerEvent` (mouse,
   touch, pen; per-contact ids; buttons; modifiers; pressure; monotonic
   timestamps), `WheelDelta` (1/120-notch lines, or pixels), `Gesture`,
   `Composition`, `ClipboardAction`, `DragData`/`DropEffect`, and gamepad
@@ -705,7 +705,7 @@ with `WM_POINTER`).
 
 Implemented:
 
-- a portable model in `framework-core::accessibility`: 29 roles (including
+- a portable model in `rustnative-core::accessibility`: 29 roles (including
   headings with levels), text and range values, checked/expanded/selected/
   read-only/required/busy states, declared actions (`AccessibleActionKind`)
   and invoked ones (`AccessibleAction`, delivered as
@@ -742,7 +742,7 @@ so rather than advertising a bridge it cannot provide.
 
 Implemented:
 
-- a portable animation model in `framework_core::animation`: animatable
+- a portable animation model in `rustnative_core::animation`: animatable
   properties (position, size, translation, opacity, background, foreground),
   typed animated values, `Transition` (a duration and easing curve, or a real
   mass/stiffness/damping spring, either with a start delay), `Animation`
@@ -830,7 +830,7 @@ controls:
 - **GPU surface access**: `Node::native_surface(key, layout)` is a bare child
   window the framework positions and sizes and never paints.
   `Event::SurfaceResized { surface, size, scale_factor }` reports its size;
-  `framework_windows::native_surface(surface)` returns a `SurfaceHandle`
+  `rustnative_windows::native_surface(surface)` returns a `SurfaceHandle`
   implementing `raw-window-handle` 0.6's `HasWindowHandle`/`HasDisplayHandle`,
   which wgpu, ash, and glutin accept directly;
 - **integration with platform compositors**: both paths are real child
@@ -932,7 +932,7 @@ Implemented for the platform that has a backend; the other formats
 three deployment modes, plain terminal binaries, firmware images) belong to
 their backends' milestones.
 
-- **Resource bundling and manifests**: a new `framework-build` crate, run
+- **Resource bundling and manifests**: a new `rustnative-build` crate, run
   from an application's `build.rs` (the `rustnative new` template wires it, and the
   example uses it). It reads `rustnative.toml` and produces the executable's icon
   (a `.png` wrapped into a PNG-compressed `.ico`, so no image library is
@@ -1009,7 +1009,7 @@ Two of these — macOS and iOS — cannot be verified on the project's current h
 
 ## Milestone 33 — macOS backend
 
-Native AppKit interoperability through Rust Objective-C bindings, with the unsafe surface isolated the way `framework-windows` isolates Win32:
+Native AppKit interoperability through Rust Objective-C bindings, with the unsafe surface isolated the way `rustnative-windows` isolates Win32:
 
 - `NSWindow` per window root, an `NSView` hierarchy for containers, and AppKit controls (`NSButton`, `NSTextField`, `NSScrollView`/`NSClipView` for scrolling) as the realized objects;
 - Core Text measurement behind `IntrinsicMeasurer`, including bounded and wrapped measurement;
@@ -1099,7 +1099,7 @@ Capability-oriented design is critical here because embedded targets will not im
 - realization goes through the draw-list path from Milestone 29 rather than native controls, because these hosts have none: a display driver consumes a `DrawList`, and the same portable model produces it;
 - embedded Linux may instead reuse the Milestone 34 toolkit backend where a full graphical session exists; the profiles differ, and the plan keeps them named separately for that reason;
 - input arrives as buttons, rotary encoders, touch panels, or a serial console, and is mapped onto the portable key and pointer model;
-- a portable-core subset must be defined before the RTOS and bare-metal profiles start: `framework-core` currently requires `std` and an `Executor` whose tasks are `Send`, so the identity, node, reconcile, and layout layers need a `no_std`-capable profile and a single-threaded executor. That split is core work, stated here so it is not discovered during a backend;
+- a portable-core subset must be defined before the RTOS and bare-metal profiles start: `rustnative-core` currently requires `std` and an `Executor` whose tasks are `Send`, so the identity, node, reconcile, and layout layers need a `no_std`-capable profile and a single-threaded executor. That split is core work, stated here so it is not discovered during a backend;
 - resource discipline: bounded allocation, no thread pool, and a frame budget the device can actually meet;
 - packaging: firmware or image output through each target's own toolchain, driven by `rustnative`, including a consumable recipe or package for at least one embedded Linux build system so our application is integrated the way anything else on the device is (Milestone 50);
 - **guest integration rather than ownership**: the runtime must be drivable from an existing vendor project's `main` and initialization, owning neither startup, clocks, interrupts, nor the loop, and the `Executor` contract must be implementable by an existing embedded async executor rather than replacing it (Milestone 40, Milestone 52);
@@ -1114,7 +1114,7 @@ Capability-oriented design is critical here because embedded targets will not im
 
 ## Milestone 38 — Terminal (TUI) backend
 
-A `framework-tui` backend realizing the same application model onto a terminal. In scope: Windows, macOS, and Linux desktop terminals, and embedded Linux consoles — local, over SSH, or on a serial line. Deliberately out of scope: Android, iOS, and the browser. A terminal emulator running inside those is the emulator's application, not a platform target of this framework.
+A `rustnative-tui` backend realizing the same application model onto a terminal. In scope: Windows, macOS, and Linux desktop terminals, and embedded Linux consoles — local, over SSH, or on a serial line. Deliberately out of scope: Android, iOS, and the browser. A terminal emulator running inside those is the emulator's application, not a platform target of this framework.
 
 - **the terminal is the host**: the Windows console API in virtual-terminal mode, and `termios` plus VT sequences on Unix. Alternate screen, cursor control, the terminal's own colour depth (16/256/true colour, detected rather than assumed), text attributes, bracketed paste, focus reporting, and resize notification (`SIGWINCH` or console events);
 - **drawn, not native**: this is the one target where 2.2's native host object is the terminal's own cell grid. Drawing goes through the existing draw-list path quantized to cells, so the framework does not gain a second rendering runtime; a "control" is a drawn widget with the same portable semantics, identity, and events as everywhere else;
@@ -1161,7 +1161,7 @@ An application that renders identically in all three is the test that the modes 
 
 ### Web milestone A — Browser host and client code generation
 
-Build a dedicated `framework-web` adapter that:
+Build a dedicated `rustnative-web` adapter that:
 
 - splits an application's logic into **client logic**, which runs in the browser, and **server logic**, which is Rust on the server;
 - defines client logic as a restricted subset of Rust — plain serializable state (numbers, strings, booleans, lists, plain structs), assignment, arithmetic, `if`/`match`, string formatting, showing and hiding, class toggles, input binding, list insertion and removal, and navigation — which covers toggles, tabs, counters, form validation, filtering, dialogs, and optimistic updates;
@@ -1171,7 +1171,7 @@ Build a dedicated `framework-web` adapter that:
 - declares client state with serializable types and emits a matching JavaScript shape from the same Rust definition, so the browser and the server share one schema;
 - embeds each page's initial client state in the rendered HTML as JSON, together with the element hooks the generated code attaches to;
 - owns browser-side initialization and lifecycle, and integrates with the browser event loop and microtask/task model;
-- creates and tracks DOM handles without exposing browser types to `framework-core`.
+- creates and tracks DOM handles without exposing browser types to `rustnative-core`.
 
 The client and the server exchange serializable data and nothing else, and no JavaScript runs on the server. The subset is kept deliberately small, because every construct in it is a translation the framework maintains for as long as it exists, and because a WebAssembly subtree is always available for what the subset does not express. Within the subset, numeric and string semantics that differ between Rust and JavaScript — 64-bit integers, overflow, UTF-8 versus UTF-16 indexing, float formatting — are restricted or wrapped so both sides agree on the same data. On every other target the same client logic is ordinary Rust and runs natively, so the subset constrains only what the browser receives, and a route with no WebAssembly subtree pays nothing for the option.
 
@@ -1598,7 +1598,7 @@ The final framework should feel like a native application framework first and a 
 
 ## Long-range roadmap
 
-Everything through Milestone 32 is complete (section 3), and so is the core work shared by the remaining targets (the host clock, the single-threaded executor seam, and the `no_std` value types in `framework-types` — 2026-09-23). What remains, in the order the backlog is currently expected to be taken up — subject to 2.13, since the order follows hardware availability and contract readiness rather than importance:
+Everything through Milestone 32 is complete (section 3), and so is the core work shared by the remaining targets (the host clock, the single-threaded executor seam, and the `no_std` value types in `rustnative-types` — 2026-09-23). What remains, in the order the backlog is currently expected to be taken up — subject to 2.13, since the order follows hardware availability and contract readiness rather than importance:
 
 ```text
 core work shared by the remaining targets
@@ -1740,7 +1740,7 @@ wraps and delegates, and does not parse markup a second way.
 
 ### The grammar
 
-One grammar, identical in both carriers, owned by a `framework-markup` library
+One grammar, identical in both carriers, owned by a `rustnative-markup` library
 crate that the proc macro, the build-script compiler, and the CLI all link:
 
 - **elements are node kinds**: `Column`, `Row`, `Label`, `Button`,
@@ -1799,10 +1799,10 @@ crate that the proc macro, the build-script compiler, and the CLI all link:
   parameter; a function with none, or with more than one, is a compile error at
   the component element, and the fix is the macro form with an explicit
   context — which is valid in a `.rsx` file, since a `.rsx` file is Rust;
-- **the lowering is a wrap.** `framework_build::compile_rsx()`, one line in the
+- **the lowering is a wrap.** `rustnative_build::compile_rsx()`, one line in the
   build script beside `embed_resources()`, compiles every `.rsx` file under
   `src/` into `OUT_DIR`, emitting it byte for byte except that each markup
-  expression becomes `::framework_core::rsx!(…)` around the original text, with
+  expression becomes `::rustnative_core::rsx!(…)` around the original text, with
   the inferred context supplied. Lines never move, so the map from the lowered
   file back to the source is a column offset on the lines that contain markup,
   recorded in a source map beside the output;
@@ -1837,8 +1837,8 @@ crate that the proc macro, the build-script compiler, and the CLI all link:
 
 ### Carrier 2 — the `rsx!` macro
 
-- **`rsx!`**, in a `framework-macros` proc-macro crate that is a thin shell
-  over `framework-markup`, re-exported from `framework-core` behind a
+- **`rsx!`**, in a `rustnative-macros` proc-macro crate that is a thin shell
+  over `rustnative-markup`, re-exported from `rustnative-core` behind a
   default-on `markup` feature — default-on so it is not a second-class opt-in,
   and a feature so the constrained profiles of Milestone 37 can drop a
   proc-macro dependency they cannot afford. `.rsx` files lower to `rsx!`, so
@@ -1893,13 +1893,13 @@ source position by `rustnative build` and by the editor, `rustnative fmt` and
 `rustnative expand` work on both carriers, both project templates build and
 run, and no documented example exists in only one syntax.
 
-**Status (2026-09-24): implemented** — `crates/framework-markup` (parser,
+**Status (2026-09-24): implemented** — `crates/rustnative-markup` (parser,
 element table, lowering, formatter, `.rsx` compiler and source map),
-`rsx!` in `crates/framework-macros`, `.rsx` compilation through
-`framework_build::compile_rsx`, diagnostics remapped by the CLI,
+`rsx!` in `crates/rustnative-macros`, `.rsx` compilation through
+`rustnative_build::compile_rsx`, diagnostics remapped by the CLI,
 `rustnative expand`/`fmt`/`lsp`, both project templates, and the
 equivalence, compile-failure, and documentation-parity suites in
-`crates/framework-conformance`. Unverified: the LSP proxy against a live
+`crates/rustnative-conformance`. Unverified: the LSP proxy against a live
 rust-analyzer (tested with a scripted server). See `BUILD_STATUS.md`.
 
 **Depends on** nothing. Like Milestone 39, it is deliberately early.
@@ -1952,7 +1952,7 @@ same trade Web milestone C refuses for layout.
 ### The declaration vocabulary
 
 A small, exactly specified subset of the web's value syntax, owned by a
-`framework-style` library crate and parsed at build time:
+`rustnative-style` library crate and parsed at build time:
 
 - **values and units**: lengths (`px`, `rem`, `em`, `%`, and the viewport and
   container units where a host can answer them), colours, angles, numbers, and
@@ -2011,7 +2011,7 @@ already needs:
 ### The style file
 
 One file per project — `app.css` by default, read by
-`framework_build::compile_styles()` in the build script beside `compile_rsx()` —
+`rustnative_build::compile_styles()` in the build script beside `compile_rsx()` —
 written in the subset of the v4 directives that survive without a cascade:
 
 - **`@theme`** defines the token namespaces (colour, spacing, radius, text,
@@ -2063,11 +2063,11 @@ written in the subset of the v4 directives that survive without a cascade:
 
 ### Shared with Milestone 53
 
-- **one implementation, three callers**: `framework-style` owns the vocabulary,
+- **one implementation, three callers**: `rustnative-style` owns the vocabulary,
   the parse, the lowering, and the diagnostics; the `rsx!` macro,
-  `framework_build::compile_styles()` in the build script beside
+  `rustnative_build::compile_styles()` in the build script beside
   `compile_rsx()`, and the CLI link it, exactly as they link
-  `framework-markup`;
+  `rustnative-markup`;
 - **diagnostics at compiler quality**, spanned to the class or declaration the
   developer wrote — in a `.rsx` file, inside `rsx!`, in a builder call, and in
   `app.css` — held by a compile-failure suite rather than by inspection;
@@ -2088,7 +2088,7 @@ switch on Windows, `rustnative expand` shows the lowering, every backend's
 capability table and unit mapping are recorded, and no documented style example
 exists in only one spelling.
 
-**Status (2026-09-24): implemented** — `crates/framework-style` (declaration
+**Status (2026-09-24): implemented** — `crates/rustnative-style` (declaration
 vocabulary, Tailwind CSS v4.1.13 utilities over the vendored default theme,
 `app.css`, capability tables and unit mappings), `classes!`/`styles!` and
 markup `class=`/`style=`, resolution in the core against theme tokens and the
@@ -2141,7 +2141,7 @@ Satisfies: `D-PT-1`, `D-PT-2`, `D-TW-1`, `X-L3-3`, `M-OB-1`, `M-OB-3`,
 - **thread affinity enforced** by the type system where the substrate allows
   and by a debug assertion everywhere else, never by prose;
 - **one ownership module per backend**, with the host's memory-management
-  convention written down and asserted in tests — the rule `framework-windows`
+  convention written down and asserted in tests — the rule `rustnative-windows`
   already follows, made a precondition for every future backend;
 - **a documented escape-hatch contract**: how application code obtains a host
   object, what it may do with it, what invalidates it, and what the framework
@@ -2259,7 +2259,7 @@ RustNative subtree, a sample RustNative application hosts a foreign control,
 and both are under test.
 
 **Status (2026-09-24): implemented** on Windows — library-only mode
-(`crates/framework-interop`: the `.ril` description, C/C#/Rust generation,
+(`crates/rustnative-interop`: the `.ril` description, C/C#/Rust generation,
 `rustnative bindgen`), embedding inward (`WindowsPlatform::embed`) and
 guest-runtime mode (`start_external`), embedding outward (`Node::foreign`,
 `register_foreign`), the surface hand-off contract with `WM_DPICHANGED`, and
@@ -2609,7 +2609,7 @@ From the concept survey (`docs/ecosystem-analysis/concepts-*.md`):
 **Done when** component, interaction, golden, and lifecycle tests for the full
 application layer run on a machine that has none of the target hardware.
 
-**Status (2026-09-23): implemented** as `crates/framework-headless` — the
+**Status (2026-09-23): implemented** as `crates/rustnative-headless` — the
 headless reference backend, `HeadlessApp`'s synthetic input through
 hit-testing and host focus rules, the accessibility query API, goldens and
 Windows `PrintWindow` visual goldens, exhaustive mode, and the lifecycle
@@ -2853,7 +2853,7 @@ backend.
 Milestone 46 (mirroring and text growth).
 
 **Status (2026-09-25): implemented** on Windows and the headless backend.
-`examples/gallery` is built only from `framework-components` and one token
+`examples/gallery` is built only from `rustnative-components` and one token
 set. It renders on Windows as the host's controls, in the host's accent.
 Web content (WebView2), the system media controls, and picture-in-picture
 are owed, as is rendering on the other backends. See `docs/components.md`

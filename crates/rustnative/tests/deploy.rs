@@ -97,7 +97,7 @@ fn a_manifest_is_signed_only_with_the_trusted_key() {
 
     #[cfg(windows)]
     {
-        use framework_windows::update::{Decision, UpdateError, Updater};
+        use rustnative_windows::update::{Decision, UpdateError, Updater};
         let updater = Updater::new(project.join("install"), &public, "1.0.0").unwrap();
         let Ok(Decision::Update(taken)) = updater.check(signed.as_bytes()) else {
             panic!("the updater accepts what the CLI signed: {signed}")

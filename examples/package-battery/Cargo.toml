@@ -25,7 +25,7 @@ framework = ">=0.1, <0.2"
 grants = []
 
 [dependencies]
-framework-core.workspace = true
+rustnative-core.workspace = true
 
 [target.'cfg(windows)'.dependencies]
 windows-sys.workspace = true

@@ -18,12 +18,12 @@ workspace = true
 # Milestone 48's example: an application built entirely from the component
 # library and a token set (`tokens.json`, imported into `gallery.css`).
 [dependencies]
-framework-core.workspace = true
-framework-components.workspace = true
-framework-windows.workspace = true
+rustnative-core.workspace = true
+rustnative-components.workspace = true
+rustnative-windows.workspace = true
 
 [dev-dependencies]
-framework-headless.workspace = true
+rustnative-headless.workspace = true
 
 [build-dependencies]
-framework-build.workspace = true
+rustnative-build.workspace = true

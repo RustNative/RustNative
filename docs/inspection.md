@@ -7,7 +7,7 @@ inside the application.
 
 ## The protocol
 
-`framework_core::inspect`. A `Request` goes in and a `Reply` (`{"ok": …}` or
+`rustnative_core::inspect`. A `Request` goes in and a `Reply` (`{"ok": …}` or
 `{"error": "…"}`) comes out. `Application::inspect(request, backend)` answers
 it. The core answers everything about the tree. The backend, through
 `InspectBackend`, answers what only it knows: its objects, their rectangles, its
@@ -129,7 +129,7 @@ responses, replayed against the same program, reach the same state.
   reproduces any earlier point exactly.
 - **To a test.** `Recording::to_test` (`inspect to-test`) writes a `#[test]`.
   The test replays the recording on the headless backend and asserts the final
-  state. `crates/framework-headless/tests/replayed_session.rs` is one,
+  state. `crates/rustnative-headless/tests/replayed_session.rs` is one,
   generated and checked in; `RUSTNATIVE_BLESS=1` regenerates it.
 
 ## The reduced form (`inspect::compact`)

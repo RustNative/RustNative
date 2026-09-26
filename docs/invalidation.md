@@ -3,7 +3,7 @@
 Exactly which components render for each kind of change. Every other
 component is skipped and its previous output reused — spliced into its
 parent's output, so a parent does not render because a child did. The
-contract is held by `crates/framework-core/tests/invalidation.rs` against
+contract is held by `crates/rustnative-core/tests/invalidation.rs` against
 `ComponentTree::last_render_log`, which records each render with its
 `RenderCause`.
 

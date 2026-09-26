@@ -21,11 +21,11 @@ name = "counter"
 crate-type = ["cdylib", "rlib"]
 
 [dependencies]
-framework-core.workspace = true
-framework-interop.workspace = true
+rustnative-core.workspace = true
+rustnative-interop.workspace = true
 
 [build-dependencies]
-framework-interop.workspace = true
+rustnative-interop.workspace = true
 
 [dev-dependencies]
 cc = "1"

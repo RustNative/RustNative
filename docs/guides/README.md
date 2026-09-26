@@ -3,7 +3,7 @@
 Task-oriented guides, each with an example in `examples/` that builds and
 is tested on every change (`PLAN.md` Milestone 52). Where a guide shows a
 tree, it shows it in both syntaxes, and where it styles one, in both
-spellings. `crates/framework-conformance/tests/doc_parity.rs` holds that.
+spellings. `crates/rustnative-conformance/tests/doc_parity.rs` holds that.
 
 | Task | Guide | Runnable example |
 |---|---|---|
@@ -17,8 +17,8 @@ spellings. `crates/framework-conformance/tests/doc_parity.rs` holds that.
 | Write a server | `docs/server.md` | `examples/server-demo`, `examples/server-client` |
 | Sync and collaborate | `docs/sync.md` | `examples/collab-notes`, `examples/live-counter`, `examples/device-desired` |
 | Run durable work | `docs/durable.md` | `examples/workflow-crash` |
-| Deploy and update | `docs/deploy.md` | `crates/framework-server/tests/deploy.rs` |
-| Observe and secure it | `docs/observability.md`, `docs/security/` | `crates/framework-windows/tests/observability.rs` |
+| Deploy and update | `docs/deploy.md` | `crates/rustnative-server/tests/deploy.rs` |
+| Observe and secure it | `docs/observability.md`, `docs/security/` | `crates/rustnative-windows/tests/observability.rs` |
 | Tray, jump list, secure storage, flags | `docs/surfaces.md` | `examples/product-services` |
 | Adopt it inside an existing application | `docs/interop/` | `examples/adoption-*` |
 | Host web or media content | `docs/guides/host-content-controls.md` | `examples/gallery` |

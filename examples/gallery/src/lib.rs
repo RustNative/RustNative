@@ -1,20 +1,20 @@
 //! The component gallery (`PLAN.md` Milestone 48's "done when"): an
-//! application built entirely from `framework-components` and one token
+//! application built entirely from `rustnative-components` and one token
 //! set. Nothing here draws or styles a primitive itself; every color comes
 //! from `tokens.json` through `gallery.css`, and the roles the token set
 //! marks follow the host's accent and surface.
 
 use std::time::Duration;
 
-use framework_components::behaviour::TreeItem;
-use framework_components::{
+use rustnative_components::behaviour::TreeItem;
+use rustnative_components::{
     ActionButton, ActionButtonProps, AdaptiveNavigation, AdaptiveNavigationProps, Badge,
     BadgeProps, ButtonVariant, Card, CardProps, Chart, ChartKind, ChartProps, DataTable,
     DataTableProps, RadioGroup, RadioGroupProps, Section, SectionLayout, SectionedView,
     SectionedViewProps, Series, TextField, Toast, ToastProps, Tone, TreeView, TreeViewProps,
     with_roles,
 };
-use framework_core::{Command, CommandId, Component, ComponentContext, Event, Node, Store, rsx};
+use rustnative_core::{Command, CommandId, Component, ComponentContext, Event, Node, Store, rsx};
 
 /// The gallery's save command.
 pub const SAVE: CommandId = CommandId::new("gallery.save");
@@ -22,7 +22,7 @@ pub const SAVE: CommandId = CommandId::new("gallery.save");
 /// The gallery's theme: its token set, with the library's defaults for any
 /// role the set leaves out.
 #[must_use]
-pub fn theme() -> framework_core::Theme {
+pub fn theme() -> rustnative_core::Theme {
     with_roles(include!(concat!(env!("OUT_DIR"), "/app_theme.rs")))
 }
 

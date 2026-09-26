@@ -6,10 +6,10 @@
 
 use std::time::Duration;
 
-use framework_core::{Application, Component, Platform, Size, Window};
-use framework_sync::live::{LiveClient, LiveServer, RemoteView};
-use framework_windows::WindowsPlatform;
 use live_counter::CounterApp;
+use rustnative_core::{Application, Component, Platform, Size, Window};
+use rustnative_sync::live::{LiveClient, LiveServer, RemoteView};
+use rustnative_windows::WindowsPlatform;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut arguments = std::env::args().skip(1);

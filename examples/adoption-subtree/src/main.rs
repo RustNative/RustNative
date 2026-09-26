@@ -8,8 +8,8 @@
 //! `set_bounds` when the host lays itself out. Run with `--self-test` to
 //! drive it and exit (what `tests/subtree.rs` does).
 
-use framework_core::{Application, Component, Event, Node, NodeId, Size, Window};
-use framework_windows::{EmbeddedRoot, WindowsPlatform};
+use rustnative_core::{Application, Component, Event, Node, NodeId, Size, Window};
+use rustnative_windows::{EmbeddedRoot, WindowsPlatform};
 use windows_sys::Win32::Foundation::{HWND, LPARAM, LRESULT, RECT, WPARAM};
 use windows_sys::Win32::System::LibraryLoader::GetModuleHandleW;
 use windows_sys::Win32::UI::WindowsAndMessaging::{

@@ -1,4 +1,4 @@
-# Build Status — Native Rust Framework
+# Build Status — RustNative
 
 ## Current work: Milestones 39–58 on the Windows backend
 
@@ -37,7 +37,7 @@ is owed, and each milestone's own entry names the parts it owes:
     `start`/`end` (Milestone 39). It is tested against a corpus in
     `crates/rustnative/tests/codemod-corpus/`.
 - **Capability packages (`C71`).**
-  - `framework_core::package` adds `CapabilityPackage` and
+  - `rustnative_core::package` adds `CapabilityPackage` and
     `PackageManifest` (backends, framework version range, grants), with
     Cargo-compatible version matching.
   - `Services::install(&package, backend)` checks all three, builds the
@@ -129,7 +129,7 @@ is owed, and each milestone's own entry names the parts it owes:
 
 **Built.** Guide: `docs/surfaces.md`.
 
-- **Surfaces.** `framework_core::surfaces::Surfaces`, in every
+- **Surfaces.** `rustnative_core::surfaces::Surfaces`, in every
   application's services, asks for the tray icon and its menu, a jump
   list, taskbar progress, and notifications. They answer with the new
   `Event::SurfaceAction`, routed to the window's root component like a
@@ -145,7 +145,7 @@ is owed, and each milestone's own entry names the parts it owes:
   - `Capability::Surface(TrayExtra | JumpList | TaskbarProgress)` is now
     advertised. The remaining surfaces are answered as unavailable, with
     the reasons in the guide.
-- **Product services** (`framework_core::product`).
+- **Product services** (`rustnative_core::product`).
   - **`SecureStorage`:** stated traits (hardware backing, biometric
     gating), an in-memory store, and `WindowsSecureStorage` (Credential
     Manager, with DPAPI sealing for the user).
@@ -201,7 +201,7 @@ is owed, and each milestone's own entry names the parts it owes:
 `docs/security/threat-model-server.md`,
 `docs/security/certification-posture.md`, and `docs/telemetry-policy.md`.
 
-- **`framework-observe`** follows OpenTelemetry's model (`C70`).
+- **`rustnative-observe`** follows OpenTelemetry's model (`C70`).
   - Spans, structured logs tied to spans, semantic conventions, counters
     and histograms, and output in the Prometheus text format.
   - Exporters write to stdout, a file, OTLP/HTTP (batched), or memory.
@@ -209,7 +209,7 @@ is owed, and each milestone's own entry names the parts it owes:
     that trace, so one trace spans the client and the server.
   - The OTLP exporter holds and sends nothing until the person consents
     (`Telemetry` is off by default, and the choice persists).
-- **Crash capture on Windows** (`framework_windows::crash`).
+- **Crash capture on Windows** (`rustnative_windows::crash`).
   - Handles panics and unhandled exceptions.
   - Writes a minidump (`MiniDumpWriteDump`) and a JSON report.
   - The report carries the message, a backtrace symbolicated in process,
@@ -219,7 +219,7 @@ is owed, and each milestone's own entry names the parts it owes:
 - **Grants enforced at each call** (`C68`): a scoped `HttpService`
   refuses origins outside its grant when each request is made, so
   refused requests never leave.
-- **The isolated worker** (`C67`, `framework_windows::isolated`).
+- **The isolated worker** (`C67`, `rustnative_windows::isolated`).
   - Runs with a low-integrity token.
   - A job object caps its memory, withholds UI access, and kills it when
     its owner drops it.
@@ -228,7 +228,7 @@ is owed, and each milestone's own entry names the parts it owes:
   number and an FNV-1a checksum, so a torn file or a flipped bit reads as
   nothing stored. Files in the old format are still read.
 - **Industrial services.**
-  - `framework_core::industrial::{PrintService, SerialService}` are the
+  - `rustnative_core::industrial::{PrintService, SerialService}` are the
     contracts.
   - `WindowsPrinting` prints through the spooler and can print to a file.
   - `WindowsSerial` opens COM ports through the communications API.
@@ -298,7 +298,7 @@ is owed, and each milestone's own entry names the parts it owes:
 
 **Built.** Guides: `docs/deploy.md` and `docs/deploy/update-rules.md`.
 
-- **The adapter contract.** `framework_server::deploy::DeploymentAdapter`
+- **The adapter contract.** `rustnative_server::deploy::DeploymentAdapter`
   covers `deploy`, `promote`, `rollback`, `status`, and `limits`, the
   per-request host limits.
 - **A long-lived server.**
@@ -317,7 +317,7 @@ is owed, and each milestone's own entry names the parts it owes:
     read-only root file system, and only the declared resources as secrets;
   - a hardened systemd unit.
   - `--build` builds the image when Docker is installed.
-- **Single artifact.** `framework_build::embed_assets` compiles a
+- **Single artifact.** `rustnative_build::embed_assets` compiles a
   directory into the binary, each file named by its content hash.
   `ServerApp::assets` serves them as immutable. `assets::stylesheet` and
   `assets::script` write links with subresource-integrity digests, and
@@ -328,7 +328,7 @@ is owed, and each milestone's own entry names the parts it owes:
   - `x-cache: hit|miss` reports each lookup.
   - `ResponseCache::invalidate(tag)` supports incremental regeneration.
   - `cache_inspection::<P, Policy>()` serves the queryable cache state.
-- **Desktop updates (`framework_windows::update`).**
+- **Desktop updates (`rustnative_windows::update`).**
   - Ed25519-signed manifests, checked against the key pinned in
     `[update] public-key`.
   - Staged rollout by a stable installation bucket, and version pinning.
@@ -391,7 +391,7 @@ is owed, and each milestone's own entry names the parts it owes:
 
 ### Milestone 56 — Durable and event-driven execution — complete (local implementation)
 
-**Built.** A new crate, `framework-durable`. Guide: `docs/durable.md`.
+**Built.** A new crate, `rustnative-durable`. Guide: `docs/durable.md`.
 
 - **Durable workflows**
   - `step` results are journaled in SQLite, and a replay returns the
@@ -450,7 +450,7 @@ is owed, and each milestone's own entry names the parts it owes:
 
 ### Milestone 55 — Reconciliation beyond the screen — complete (Windows scope)
 
-**Built.** A new crate, `framework-sync`. Guide: `docs/sync.md`.
+**Built.** A new crate, `rustnative-sync`. Guide: `docs/sync.md`.
 
 - **The sync service**
   - `SyncedCollection` reads and writes locally first. Writes made offline
@@ -463,7 +463,7 @@ is owed, and each milestone's own entry names the parts it owes:
   - Schema versioning: the server upgrades an older client's writes, and
     tells a client below the minimum `NeedsUpgrade`.
   - Transports: `InMemory` and `HttpSync` (over `HttpService`, so through
-    `WinHttp`). The `server` feature adds `framework-server` endpoints.
+    `WinHttp`). The `server` feature adds `rustnative-server` endpoints.
 - **Replicated types**
   - `GCounter`, `PnCounter`, `LwwRegister`, `OrSet`, `LwwMap`, and `Rga`
     (text and lists).
@@ -513,7 +513,7 @@ is owed, and each milestone's own entry names the parts it owes:
   issue the same session id. Ids now include a random part per instance.
 
 **Verified.** Full gate.
-- 23 `framework-sync` tests:
+- 23 `rustnative-sync` tests:
   - CRDT properties;
   - sync policies, filters, schema versions, push, and presence;
   - device convergence;
@@ -533,12 +533,12 @@ is owed, and each milestone's own entry names the parts it owes:
 
 ### Milestone 49 — The server application model — complete (Windows scope)
 
-**Built.** The new `framework-server` crate, with `framework-server-macros`
+**Built.** The new `rustnative-server` crate, with `rustnative-server-macros`
 for `query!`. Guides: `docs/server.md` and
 `docs/server/security-checklist.md`.
 
 - **The application model on the client's contracts**
-  - Routes are `framework_core::Route` patterns.
+  - Routes are `rustnative_core::Route` patterns.
   - Handlers are `async fn`s with typed extractors: `Path`, `Query`,
     `Json`, `Form`, `State`, `Session`, `Principal`, `RequestScope`,
     `CsrfToken`, and `CspNonce`.
@@ -582,11 +582,11 @@ for `query!`. Guides: `docs/server.md` and
   - escaping `Html`;
   - errors that hide internal detail.
 - **Admin surface**: generated from the model and gated by a policy.
-- **Typed server functions**: `framework_core::server_fn`. The server
+- **Typed server functions**: `rustnative_core::server_fn`. The server
   serves them with `server_fn`, and a client calls them over any
   `HttpService`.
 - **Server-only components** (`C05`): `ServerComponentDef`, with the tree
-  payload in the new `framework_core::wire` format. The client merges it
+  payload in the new `rustnative_core::wire` format. The client merges it
   with the ordinary reconciler.
 - **The API schema** (`C35`):
   - `ApiSchema` types;
@@ -614,7 +614,7 @@ for `query!`. Guides: `docs/server.md` and
   `String`. Text is now tried as well.
 
 **Verified.** Full gate.
-- 26 `framework-server` tests and its doc tests.
+- 26 `rustnative-server` tests and its doc tests.
 - The CLI `db` test.
 - A wire round-trip of every syntax-equivalence case the format carries.
 - The notes server:
@@ -646,7 +646,7 @@ for `query!`. Guides: `docs/server.md` and
   image. Each has an `rsx!` element. On Windows each is the system control,
   and its changes arrive as `Toggled`, `ValueChanged`, `SelectionChanged`,
   or `DateChanged`.
-- **`framework-components`**: 18 composite components. Each has builder and
+- **`rustnative-components`**: 18 composite components. Each has builder and
   markup forms, uses stores for binding and commands for actions, and has
   its accessibility role asserted.
   - The headless behaviour layer (`C19`) covers list selection, tabs,
@@ -669,7 +669,7 @@ for `query!`. Guides: `docs/server.md` and
   place of one with the same identity moves and resizes from the old one's
   rectangle (`matched_geometry`). Windows animates it with the timeline, and
   it respects reduced motion.
-- **Lists** (`C26`): `framework_data::list::Projection` gives non-copying
+- **Lists** (`C26`): `rustnative_data::list::Projection` gives non-copying
   filter, sort, and group views. `diff_keys` reports removals, insertions,
   and minimal moves. `SectionedView` has list, grid, or carousel sections
   on a virtual list.
@@ -691,7 +691,7 @@ for `query!`. Guides: `docs/server.md` and
   props (a card's body of badges) were scoped a second time. Only their
   local keys survived, so two badges collided. The duplicate identity then
   made the headless window render nothing. Already-scoped nodes now keep
-  their identity. Regression test: `framework-core/tests/composition.rs`.
+  their identity. Regression test: `rustnative-core/tests/composition.rs`.
 - **CLI manifest.** `rustnative.toml` refused a `[style]` table in the CLI,
   although the build reads it. `rustnative tokens import` could not run in
   a project that declared its style file.
@@ -788,7 +788,7 @@ for `query!`. Guides: `docs/server.md` and
 
 **Built.** `docs/data.md`.
 
-- **Core** (`framework-core`):
+- **Core** (`rustnative-core`):
   - `Store<T>` shared state, provided to a subtree (`provide_scoped`,
     `scoped`) and read by slice (`select`). A component re-renders only when
     its slice changes by value (`C08`). Updates are ordered, and nested
@@ -805,7 +805,7 @@ for `query!`. Guides: `docs/server.md` and
     offloaded work.
   - `NavigationStack::saved_state` with a 64 KiB budget (`C14`), and
     `CertificatePins`.
-- **Data layer** (`framework-data`, a new crate):
+- **Data layer** (`rustnative-data`, a new crate):
   - `QueryClient` with exhaustive `QueryState` (`C29`), deduplication, stale
     and retention lifetimes, stale-while-revalidate, a `Revalidate` policy,
     retries with seeded jitter, hierarchical invalidation, cancellation when
@@ -838,7 +838,7 @@ for `query!`. Guides: `docs/server.md` and
   work, render and handler failures contained, restart with backoff on
   virtual time, manual retry, an uncontained panic still reaching the
   application, supervised task restarts, and stream delivery.
-- `framework-data` has 22 tests: dedup, freshness, retention, retries,
+- `rustnative-data` has 22 tests: dedup, freshness, retention, retries,
   failure and empty states, invalidation, identity kept, optimistic
   rollback, the durable offline queue, merge conflicts, pagination,
   batching, forms, migrations, paging gaps, live queries, the interceptor
@@ -870,7 +870,7 @@ for `query!`. Guides: `docs/server.md` and
 
 **Built.** `docs/i18n.md`.
 
-- **Catalogues** (`framework-i18n`, a new platform-free crate): a documented
+- **Catalogues** (`rustnative-i18n`, a new platform-free crate): a documented
   Fluent subset.
   - It covers messages, `{ $var }`, `{ -term }`, selectors with exact
     numbers, plural categories, and gender or text keys, and comments as
@@ -878,13 +878,13 @@ for `query!`. Guides: `docs/server.md` and
   - It has CLDR cardinal rules for en, de, fr, ar, he, pl, ru, ja, zh, and
     ko, tested on CLDR's own samples (`VENDORED.md`).
   - Fallback goes locale → language → source.
-- **Typed messages**: `framework_build::compile_messages` checks the
+- **Typed messages**: `rustnative_build::compile_messages` checks the
   translations against the source (a translation reading a variable its
   source never passes fails the build). It generates one function per
   message whose parameters are exactly its variables (`i64` for plurals,
   text otherwise), plus the embedded `catalogues()`.
-  `framework_core::messages_mod!()` declares them.
-- **Resolution** (`framework_core::i18n`): `Message` is data, and becomes
+  `rustnative_core::messages_mod!()` declares them.
+- **Resolution** (`rustnative_core::i18n`): `Message` is data, and becomes
   text during the render of the component showing it, against that
   component's `LOCALE`.
   - Showing a message records the locale read, so a switch re-renders only
@@ -947,11 +947,11 @@ example's own.
 - **Budgets**: `dev_loop_restart_ms` (6.9 s on `examples/hello-label`, of
   which the build is 5.7 s; two state fields restored). `first_run_s` covers
   three commands, new to interactive.
-- **Previews and catalogue** (`C55`): `framework_core::preview`, covering
+- **Previews and catalogue** (`C55`): `rustnative_core::preview`, covering
   `Preview`, `PreviewMatrix` (48 configurations when full), `PreviewFrame`,
   and `Catalogue`.
   - `rustnative preview` opens it natively.
-  - `framework_headless::preview_goldens` makes every preview a golden test
+  - `rustnative_headless::preview_goldens` makes every preview a golden test
     (`C55-3`), in the templates' `tests/previews.rs`.
 - **Templates**: the application is a library (with `previews()`) and the
   executable is a thin shell, so an application change recompiles one crate.
@@ -971,7 +971,7 @@ example's own.
   - `[resources]` are provisioned locally;
   - `rustnative test --watch`;
   - a development run's panic dialog gives the source position, in the
-    `.rsx` file via the source map (`framework_core::dev`).
+    `.rsx` file via the source map (`rustnative_core::dev`).
 - **`rustnative doctor --install [--dry-run]`** (`C90`) adds what `rustup`
   can.
 
@@ -1004,7 +1004,7 @@ templates, with generated items, build and pass their tests.
   every key defined in `budgets/SCHEMA.md`. Each key declares its budget
   (`max`) and its noise (`tolerance`); the measured values are kept in
   comments.
-- **Startup phase model** (`C62`, `framework_core::perf`): process start,
+- **Startup phase model** (`C62`, `rustnative_core::perf`): process start,
   runtime ready, first frame, first content, interactive.
   - Windows marks each phase, with the process start taken from
     `GetProcessTimes`. The headless backend marks them too.
@@ -1026,7 +1026,7 @@ templates, with generated items, build and pass their tests.
   instrumented, runs the scripted startup, merges the profiles with
   `llvm-profdata`, and rebuilds with `-Cprofile-use`. Without the
   `llvm-tools` component it fails at once with the `rustup` command to run.
-- **No claim without a number**: `framework-conformance/tests/doc_claims.rs`
+- **No claim without a number**: `rustnative-conformance/tests/doc_claims.rs`
   rejects performance adjectives in README/docs that do not cite `budgets/`.
   README's "Performance budgets" section quotes the file.
 
@@ -1067,7 +1067,7 @@ missing-tool path is exercised.
 
 **Built.** `docs/inspection.md`.
 
-- **One protocol** (`framework_core::inspect`), answered by
+- **One protocol** (`rustnative_core::inspect`), answered by
   `Application::inspect`; the backend supplies what only it knows through
   `InspectBackend`. It covers:
   - the declarative tree, with each node's component and the classes as
@@ -1104,7 +1104,7 @@ missing-tool path is exercised.
     `Application` (`Recording::replay`).
   - State history can be stepped back through.
   - `Recording::to_test` produces a generated test.
-    `framework-headless/tests/replayed_session.rs` is one, checked in and run.
+    `rustnative-headless/tests/replayed_session.rs` is one, checked in and run.
 - **Reduced form**: `inspect::compact`, deferred formatting (message ids and
   arguments, host-side format table), tested round trip.
 - **Backends**: Windows (`native::inspect`, polled on the primary window's
@@ -1124,10 +1124,10 @@ failed once under the full workspace run:
 found two package runs' archives differed. It passed alone and in a full run
 of its own binary, so it is recorded as flaky under load and watched, not
 fixed. The protocol is verified in these places:
-- in the core (`framework-core/tests/inspection.rs`: tree, state editing,
+- in the core (`rustnative-core/tests/inspection.rs`: tree, state editing,
   layout and style explanations, trace, history, redacted recording and replay,
   overlay, transport with and without the token);
-- on headless (`framework-headless/tests/inspection.rs`: realized objects,
+- on headless (`rustnative-headless/tests/inspection.rs`: realized objects,
   capabilities, lifetimes, overlay; a session with HTTP recorded and replayed
   without the server; the generated test);
 - on Windows over the real transport (`native::inspect_integration`: answers
@@ -1152,7 +1152,7 @@ Also not done:
 **Built.** `docs/guarantees.md` lists every guarantee with its named test on
 each shipped backend.
 
-- **Shared suites** (`framework-conformance`): `host::ConformanceHost` /
+- **Shared suites** (`rustnative-conformance`): `host::ConformanceHost` /
   `Driver`, implemented for the headless backend (`HeadlessHost`) and for
   Windows over the native harness (`native::guarantees_integration`); suites
   for the transient fast path (typing renders only the owning component,
@@ -1161,9 +1161,9 @@ each shipped backend.
   equivalence moved here beside syntax equivalence.
 - **Scope-bound cancellation as a property**: random mount/unmount/time
   sequences (`tests/cancellation_property.rs`, proptest).
-- **Layout conformance**: `framework_core::localization::pseudo_localize`
+- **Layout conformance**: `rustnative_core::localization::pseudo_localize`
   (+40 %, accented, bracketed), the reference screen
-  (`framework_conformance::reference`), and the suite at text scales
+  (`rustnative_conformance::reference`), and the suite at text scales
   1.0/1.5/2.0 × pseudo × mirrored — no clipping, no overlap, targets ≥ 24×24
   inside their container, all reachable by Tab — on headless and, with the
   system's font metrics, on Windows.
@@ -1199,7 +1199,7 @@ columns are not measured. The deferred backends owe their columns.
 
 **Built.**
 
-- **Library-only mode** (`crates/framework-interop`): the `.ril` interface
+- **Library-only mode** (`crates/rustnative-interop`): the `.ril` interface
   description (services, constructors, methods, events; `bool`, integers,
   `f64`, UTF-8 `string`; `[thread = owner|any]`), generators for a C header,
   C# 5 P/Invoke bindings with an `IDisposable` wrapper per service, and the
@@ -1248,7 +1248,7 @@ their layout fixes a size.
 
 **Built.**
 
-- **`crates/framework-style`**: the declaration model (`StyleProperty` —
+- **`crates/rustnative-style`**: the declaration model (`StyleProperty` —
   every property names one typed field — `StyleValue` with token
   references, `Condition`, `DeclarationSet` in a `static`), the value parser
   (lengths in px/rem/em, `calc()`, `var()`), colours (`#hex`, `rgb()`,
@@ -1260,7 +1260,7 @@ their layout fixes a size.
   selectors, and `@media` refused with the reason), the run-time
   `TokenTable`, and the capability tables and unit mappings of both shipped
   backends.
-- **Macros**: `classes!` and `styles!` (re-exported by `framework-core`),
+- **Macros**: `classes!` and `styles!` (re-exported by `rustnative-core`),
   reading the crate's `app.css` (or `rustnative.toml [style] file`) with
   rebuild tracking; an unknown class, a computed class, a layout property
   under a state variant, and — for `target_os = "windows"` — a property the
@@ -1277,8 +1277,8 @@ their layout fixes a size.
   environment change — per node, in the environment of the component that
   rendered it (so `provide_env` scopes `dark:`), with `rem` following the
   text scale. `Platform::style_capabilities` / `unit_mapping`.
-- **Build and CLI**: `framework_build::compile_styles()` →
-  `framework_core::app_theme!()`; both project templates ship `app.css`, a
+- **Build and CLI**: `rustnative_build::compile_styles()` →
+  `rustnative_core::app_theme!()`; both project templates ship `app.css`, a
   project utility, and `set_theme(app_theme!())`; `rustnative expand
   --classes/--styles` prints each declaration and what it resolves to.
 - **Windows**: the table (colours, fonts, layout, opacity realized; border
@@ -1289,7 +1289,7 @@ their layout fixes a size.
   existing controls. `hello-label` styles its counter panel with classes and
   an `app.css` utility and gains a System/Dark/Light scheme toggle.
 
-**Verified.** Full gate. `framework-core/tests/style_equivalence.rs` resolves
+**Verified.** Full gate. `rustnative-core/tests/style_equivalence.rs` resolves
 every property in the utility, declaration, and typed spellings to equal
 nodes (a property without a case fails the suite), and shows state,
 scheme, width, direction, motion, pointer, text-scale, token-switch, and
@@ -1297,7 +1297,7 @@ provided-environment conditions. `native::style_integration` reads the
 Windows table back from the native objects (font face/weight/size via
 `WM_GETFONT`, colours via `WM_CTLCOLORSTATIC`, container border and rounded
 region) across a scheme and a token switch on the same HWNDs.
-Compile-failure cases in `framework-conformance/tests/style_ui*`; CLI tests
+Compile-failure cases in `rustnative-conformance/tests/style_ui*`; CLI tests
 for `expand --classes` and an `app.css` mistake reported at
 `app.css:line:col`; the documentation-parity check now also requires both
 style spellings.
@@ -1317,16 +1317,16 @@ text-scale setting.
 
 **Built.**
 
-- **`crates/framework-markup`**: the one parser (`syn`), the element table
+- **`crates/rustnative-markup`**: the one parser (`syn`), the element table
   (every node kind, its required and optional attributes, the universal
   modifiers), the lowering to builder calls with spans preserved
   (`quote_spanned`), the formatter, and the `.rsx` compiler with its
   source map. Expansion goldens pin the lowering of every element.
-- **Carrier 1, `rsx!`** (`crates/framework-macros`, re-exported as
-  `framework_core::rsx` behind the default `markup` feature): elements,
+- **Carrier 1, `rsx!`** (`crates/rustnative-macros`, re-exported as
+  `rustnative_core::rsx` behind the default `markup` feature): elements,
   components (`child_with_props`), `if`/`else`, `match`, `for`, braces for
   any Rust expression, fragments, `IntoChildren`.
-- **Carrier 2, `.rsx` files**: `framework_build::compile_rsx` compiles
+- **Carrier 2, `.rsx` files**: `rustnative_build::compile_rsx` compiles
   `src/**/*.rsx` into `OUT_DIR/rsx/…` from `build.rs`, with
   `rerun-if-changed` per file; `rsx_mod!` includes one. `rustnative
   build`/`check`/`test`/`run` run Cargo with JSON diagnostics and remap every
@@ -1337,7 +1337,7 @@ text-scale setting.
   Rust language server as their lowered files and maps positions and
   diagnostics back; markup completion and hover), and `rustnative new
   --syntax builder|markup` (required; both templates build).
-- **Conformance** (`crates/framework-conformance`): the equivalence suite
+- **Conformance** (`crates/rustnative-conformance`): the equivalence suite
   (every node kind and modifier, builder vs `rsx!` vs `.rsx`), the
   compile-failure suite (trybuild; unknown element, unknown/missing/duplicate
   attribute, mismatched tag, wrong type, and the rest, through both
@@ -1359,7 +1359,7 @@ lowered file (stated in the plan).
 **Built.** Every item of the milestone, with its proving test listed in
 `docs/conformance/new-backend-checklist.md`:
 
-- **typed environment** (`framework_core::environment`): `EnvKey`, window
+- **typed environment** (`rustnative_core::environment`): `EnvKey`, window
   and per-subtree values (`provide_env`), upward preferences, and the
   framework keys (locale, direction, text scale, size class, colour scheme,
   reduced motion, contrast, posture, safe area, window mode). Windows feeds
@@ -1377,7 +1377,7 @@ lowered file (stated in the plan).
   mirroring (headless), and Windows mirrors natively with
   `WS_EX_LAYOUTRTL` on the logical rectangles (`rendering::direction`),
   switchable at run time on the same native objects;
-- **commands** (`framework_core::command`): declared per render, bound by
+- **commands** (`rustnative_core::command`): declared per render, bound by
   `Node::with_command`, `MenuItem::command`, and shortcuts, routed through
   the focus chain; disabled everywhere at once. Windows takes shortcuts
   before a key reaches the control and updates bound menu items (state and
@@ -1391,10 +1391,10 @@ lowered file (stated in the plan).
   (`arbitrate`, applied to scroll-vs-pan on Windows), **thread affinity**
   (compile-time `!Send` proof; `UiThread`; `ThreadAffinity`), the
   **escape-hatch contract** (`NativeHandle<Unchecked|Live>`,
-  `framework_windows::native_handle`), the **teardown policy** (Windows
+  `rustnative_windows::native_handle`), the **teardown policy** (Windows
   releases capture, unclips the cursor, cancels IME composition on a
   terminating panic and on exit), **per-property mappers**
-  (`framework_windows::register_mapper`), **cursors**
+  (`rustnative_windows::register_mapper`), **cursors**
   (`Node::with_cursor`, `WM_SETCURSOR`), the **surface vocabulary**
   (`Capability::Surface`), **capability grants' shape** (`GrantSet`,
   `Services::scoped`, `Granted`), the Windows **ownership module**, and the
@@ -1422,7 +1422,7 @@ permission states belong to the mobile and web backends (33, 35, 36, Web D/E).
 
 ### Milestone 45 — Test infrastructure — complete (Windows scope)
 
-**Built.** `crates/framework-headless`, a real backend (`HeadlessPlatform`
+**Built.** `crates/rustnative-headless`, a real backend (`HeadlessPlatform`
 implements `Platform` and advertises only what its model realizes) that
 realizes the tree through the same `TreeSnapshot`/`TreeDiff` a native backend
 consumes, lays it out with deterministic metrics (`HeadlessMeasurer`: 8 px per
@@ -1430,7 +1430,7 @@ character, 32 px lines, a text scale for Milestone 41), and drives it with
 `HeadlessApp`: `click`, `type_text`, `set_text`, `press`, `tab`, `select_tab`,
 `scroll`, `resize`, `open_url`, `lifecycle`, `advance`, `settle`. Every
 interaction goes through hit-testing and host focus rules to the same events
-`framework-windows` produces — a click on a covered or disabled control is an
+`rustnative-windows` produces — a click on a covered or disabled control is an
 error, Tab skips disabled and hidden controls, Enter activates a focused
 button, typing reports one `TextChanged` per keystroke, a virtual list reports
 a range change on its first frame and then only when scrolling leaves the
@@ -1477,7 +1477,7 @@ runner; by Milestones 35–37: the device and emulator matrix. Preview goldens
 single-threaded executor seam (`LocalExecutor`, `LocalPool`,
 `ComponentContext::spawn_local`, polled by `pump_tasks`, with a wake that fires
 before the backend installs its waker remembered and delivered); and
-`framework-types`, the `no_std` crate for geometry, `Color`, and `Scalar`,
+`rustnative-types`, the `no_std` crate for geometry, `Color`, and `Scalar`,
 built for `thumbv7em-none-eabihf` here and in CI. Verified by unit tests, three
 integration tests (a `!Send` task delivered on virtual time; cancelled with its
 owner and never resumed; `now` and `sleep` on one clock) and a Windows test in
@@ -1490,7 +1490,7 @@ message loop.
 
 ### What was built
 
-`crates/framework-build`, run from an application's `build.rs`: it reads
+`crates/rustnative-build`, run from an application's `build.rs`: it reads
 `rustnative.toml` and writes the `.ico` (a PNG wrapped into a PNG-compressed icon
 entry — six bytes of header, sixteen of directory, then the PNG, so no
 image library), the application manifest, and the `.rc` carrying both plus
@@ -1525,7 +1525,7 @@ from 0.9 to 1.x in both new crates, which also resolved a duplicate
 
 ### Verified, and how
 
-Fifteen unit tests in `framework-build` cover the ICO writer (including a
+Fifteen unit tests in `rustnative-build` cover the ICO writer (including a
 256-pixel icon, which an `.ico` records as zero), the manifest's contents
 and its XML escaping, the `.rc` text and its quoting, and SDK discovery.
 Six integration tests in `rustnative` build a generated project for real and then
@@ -1578,8 +1578,8 @@ in, and what every test, example, and doc example in this repository currently
 compiles.
 
 The markup syntax — `.rsx` files and the `rsx!` macro alike — is **specified
-and not implemented.** There is no `framework-markup` or `framework-macros`
-crate, no `markup` feature, no `framework_build::compile_rsx()`, no `.rsx`
+and not implemented.** There is no `rustnative-markup` or `rustnative-macros`
+crate, no `markup` feature, no `rustnative_build::compile_rsx()`, no `.rsx`
 tooling in `rustnative` (`fmt`, `expand`, `lsp`, source-mapped diagnostics),
 and no equivalence suite yet; Milestone 53 is that work. The markup in
 `README.md` and `PLAN.md` is the specification those tests will be written
@@ -1602,8 +1602,8 @@ way.
 
 The second spelling — the declaration vocabulary, the utility classes, and the
 `app.css` theme file — is **specified and not implemented.** There is no
-`framework-style` crate, no `with_class`/`class` attribute, no
-`framework_build::compile_styles()`, no `app.css` handling, and no per-backend
+`rustnative-style` crate, no `with_class`/`class` attribute, no
+`rustnative_build::compile_styles()`, no `app.css` handling, and no per-backend
 style capability table or unit mapping; Milestone 58 is that work. The
 `bg-primary rounded-lg p-4` examples in `README.md` and `PLAN.md` are the
 specification its tests will be written against, not code that compiles today.
@@ -1675,7 +1675,7 @@ cargo deny check                                                  clean
 A machine *without* the MSVC tools or the Windows SDK: `doctor` reports
 what it finds, and the "missing" branches were exercised only by reading
 them, not by uninstalling a toolchain. `rustnative new` against published crates
-(`framework-core = "0.1"`) cannot be resolved until the crates are
+(`rustnative-core = "0.1"`) cannot be resolved until the crates are
 published, so the generated-project tests use `--framework-path`.
 
 ---
@@ -1778,7 +1778,7 @@ test.
 
 ### What was built
 
-`framework_core::graphics`: `DrawList` (retained, cheaply cloned, compared by
+`rustnative_core::graphics`: `DrawList` (retained, cheaply cloned, compared by
 pointer first), `DrawCommand`, `Paint`, `Path`, `ImageData`, `Transform2D`,
 `Vec2`/`RectF` (all on `Scalar`, so the node tree stays `Eq`), hit testing
 that honours transforms and clips, and `SurfaceId`. Two new node kinds,
@@ -1790,7 +1790,7 @@ both the canvas window and the pixel tests; the canvas window class, which
 keeps its draw list and render target on the window so painting never
 re-enters the runtime, and rebuilds a lost device on the next paint; the
 surface window class and a per-thread `SurfaceId` table; and the public
-`framework_windows::native_surface` returning a `SurfaceHandle` that
+`rustnative_windows::native_surface` returning a `SurfaceHandle` that
 implements `raw-window-handle` 0.6.
 
 **Dependency changes.** `raw-window-handle` 0.6 (MIT/Apache/Zlib) and
@@ -1861,7 +1861,7 @@ already become UI Automation fragments.
 
 ### What was built
 
-`framework_core::virtualization`: `VirtualListStyle` (item count, `ItemExtent`
+`rustnative_core::virtualization`: `VirtualListStyle` (item count, `ItemExtent`
 fixed or estimated, overscan, axis), `ExtentCache` (arithmetic for fixed
 items, a Fenwick tree for measured ones), `VirtualRange::compute`, and
 `ScrollAnchor`. `Node::virtual_list`/`virtual_list_with_layout` build a
@@ -1949,7 +1949,7 @@ reused window would change which node it belongs to for no measured benefit.
 
 ### What was built
 
-`framework_core::animation`: animatable properties and typed animated values,
+`rustnative_core::animation`: animatable properties and typed animated values,
 `Transition` (duration and easing curve, or a mass/stiffness/damping spring,
 either with a start delay), `Animation` (from/to, repeat, autoreverse, fill,
 reduced-motion behaviour), and `Timeline`, the platform-free evaluator that
@@ -2010,7 +2010,7 @@ cargo deny check                                                  clean
 
 Layered child windows need a manifest declaring a supported OS, which a
 `cargo test` binary does not get by default.
-`crates/framework-windows/build.rs` embeds `tests.manifest` into the test
+`crates/rustnative-windows/build.rs` embeds `tests.manifest` into the test
 executables, so the opacity test exercises the real code path instead of
 silently proving nothing.
 
@@ -2028,7 +2028,7 @@ by toggling the setting in Windows' own settings UI.
 
 ### What was built
 
-`framework-core::accessibility`: the full portable model the milestone lists
+`rustnative-core::accessibility`: the full portable model the milestone lists
 (roles, names, descriptions, values and ranges, states, actions,
 relationships, focus, virtualized children) plus live regions, automation
 ids, and virtual elements, and `AccessibilityTree`, the portable projection
@@ -2102,12 +2102,12 @@ yet.
 
 ### What was built
 
-`framework-core::input` holds the portable half: pointer, wheel, gesture,
+`rustnative-core::input` holds the portable half: pointer, wheel, gesture,
 IME, clipboard, drag, and gamepad payloads; per-node `InputInterest` so
 high-frequency streams are opt-in; `GestureRecognizer` and `GamepadPoller`,
 the two pieces of input *logic* that do not depend on a platform and so exist
 once; and `InputRequests` for deferred pointer capture and drag feedback.
-`framework-windows::native::input` realizes it: mouse and hover,
+`rustnative-windows::native::input` realizes it: mouse and hover,
 `WM_POINTER*` touch and pen with implicit per-contact capture, top-level
 mouse capture with lost capture reported as a cancel, IMM32 composition,
 clipboard shortcuts and change notifications, an OLE `IDropTarget` per
@@ -2228,7 +2228,7 @@ looks for it again.
 | **P1.16** | The Windows backend consumed exactly one field of the portable accessibility model (`is_focusable`). Role, name, and description reached no Win32 API at all — and every leaf node defaulted to `AccessibilityRole::None`, so the model carried nothing to consume. |
 | **P1.17** | No native message-loop test existed. The twelve scenarios the audit names by name were all absent. |
 | **P1.21** | `Renderer` was still the god object the audit describes: diff application, HWND creation, styling, accessibility, scrolling, layout, and positioning in one type. |
-| **P2.23** | `framework-windows` had no `deny(missing_docs)`; only `framework-core` did. |
+| **P2.23** | `rustnative-windows` had no `deny(missing_docs)`; only `rustnative-core` did. |
 | **P2.28** | `style_override` and `visual_style` were two fields of the same type, distinguished only by name and a comment. |
 | **P2.30** | `WM_ERASEBKGND` still created and destroyed a brush on every repaint. |
 | **P2.31** | No Win32 return-value classification existed; ignored returns were indistinguishable from unconsidered ones. |
@@ -2341,7 +2341,7 @@ cargo doc --workspace --no-deps                                   clean
 ```
 
 Verified on real Windows (Windows 10, `rustc` 1.98.0, `x86_64-pc-windows-msvc`),
-not cross-compiled and not under Wine. `framework-windows`'s `native` module
+not cross-compiled and not under Wine. `rustnative-windows`'s `native` module
 — the `#[cfg(windows)]`-gated part that a Linux pipeline silently excludes —
 is compiled, linted, and *executed* by that run, including 19 tests that
 create real top-level windows and drive them through the production message
@@ -2392,7 +2392,7 @@ every item in its Phase 1–3 roadmap — the two items (P0.2, P1.15's owner-
 window support, and P2.23's `missing_docs` enforcement) that earlier status
 updates once recorded as deferred were all revisited and closed for real,
 the first two once this pass developed a way to actually compile and run
-`framework-windows`'s Windows-only code in this environment (see P1.17
+`rustnative-windows`'s Windows-only code in this environment (see P1.17
 below), and the third as a self-contained mechanical documentation pass
 verified by the crate's own `deny(missing_docs)` lint. A prior pass had
 already closed a meaningful subset before this one started (engineering
@@ -2407,10 +2407,10 @@ shared blocking pool — but, notably, *not* an actual CI workflow: this
 repository had none until this pass, see P1.17 below). This pass picked up
 from there and closed every remaining P0/P1/P2 finding and every roadmap
 item in `Audit.md`, once the compile/test breakthrough below made
-`framework-windows`'s Windows-only surface reachable by the same tools
-(`cargo build`/`test`/`clippy`/`fmt`) as `framework-core` already was.
+`rustnative-windows`'s Windows-only surface reachable by the same tools
+(`cargo build`/`test`/`clippy`/`fmt`) as `rustnative-core` already was.
 
-**P0.1 — node identity could theoretically collide (`framework-core`,
+**P0.1 — node identity could theoretically collide (`rustnative-core`,
 fully fixed).** `NodeId::from_key` was an FNV-1a hash of the key string:
 compact, but a many-to-one mapping, so *some* pair of distinct keys
 colliding was mathematically inevitable even though any one collision was
@@ -2456,7 +2456,7 @@ this pass draws between the two is documented directly on `RenderError`.
 
 **P1.4 — the Windows tray-notification icon used an undocumented `hWnd =
 NULL` identity, added and immediately deleted per call (fixed).**
-`framework-windows` now creates one persistent, hidden, message-only host
+`rustnative-windows` now creates one persistent, hidden, message-only host
 window on first use (`NotificationHost`) and keeps it alive for the life
 of the process; the icon is added once and updated in place via
 `NIM_MODIFY` for every subsequent notification instead of being torn down
@@ -2487,7 +2487,7 @@ called against a possibly-null ancestor window) was additionally confirmed
 against a real Win32 implementation via a MinGW/Wine ground-truth probe.
 
 **P1.17 — no way to ever compile or run the native Win32 backend existed
-(fixed).** `framework-windows`'s `native` module is `#[cfg(windows)]`-gated,
+(fixed).** `rustnative-windows`'s `native` module is `#[cfg(windows)]`-gated,
 so every local development and review pass — including every one before
 this repository had a CI workflow at all — ran on Linux, where that module
 is simply excluded from the build. No commit in this project's history had
@@ -2521,10 +2521,10 @@ effects,error,tree}`, `reconcile/{snapshot,diff}`,
 `layout/{geometry,constraints,measure,engine}`, `style/theme`,
 `scheduler/{mod,executor}`, `services/{mod,memory}`, `capability`, `menu`,
 `window`, `application`, `platform`. The public API is re-exported flat
-from the crate root exactly as before (`framework_core::NodeId`,
-`framework_core::Component`, ...), so no downstream call site — including
-every one in `framework-windows` and the example — changed.
-`framework-windows` was deliberately **not** similarly re-split in this
+from the crate root exactly as before (`rustnative_core::NodeId`,
+`rustnative_core::Component`, ...), so no downstream call site — including
+every one in `rustnative-windows` and the example — changed.
+`rustnative-windows` was deliberately **not** similarly re-split in this
 pass; see "What this pass deliberately did not do" below.
 
 **Encapsulation (P2.24/25).** `VisualStyle`, `Theme`, `WindowState`, and
@@ -2546,7 +2546,7 @@ added a `proptest`-based property test suite covering identity,
 reconciliation round-tripping, and layout non-negativity under randomized
 input (P2.34); added a `criterion` benchmark suite covering snapshot
 construction, diffing, layout, component dispatch, and task scheduling
-(P2.35); every public struct/enum/trait/associated type in `framework-core`
+(P2.35); every public struct/enum/trait/associated type in `rustnative-core`
 now has a doc comment (P2.23 — see "Known, deliberately incomplete" below
 for the part of this that's still open).
 
@@ -2554,8 +2554,8 @@ for the part of this that's still open).
 
 `cargo clippy --workspace --all-targets -- -D warnings` had, since this
 project's `deny.toml`/`clippy.toml` policy was first written, only ever
-actually been evaluated against `framework-core` and the tiny
-`#[cfg(windows)]`-free surface of `framework-windows` — every claim in this
+actually been evaluated against `rustnative-core` and the tiny
+`#[cfg(windows)]`-free surface of `rustnative-windows` — every claim in this
 document (and every prior one) that "clippy is clean" was true only of
 that subset, because clippy, like `cargo check`, silently excludes
 `#[cfg(windows)]`-gated code on a non-Windows host. The first time this
@@ -2591,13 +2591,13 @@ older/newer `windows` release chosen only to dodge the lint.
 
 **What this pass deliberately did not do, and why:**
 
-- **`framework-windows`'s module split (P1.21/P2.22).** Unlike
-  `framework-core`, this crate's `native` module can only be
+- **`rustnative-windows`'s module split (P1.21/P2.22).** Unlike
+  `rustnative-core`, this crate's `native` module can only be
   compiler-verified via the cross-compilation path in
   `tools/windows-cross-test.sh` (see "Local verification" below), not via
   plain `cargo check` on this host — a real but no longer absolute
   limitation. The crate is organized into the same kind of focused module
-  tree `framework-core` uses: `native::{app, container, input, measure,
+  tree `rustnative-core` uses: `native::{app, container, input, measure,
   menu, message_loop, registry, renderer, runtime, user_data,
   window_handles, util, test_support}`, plus `error`, `ffi`, `platform`,
   and `services::{clipboard, dialogs, notifications, system}` at the crate
@@ -2640,8 +2640,8 @@ document describes for everything else in `native/`.
 
 **`Audit.md`'s Phase 3 roadmap item 15 — real owner/parent-window support —
 is now also closed.** `FileDialogRequest` (the cross-platform request type
-in `framework-core`, shared by every future platform backend) gained an
-`owner: Option<WindowId>` field. `framework-windows` resolves it to a real
+in `rustnative-core`, shared by every future platform backend) gained an
+`owner: Option<WindowId>` field. `rustnative-windows` resolves it to a real
 native `HWND` through a new module, `native::window_handles`: a small,
 thread-safe `WindowId -> HWND` table for top-level windows, kept in sync by
 `WindowRegistry` at window creation and by `window_proc`'s `WM_DESTROY`
@@ -2659,12 +2659,12 @@ enhancement, not a correctness requirement, so a stale or absent owner
 falls back to an unowned dialog rather than an error). Covered by three new
 unit tests in `native::window_handles::tests`, run and passing under the
 same real Windows/Wine verification as everything else in `native/` (see
-"Local verification" below) — `framework-windows`'s native test suite is
+"Local verification" below) — `rustnative-windows`'s native test suite is
 now 19 tests, up from 16.
 
 ## `missing_docs` (P2.23, now fully enforced)
 
-Every public item in `framework-core` — including individual struct
+Every public item in `rustnative-core` — including individual struct
 fields, enum variants, trait methods, and associated functions, not just
 the types that contain them — now carries a doc comment, and
 `#![deny(missing_docs)]` (not `warn`) is set in `lib.rs` so this cannot
@@ -2674,7 +2674,7 @@ warnings as a bounded, mechanical follow-up rather than fixing them or
 half-enabling a lint that would fail `-D warnings` CI on an unrelated
 backlog; this pass wrote that documentation (not filler — each comment
 describes what the specific field/variant/method actually does) and
-flipped the lint to `deny`. `cargo build -p framework-core --all-targets`
+flipped the lint to `deny`. `cargo build -p rustnative-core --all-targets`
 now reports zero `missing_docs` warnings.
 
 
@@ -2760,26 +2760,26 @@ cargo run -p hello-label
 
 ## Local verification
 
-`framework-core` — every module from this pass and the audit-remediation
+`rustnative-core` — every module from this pass and the audit-remediation
 pass above — was compiled, linted, and tested locally with a genuine
 current-stable toolchain (`rustc`/`cargo` 1.91.1, obtained via this
 environment's package manager, well past the crate's declared MSRV of
 1.85), not the older, edition-downgraded 1.75 compiler prior passes were
-limited to. `cargo test -p framework-core` passes (65 test functions: 57
+limited to. `cargo test -p rustnative-core` passes (65 test functions: 57
 unit tests across every module — including new ones in
 `scheduler::executor::tests` covering `ManualExecutor`'s deterministic
 scheduling and virtual-time behavior — 4 integration tests in
 `component_lifecycle.rs`, and 4 `proptest` properties in
 `property_tests.rs` — each of those 4 runs hundreds of independently
 generated cases per invocation, so effective input coverage is well beyond
-the function count alone), `cargo bench -p framework-core` runs its full
+the function count alone), `cargo bench -p rustnative-core` runs its full
 `criterion` suite successfully, `cargo clippy --workspace --all-targets
 --all-features -- -D warnings` is clean under the strengthened
 `pedantic`/`cargo` lint policy, and `cargo fmt --all -- --check` is clean.
 `examples/hello-label` was also fully type-checked against the same
 compiler and compiles cleanly.
 
-The Windows-specific code under `crates/framework-windows/src/native/` was,
+The Windows-specific code under `crates/rustnative-windows/src/native/` was,
 this pass, **actually compiled, linked into real PE32+ binaries, and
 executed** for the first time in this project's history — not merely
 type-checked on a non-Windows subset. Earlier passes (and the first attempt
@@ -2810,7 +2810,7 @@ documented script: **`tools/windows-cross-test.sh`**.
 
 Running it:
 
-- Compiles `framework-core` and all of `framework-windows` — every file
+- Compiles `rustnative-core` and all of `rustnative-windows` — every file
   under `native/` and `services/`, including this session's `user_data.rs`
   centralization and the `IFileOpenDialog`/`IFileSaveDialog` rewrite of
   `services::dialogs` (P1.15) — as real `x86_64-pc-windows-gnu` code,
@@ -2822,9 +2822,9 @@ Running it:
   full type-checking, borrow-checking, and code generation.
 - Links successfully via `x86_64-w64-mingw32-gcc`/`-ld` (from
   `gcc-mingw-w64-x86-64`) into real PE32+ binaries — confirmed with `file`.
-- Runs `framework-core`'s full 57-test unit suite under Wine, all passing,
+- Runs `rustnative-core`'s full 57-test unit suite under Wine, all passing,
   as an actual Windows binary rather than a Linux one.
-- Runs `framework-windows`'s 19-test suite under Wine, all passing — see
+- Runs `rustnative-windows`'s 19-test suite under Wine, all passing — see
   "Native test coverage" below for what these actually exercise.
 - Runs `cargo clippy` against this same real target with the workspace's
   full `-D warnings` policy — see "122 real clippy findings" above.
@@ -2855,7 +2855,7 @@ environment.
 
 ### Native test coverage (P1.17, closed this pass)
 
-Before this pass, `framework-windows` had exactly one unit test
+Before this pass, `rustnative-windows` had exactly one unit test
 (`platform::tests::capabilities_only_advertise_realized_backend_features`),
 and it did not touch the `native` module at all — every other module
 under `native/` had zero automated coverage of its own, correctness
@@ -2896,7 +2896,7 @@ message-dispatch path."
 person using this project ran `cargo test --workspace` on an actual
 Windows machine after this pass — the first time anything in this
 repository's history had that happen. 72 of 73 tests passed unmodified,
-including all 57 `framework-core` tests and 15 of 16 `framework-windows`
+including all 57 `rustnative-core` tests and 15 of 16 `rustnative-windows`
 tests, which is itself a strong, independent confirmation that the
 Wine-based verification this pass relied on throughout was not fooling
 itself. The one failure,
@@ -2958,7 +2958,7 @@ perspective and `sync()` created a second native window for the same
 This is precisely the kind of native-callback reentrancy bug that cannot be
 caught by `cargo check`/`cargo test`, only by running the real event loop.
 
-**Fix:** two layers, both in `crates/framework-windows/src/lib.rs`:
+**Fix:** two layers, both in `crates/rustnative-windows/src/lib.rs`:
 
 1. `create_window` now inserts the new `Runtime` into `self.runtimes`
    immediately after `CreateWindowExW` succeeds — before `SetMenu`, the
@@ -2979,7 +2979,7 @@ correctly: every window is created exactly once, and `self.creating` and
 `self.runtimes` end each `sync()` pass consistent with
 `Application::window_ids()`.
 
-`cargo test -p framework-core` still passes 37/37 and `cargo check -p
+`cargo test -p rustnative-core` still passes 37/37 and `cargo check -p
 hello-label` still compiles cleanly after this fix; the fix itself remains
 subject to the same Windows-target compile-check limitation described below
 — it is reasoned through carefully, but a second real-Windows run is what

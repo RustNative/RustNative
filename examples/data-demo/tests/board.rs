@@ -13,8 +13,8 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use data_demo::{Board, DemoServer};
-use framework_core::{Component, Services, Size, Theme, Window};
-use framework_headless::{HeadlessApp, Query};
+use rustnative_core::{Component, Services, Size, Theme, Window};
+use rustnative_headless::{HeadlessApp, Query};
 
 fn launch(server: &DemoServer) -> HeadlessApp {
     launch_with(server, Services::default())
@@ -44,7 +44,7 @@ fn tasks(app: &HeadlessApp) -> Vec<String> {
 
 fn quiet() {
     std::panic::set_hook(Box::new(|info| {
-        let message = framework_core::scheduler::panic_message(info.payload());
+        let message = rustnative_core::scheduler::panic_message(info.payload());
         if !message.contains("garbage") && !message.contains("on purpose") {
             eprintln!("{info}");
         }
@@ -135,7 +135,7 @@ fn a_failing_widget_is_contained_and_restarted_without_disturbing_the_board() {
     assert_eq!(tasks(&app).len(), 3, "the rest of the board is untouched");
     app.click(&Query::key("retry")).unwrap();
     assert_eq!(text(&app, "forecast"), "Sunny, 21°C");
-    let failures = app.application_mut().take_failures(framework_core::WindowId::PRIMARY);
+    let failures = app.application_mut().take_failures(rustnative_core::WindowId::PRIMARY);
     assert!(failures.is_empty() || failures.iter().all(|f| f.component.ends_with("/weather")));
 }
 

@@ -7,9 +7,9 @@
 
 use std::sync::Arc;
 
-use framework_core::product::{CommerceService, FakeStore, Product, Receipt};
-use framework_server::db::{Db, DbError};
-use framework_server::{Json, Path, ServerApp, ServerError, State, get, post};
+use rustnative_core::product::{CommerceService, FakeStore, Product, Receipt};
+use rustnative_server::db::{Db, DbError};
+use rustnative_server::{Json, Path, ServerApp, ServerError, State, get, post};
 
 /// The store and how its receipts are checked.
 #[derive(Clone)]

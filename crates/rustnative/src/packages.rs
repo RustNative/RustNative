@@ -4,7 +4,7 @@
 
 use std::path::{Path, PathBuf};
 
-use framework_core::package::{FRAMEWORK_VERSION, version_matches};
+use rustnative_core::package::{FRAMEWORK_VERSION, version_matches};
 use serde::Deserialize;
 
 use crate::error::{Error, Result};

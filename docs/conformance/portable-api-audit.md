@@ -23,7 +23,7 @@ expected to imitate an affordance its host does not have.
 |---|---|
 | `EdgeInsets` had `left`/`right`: a physical vocabulary that cannot mirror | fields are now `start`/`end`; `EdgeInsets::left(direction)`/`right(direction)` answer the physical question; `EdgeInsets::logical(top, end, bottom, start)` |
 | Layout rectangles were implicitly physical | `LayoutResult::rects` are logical; `physical_rects` mirrors for hosts without their own mirroring, so a host with it (Windows `WS_EX_LAYOUTRTL`, a browser) is not mirrored twice |
-| Host settings were read by components (motion) or not at all (scheme, scale, contrast, locale) | the typed environment (`framework_core::environment`), fed by each backend |
+| Host settings were read by components (motion) or not at all (scheme, scale, contrast, locale) | the typed environment (`rustnative_core::environment`), fed by each backend |
 | Menu items were enabled and checked once, when built | `MenuItem::command` binds live command state, applied by the host as the menu opens |
 | Keyboard shortcuts were application code comparing `KeyCode`s | `Command::shortcut`, matched once in the core against live declarations |
 | Low memory was not a lifecycle event (Windows has no message for it) | `Lifecycle::LowMemory`, realized on Windows from the resource notification |

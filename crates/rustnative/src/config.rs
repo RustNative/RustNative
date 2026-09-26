@@ -62,7 +62,7 @@ pub struct Config {
     pub app: App,
     /// Development resources (`[resources.<name>]`), provisioned by
     /// `rustnative dev` when absent and handed to the application as
-    /// `RUSTNATIVE_RESOURCE_<NAME>` (`framework_core::dev::resource`).
+    /// `RUSTNATIVE_RESOURCE_<NAME>` (`rustnative_core::dev::resource`).
     #[serde(default, skip_serializing_if = "std::collections::BTreeMap::is_empty")]
     pub resources: std::collections::BTreeMap<String, Resource>,
     /// Localization (`[i18n]`, Milestone 46).

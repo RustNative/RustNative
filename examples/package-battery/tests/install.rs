@@ -8,9 +8,9 @@
     reason = "a failed expectation in an integration test is the test failing"
 )]
 
-use framework_core::Services;
-use framework_core::package::{CapabilityPackage, PackageError};
 use package_battery::{BatteryPackage, BatteryService};
+use rustnative_core::Services;
+use rustnative_core::package::{CapabilityPackage, PackageError};
 
 #[test]
 fn the_package_installs_only_where_it_has_code() {

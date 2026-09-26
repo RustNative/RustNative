@@ -12,7 +12,7 @@ use std::io::{BufRead, BufReader};
 use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
 
-use framework_markup::SourceMap;
+use rustnative_markup::SourceMap;
 
 use crate::error::{Error, Result};
 
@@ -202,9 +202,9 @@ mod tests {
         std::fs::create_dir_all(&out).expect("dirs");
         let source = "fn f() -> Node {\n    <Column key=\"a\" gap={\"x\"}></Column>\n}\n";
         std::fs::write(src.join("app.rsx"), source).expect("write");
-        let output = framework_markup::compile(
+        let output = rustnative_markup::compile(
             source,
-            &framework_markup::CompileOptions {
+            &rustnative_markup::CompileOptions {
                 source_path: src.join("app.rsx"),
                 src_root: src.clone(),
                 wrapper: None,

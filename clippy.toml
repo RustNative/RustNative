@@ -5,7 +5,7 @@
 # is for the handful of lints that take a threshold rather than an on/off
 # switch.
 
-# `framework-windows`'s Win32 message-dispatch `match` arms are legitimately
+# `rustnative-windows`'s Win32 message-dispatch `match` arms are legitimately
 # large; keep clippy's default rather than fighting the lint on structurally
 # necessary code, but keep the value explicit here instead of implicit.
 too-many-lines-threshold = 200

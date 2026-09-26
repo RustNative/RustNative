@@ -12,8 +12,8 @@
 use std::process::{Command, Output};
 use std::time::{Duration, Instant};
 
-use framework_core::inspect::NoBackend;
-use framework_core::{Application, Component, Event, Node, Size, Window, classes};
+use rustnative_core::inspect::NoBackend;
+use rustnative_core::{Application, Component, Event, Node, Size, Window, classes};
 use serde_json::{Value, json};
 
 struct Counter {

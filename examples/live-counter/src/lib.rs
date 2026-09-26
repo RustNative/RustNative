@@ -1,10 +1,10 @@
 //! A server-interactive counter (`PLAN.md` Milestone 55's second "done
 //! when"): the screen lives on the server; the Windows client shows it
-//! with [`framework_sync::live::RemoteView`] and survives a reconnect and a
+//! with [`rustnative_sync::live::RemoteView`] and survives a reconnect and a
 //! deploy without losing its state.
 
-use framework_core::{Component, Event, Node, NodeId};
-use framework_sync::live::LiveApp;
+use rustnative_core::{Component, Event, Node, NodeId};
+use rustnative_sync::live::LiveApp;
 use serde_json::{Value, json};
 
 /// The counter, on the server.

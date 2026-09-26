@@ -7,11 +7,11 @@
 //! Run with `--self-test` to drive it under an external loop and exit
 //! (what `tests/foreign.rs` does).
 
-use framework_core::{
+use rustnative_core::{
     Alignment, Application, Component, Event, LayoutStyle, Node, NodeId, Platform, Size, SizeMode,
     Window,
 };
-use framework_windows::{ForeignControl, Ownership, WindowsPlatform, register_foreign};
+use rustnative_windows::{ForeignControl, Ownership, WindowsPlatform, register_foreign};
 use windows_sys::Win32::Foundation::{HWND, RECT};
 use windows_sys::Win32::UI::Controls::{
     ICC_DATE_CLASSES, INITCOMMONCONTROLSEX, InitCommonControlsEx,
@@ -148,7 +148,7 @@ fn size_of_window(hwnd: HWND) -> (i32, i32) {
     (rect.right - rect.left, rect.bottom - rect.top)
 }
 
-fn pump(guest: &mut framework_windows::ExternalLoop<'_>) {
+fn pump(guest: &mut rustnative_windows::ExternalLoop<'_>) {
     let mut message = MSG::default();
     // SAFETY: `message` is writable.
     while unsafe { PeekMessageW(&raw mut message, std::ptr::null_mut(), 0, 0, PM_REMOVE) } != 0 {
@@ -169,7 +169,7 @@ fn self_test() -> Result<(), String> {
         .start_external(&mut application)
         .map_err(|error| error.to_string())?;
     pump(&mut guest);
-    let window = guest.window(framework_core::WindowId::PRIMARY).ok_or("the window exists")?;
+    let window = guest.window(rustnative_core::WindowId::PRIMARY).ok_or("the window exists")?;
     let calendar =
         find(window, Some("SysMonthCal32"), None).ok_or("the calendar is adopted into the tree")?;
     let picker = find(window, Some("SysDateTimePick32"), None)

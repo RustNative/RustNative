@@ -18,8 +18,8 @@ workspace = true
 # Milestone 56's example: a durable workflow is killed mid-step, then
 # completes with each step executed exactly once.
 [dependencies]
-framework-durable.workspace = true
-framework-server.workspace = true
+rustnative-durable.workspace = true
+rustnative-server.workspace = true
 async-trait.workspace = true
 rusqlite = { version = "0.40", default-features = false, features = ["bundled"] }
 serde = { version = "1", features = ["derive"] }

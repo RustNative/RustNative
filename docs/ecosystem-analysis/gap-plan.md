@@ -104,7 +104,7 @@ resolution half of `X-L3-7`; concept `C22-4`.
 
 **Scope.**
 
-- `X-L3-13` A declaration vocabulary in a `framework-style` crate — values,
+- `X-L3-13` A declaration vocabulary in a `rustnative-style` crate — values,
   units, arithmetic, colour functions and spaces, token references — parsed at
   build time, with no selector, specificity, or cascade admitted at any point,
   and every property mapped to exactly one typed style or layout property.

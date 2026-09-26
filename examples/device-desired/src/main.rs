@@ -5,15 +5,15 @@
 use std::time::Duration;
 
 use device_desired::{Cloud, Config, Hardware, device_session};
-use framework_sync::Clock;
-use framework_sync::bus::Broker;
-use framework_sync::device::DeviceAgent;
+use rustnative_sync::Clock;
+use rustnative_sync::bus::Broker;
+use rustnative_sync::device::DeviceAgent;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let listener = tokio::net::TcpListener::bind("127.0.0.1:1883").await?;
     let address = listener.local_addr()?.to_string();
-    tokio::spawn(framework_sync::mqtt::serve(Broker::new(), listener));
+    tokio::spawn(rustnative_sync::mqtt::serve(Broker::new(), listener));
     println!("broker on mqtt://{address}");
 
     let clock = Clock::new(1);

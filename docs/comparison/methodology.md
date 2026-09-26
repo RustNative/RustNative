@@ -9,7 +9,7 @@ worth making if it is measured.
 ## The application
 
 `examples/reference-app` — the reference screen of the layout conformance suite
-(`framework_conformance::reference`): a heading, wrapping prose, a tab strip,
+(`rustnative_conformance::reference`): a heading, wrapping prose, a tab strip,
 labelled fields, and actions. The comparison builds the same screen in each
 approach with that approach's own idioms, not a port of this one's code.
 

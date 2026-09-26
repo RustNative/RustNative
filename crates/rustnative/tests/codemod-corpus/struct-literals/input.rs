@@ -1,4 +1,4 @@
-use framework_core::{EdgeInsets, LayoutStyle};
+use rustnative_core::{EdgeInsets, LayoutStyle};
 
 /// Padding written before Milestone 39.
 fn padding(gutter: i32) -> EdgeInsets {
@@ -6,8 +6,8 @@ fn padding(gutter: i32) -> EdgeInsets {
     EdgeInsets { top: 4, left: gutter, bottom: 4, right: 8 }
 }
 
-fn qualified(left: i32, right: i32) -> framework_core::EdgeInsets {
-    framework_core::EdgeInsets { left, right, ..EdgeInsets::all(0) }
+fn qualified(left: i32, right: i32) -> rustnative_core::EdgeInsets {
+    rustnative_core::EdgeInsets { left, right, ..EdgeInsets::all(0) }
 }
 
 fn start_of() -> i32 {

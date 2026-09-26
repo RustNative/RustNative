@@ -452,7 +452,7 @@ pub fn move_element(
 mod tests {
     use super::*;
 
-    const FILE: &str = r#"use framework_core::{Node, rsx};
+    const FILE: &str = r#"use rustnative_core::{Node, rsx};
 
 // A comment the edits must keep.
 fn view(items: Vec<String>) -> Node {

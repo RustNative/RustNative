@@ -1,0 +1,5 @@
+error: `<Column>` has no attribute `paddng`; did you mean `padding` (ColumnStyle::padding)?
+ --> tests/ui/unknown_attribute.rs:4:39
+  |
+4 |     let _ = rsx! { <Column key="root" paddng={rustnative_core::EdgeInsets::all(4)}></Column> };
+  |                                       ^^^^^^

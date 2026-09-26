@@ -22,7 +22,7 @@ rustnative bindgen counter.ril --lang csharp   # P/Invoke bindings, C# 5
 rustnative bindgen counter.ril --lang rust     # the implementation shims
 ```
 
-The implementing crate's `build.rs` calls `framework_interop::generate_rust`,
+The implementing crate's `build.rs` calls `rustnative_interop::generate_rust`,
 implements each service's trait, and calls `export_<library>!`. The shims
 contain every failure at the boundary — a panic, a call from the wrong thread,
 a stale handle, invalid UTF-8 — as a status code with a message, never a

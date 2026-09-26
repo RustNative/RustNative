@@ -1,7 +1,7 @@
 # Reconciliation beyond the screen
 
 `PLAN.md` Milestone 55. The framework's core idea is to declare the desired
-state and reconcile reality towards it. `framework-sync` applies that idea
+state and reconcile reality towards it. `rustnative-sync` applies that idea
 in three places:
 
 1. Data replicated between devices and a server.
@@ -42,7 +42,7 @@ notes.sync(&transport).await?; // push what changed, pull what others changed
   - `InMemory`: can be taken offline, for tests.
   - `HttpSync`: over the core `HttpService`, so it works through `WinHttp`.
   - With the `server` feature, `http::server::mount` adds the endpoints to
-    a `framework-server` application.
+    a `rustnative-server` application.
 
 ## Replicated types
 
@@ -64,7 +64,7 @@ Application::new(RemoteView::new(client), window)
 
 - **Session.** Each connection is a session. Its `ComponentTree` runs on
   its own thread on the server, and the tree travels as a
-  `framework_core::wire::WireNode`. The client reconciles each arrival like
+  `rustnative_core::wire::WireNode`. The client reconciles each arrival like
   any tree.
 - **Events.** Events travel back numbered, and each tree says the last
   event it reflects. An event not yet reflected is sent again after a

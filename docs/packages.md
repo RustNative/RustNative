@@ -8,7 +8,7 @@ application installs it, and how the tool checks it.
 
 ## Writing a package
 
-A package implements `framework_core::package::CapabilityPackage`:
+A package implements `rustnative_core::package::CapabilityPackage`:
 
 ```rust
 impl CapabilityPackage for BatteryPackage {

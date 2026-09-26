@@ -4,6 +4,6 @@
 //! `rustnative.toml` — and compiles `app.css` into its theme.
 
 fn main() {
-    framework_build::compile_styles();
-    framework_build::embed_resources();
+    rustnative_build::compile_styles();
+    rustnative_build::embed_resources();
 }

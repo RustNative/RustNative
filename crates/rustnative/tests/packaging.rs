@@ -1,5 +1,5 @@
 //! Milestone 32 acceptance tests: what `rustnative package` produces, and what an
-//! executable built through `framework-build` actually carries.
+//! executable built through `rustnative-build` actually carries.
 //!
 //! These run the real binary against a real generated project, then read
 //! the results back the way Windows does — the version resource through

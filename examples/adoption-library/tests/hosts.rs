@@ -45,9 +45,9 @@ fn scratch(name: &str) -> PathBuf {
 fn generate(directory: &Path) {
     let source =
         std::fs::read_to_string(Path::new(env!("CARGO_MANIFEST_DIR")).join("counter.ril")).unwrap();
-    let idl = framework_interop::parse_idl(&source).unwrap();
-    std::fs::write(directory.join("counter.h"), framework_interop::generate::c(&idl)).unwrap();
-    std::fs::write(directory.join("Counter.cs"), framework_interop::generate::csharp(&idl))
+    let idl = rustnative_interop::parse_idl(&source).unwrap();
+    std::fs::write(directory.join("counter.h"), rustnative_interop::generate::c(&idl)).unwrap();
+    std::fs::write(directory.join("Counter.cs"), rustnative_interop::generate::csharp(&idl))
         .unwrap();
 }
 

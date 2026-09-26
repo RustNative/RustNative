@@ -1,0 +1,16 @@
+[package]
+name = "rustnative-i18n"
+version = "0.1.0"
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+description = "Message catalogues for Rust Native: a documented Fluent subset, CLDR plural rules, and resolution with plural categories and grammatical gender"
+repository.workspace = true
+homepage.workspace = true
+readme.workspace = true
+keywords = ["gui", "i18n", "l10n", "fluent", "framework"]
+categories = ["internationalization", "localization"]
+include = ["src/**", "Cargo.toml", "VENDORED.md"]
+
+[lints]
+workspace = true

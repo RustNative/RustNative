@@ -1,8 +1,8 @@
 # Durable and event-driven execution
 
-`PLAN.md` Milestone 56. `framework-durable` runs work that must survive
+`PLAN.md` Milestone 56. `rustnative-durable` runs work that must survive
 restarts, and work that arrives as events rather than as requests. It keeps
-its records in SQLite, through `framework-server`'s data layer.
+its records in SQLite, through `rustnative-server`'s data layer.
 
 ## Workflows
 
@@ -140,5 +140,5 @@ function returns the worker's history.
 serves the work's state at `GET /_ops/:id` and cancels it at
 `POST /_ops/:id/cancel`. A client follows and cancels it over the core
 `HttpService` (`follow`, `cancel`). The states are the same as in
-`framework_data::OperationState`: running with progress, succeeded,
+`rustnative_data::OperationState`: running with progress, succeeded,
 failed, and cancelled.

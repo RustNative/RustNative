@@ -18,8 +18,8 @@ workspace = true
 # Milestone 54's reference application: 200 000 rows filtered as the person
 # types, with the typing itself never waiting for the filter.
 [dependencies]
-framework-core.workspace = true
-framework-windows.workspace = true
+rustnative-core.workspace = true
+rustnative-windows.workspace = true
 
 [dev-dependencies]
-framework-headless.workspace = true
+rustnative-headless.workspace = true

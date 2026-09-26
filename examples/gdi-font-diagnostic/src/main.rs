@@ -1,5 +1,5 @@
 //! Standalone reproduction of the `DeleteObject`/font anomaly found while
-//! debugging `framework-windows`'s `ControlStyle` GDI tests.
+//! debugging `rustnative-windows`'s `ControlStyle` GDI tests.
 //!
 //! Deliberately has no dependency on this workspace's own crates and is a
 //! plain binary, not a `cargo test` target — the point is to run in a
@@ -30,7 +30,7 @@ fn wide_face_name(family: &str) -> [u16; 32] {
 }
 
 /// Returns the created font already cast to `HGDIOBJ`, the same way
-/// `framework-windows`'s own `ControlStyle::drop` casts `HFONT`/`HBRUSH`
+/// `rustnative-windows`'s own `ControlStyle::drop` casts `HFONT`/`HBRUSH`
 /// before calling `DeleteObject` — so this reproduction goes through the
 /// exact same cast path as the code under investigation.
 fn create_font(family: &str, size: i32, weight: i32) -> HGDIOBJ {

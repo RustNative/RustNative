@@ -10,8 +10,8 @@
 use std::io::{BufRead, Write};
 use std::path::{Path, PathBuf};
 
-use framework_server::db::migrate::{Migration, Migrations};
-use framework_server::db::schema::{PossibleRename, Schema, diff, squash};
+use rustnative_server::db::migrate::{Migration, Migrations};
+use rustnative_server::db::schema::{PossibleRename, Schema, diff, squash};
 
 use crate::error::{Error, Result};
 use crate::project::Project;
@@ -142,7 +142,7 @@ pub fn run(here: &Path, command: &DbCommand) -> Result<()> {
             let migrations = Migrations::from_dir(&directory)
                 .map_err(io(format!("read {}", directory.display())))?;
             let mut connection =
-                framework_server::db::rusqlite::Connection::open(database).map_err(usage)?;
+                rustnative_server::db::rusqlite::Connection::open(database).map_err(usage)?;
             if *dry_run {
                 for migration in migrations.pending(&connection).map_err(usage)? {
                     println!("db: would apply {}\n{}", migration.name, migration.up);
@@ -158,7 +158,7 @@ pub fn run(here: &Path, command: &DbCommand) -> Result<()> {
             let migrations = Migrations::from_dir(&directory)
                 .map_err(io(format!("read {}", directory.display())))?;
             let mut connection =
-                framework_server::db::rusqlite::Connection::open(database).map_err(usage)?;
+                rustnative_server::db::rusqlite::Connection::open(database).map_err(usage)?;
             for name in migrations.rollback(&mut connection, to.as_deref()).map_err(usage)? {
                 println!("db: reversed {name}");
             }

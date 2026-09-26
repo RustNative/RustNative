@@ -3,8 +3,8 @@
 
 use std::path::Path;
 
-use framework_server::db::Db;
-use framework_server::jobs::Jobs;
+use rustnative_server::db::Db;
+use rustnative_server::jobs::Jobs;
 use server_demo::{IndexNote, app, database, settings};
 
 #[tokio::main]
@@ -23,7 +23,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     } else {
         eprintln!("notes: no NOTES_SECRET_KEY; sessions will not survive a restart");
         let mut key = [0u8; 32];
-        key.copy_from_slice(&framework_server::random_token(24).into_bytes()[..32]);
+        key.copy_from_slice(&rustnative_server::random_token(24).into_bytes()[..32]);
         key
     };
     let application = app(&db, &jobs, key);

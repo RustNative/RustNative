@@ -5,8 +5,8 @@
 
 use std::sync::Arc;
 
-use framework_core::{Application, Component, Platform, Services, Size, Window};
-use framework_windows::{WinHttp, WindowsPlatform};
+use rustnative_core::{Application, Component, Platform, Services, Size, Window};
+use rustnative_windows::{WinHttp, WindowsPlatform};
 use server_client::{Connection, NotesClient};
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {

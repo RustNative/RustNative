@@ -185,7 +185,7 @@ fn doctor_reports_this_machine_as_json() {
     assert_eq!(named("rustc")["ok"], serde_json::Value::Bool(true), "rustc built this test");
     assert_eq!(named("cargo")["ok"], serde_json::Value::Bool(true));
 
-    // This machine built `framework-windows`, so the MSVC toolchain and the
+    // This machine built `rustnative-windows`, so the MSVC toolchain and the
     // SDK are here; `doctor` must agree, and say where they are.
     for name in ["visual studio (c++ build tools)", "windows sdk", "rc", "mt"] {
         assert_eq!(named(name)["ok"], serde_json::Value::Bool(true), "{name}: {}", named(name));
@@ -318,7 +318,7 @@ fn a_diagnostic_in_an_rsx_file_is_reported_where_it_was_written() {
     assert!(message.contains(&expected), "reported at {expected}:\n{message}");
     assert!(message.contains("text={42_u32}"), "the quoted line is the .rsx line:\n{message}");
     assert!(
-        !message.contains("::framework_core::rsx!"),
+        !message.contains("::rustnative_core::rsx!"),
         "the lowering does not show through:\n{message}"
     );
 }

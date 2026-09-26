@@ -23,24 +23,24 @@ categories = ["gui", "os::windows-apis"]
 # version requirement, because a consumer resolving from a registry has no
 # path to follow. With both, a workspace build still uses the path and a
 # published build gets a real requirement.
-framework-build = { path = "crates/framework-build", version = "0.1.0" }
-framework-core = { path = "crates/framework-core", version = "0.1.0" }
-framework-windows = { path = "crates/framework-windows", version = "0.1.0" }
-framework-types = { path = "crates/framework-types", version = "0.1.0" }
-framework-headless = { path = "crates/framework-headless", version = "0.1.0" }
-framework-markup = { path = "crates/framework-markup", version = "0.1.0" }
-framework-macros = { path = "crates/framework-macros", version = "0.1.0" }
-framework-style = { path = "crates/framework-style", version = "0.1.0" }
-framework-interop = { path = "crates/framework-interop", version = "0.1.0" }
-framework-i18n = { path = "crates/framework-i18n", version = "0.1.0" }
-framework-data = { path = "crates/framework-data", version = "0.1.0" }
-framework-components = { path = "crates/framework-components", version = "0.1.0" }
-framework-server = { path = "crates/framework-server", version = "0.1.0" }
-framework-server-macros = { path = "crates/framework-server-macros", version = "0.1.0" }
-framework-sync = { path = "crates/framework-sync", version = "0.1.0" }
-framework-durable = { path = "crates/framework-durable", version = "0.1.0" }
-framework-observe = { path = "crates/framework-observe", version = "0.1.0" }
-framework-conformance = { path = "crates/framework-conformance", version = "0.1.0" }
+rustnative-build = { path = "crates/rustnative-build", version = "0.1.0" }
+rustnative-core = { path = "crates/rustnative-core", version = "0.1.0" }
+rustnative-windows = { path = "crates/rustnative-windows", version = "0.1.0" }
+rustnative-types = { path = "crates/rustnative-types", version = "0.1.0" }
+rustnative-headless = { path = "crates/rustnative-headless", version = "0.1.0" }
+rustnative-markup = { path = "crates/rustnative-markup", version = "0.1.0" }
+rustnative-macros = { path = "crates/rustnative-macros", version = "0.1.0" }
+rustnative-style = { path = "crates/rustnative-style", version = "0.1.0" }
+rustnative-interop = { path = "crates/rustnative-interop", version = "0.1.0" }
+rustnative-i18n = { path = "crates/rustnative-i18n", version = "0.1.0" }
+rustnative-data = { path = "crates/rustnative-data", version = "0.1.0" }
+rustnative-components = { path = "crates/rustnative-components", version = "0.1.0" }
+rustnative-server = { path = "crates/rustnative-server", version = "0.1.0" }
+rustnative-server-macros = { path = "crates/rustnative-server-macros", version = "0.1.0" }
+rustnative-sync = { path = "crates/rustnative-sync", version = "0.1.0" }
+rustnative-durable = { path = "crates/rustnative-durable", version = "0.1.0" }
+rustnative-observe = { path = "crates/rustnative-observe", version = "0.1.0" }
+rustnative-conformance = { path = "crates/rustnative-conformance", version = "0.1.0" }
 tokio = { version = "1.53", default-features = false, features = ["rt", "rt-multi-thread", "time", "sync"] }
 parking_lot = "0.12"
 async-trait = "0.1"
@@ -109,7 +109,7 @@ cargo = { level = "warn", priority = -1 }
 # consequential half of this lint's concern — an `unsafe fn`'s body
 # silently treating its *entire* scope as pre-audited. The remaining
 # "explain why this whole function is unsafe" question is answered, in
-# `framework-windows`, per call site by that crate's own safety-comment
+# `rustnative-windows`, per call site by that crate's own safety-comment
 # discipline (see its module docs) rather than forced into a doc section on
 # every signature; duplicating the same explanation at both levels would
 # drift, not add safety.
@@ -143,7 +143,7 @@ todo = "deny"
 unimplemented = "deny"
 # Numeric conversions across the FFI boundary are where a silent wrap turns
 # into a wrong window size or a negative dimension. These are already
-# handled deliberately throughout `layout` and `framework-windows` (every
+# handled deliberately throughout `layout` and `rustnative-windows` (every
 # cast is preceded by a `.min`/`.max`/`saturating_*` that establishes range,
 # with a named `#[allow]` and a comment); `deny` locks that discipline in.
 cast_possible_truncation = "deny"

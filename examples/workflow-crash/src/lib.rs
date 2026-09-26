@@ -8,7 +8,7 @@
 //! commits. When the binary runs again the workflow resumes, and the
 //! effects table shows each step once.
 
-use framework_durable::{Workflow, WorkflowContext, WorkflowError};
+use rustnative_durable::{Workflow, WorkflowContext, WorkflowError};
 use serde::{Deserialize, Serialize};
 
 /// Where to kill the process, from the `CRASH` environment variable:

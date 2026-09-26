@@ -13,7 +13,7 @@ contract. The Windows backend implements it; the headless backend models it.
   removes it. The framework creates its native object (on Windows, a child
   window of the class `RustNativeFrameworkSurface`) and destroys it.
 - The application first learns of it from `Event::SurfaceResized`, which
-  carries a `SurfaceId`; `framework_windows::native_surface(id)` turns that
+  carries a `SurfaceId`; `rustnative_windows::native_surface(id)` turns that
   into a `SurfaceHandle` implementing `raw-window-handle`'s traits, the form
   `wgpu`, `ash-window`, and `glutin` accept.
 - A handle kept past the node's removal does not dangle: its
@@ -42,7 +42,7 @@ contract. The Windows backend implements it; the headless backend models it.
   `SurfaceResized` **for every surface**, even one whose size did not change,
   with the new `scale_factor` — held by
   `native::graphics_integration::a_dpi_change_moves_the_window_and_re_reports_every_surface`.
-- Recorded honestly (the Windows unit mapping, `framework_style::WINDOWS_UNITS`):
+- Recorded honestly (the Windows unit mapping, `rustnative_style::WINDOWS_UNITS`):
   the framework's layout is not yet scaled by DPI, so a surface's size in
   layout units is its size in device pixels; the scale factor tells the
   renderer how dense those pixels are.

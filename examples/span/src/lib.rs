@@ -1,6 +1,6 @@
 //! The one-stack span (`PLAN.md` Milestone 52): one application, written
 //! once, for a desktop window and for a device's small screen. The
-//! component depends on nothing but `framework-core`; each end supplies
+//! component depends on nothing but `rustnative-core`; each end supplies
 //! only its platform and its screen size.
 //!
 //! - **Desktop:** `src/main.rs` runs it on Windows.
@@ -8,7 +8,7 @@
 //!   240×320 display, as its tests do. Running it on a microcontroller is
 //!   owed with Milestone 37 (see `docs/policy/embedded.md`).
 
-use framework_core::{Component, Event, Node, NodeId, Size};
+use rustnative_core::{Component, Event, Node, NodeId, Size};
 
 /// A device's display.
 pub const DEVICE_SCREEN: Size = Size::new(240, 320);

@@ -9,10 +9,12 @@
 
 use std::time::Duration;
 
-use framework_sync::Clock;
-use framework_sync::bus::{BusMessage, Connect, QoS};
-use framework_sync::device::{Actuate, DeviceAgent, DevicePolicy, Twin, Versioned, decode, encode};
-use framework_sync::mqtt::MqttClient;
+use rustnative_sync::Clock;
+use rustnative_sync::bus::{BusMessage, Connect, QoS};
+use rustnative_sync::device::{
+    Actuate, DeviceAgent, DevicePolicy, Twin, Versioned, decode, encode,
+};
+use rustnative_sync::mqtt::MqttClient;
 use serde::{Deserialize, Serialize};
 
 /// The configuration.

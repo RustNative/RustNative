@@ -18,9 +18,9 @@ workspace = true
 # Milestone 57's example: the tray, a jump list, taskbar progress, a
 # notification, secure token storage, and a remotely toggled feature.
 [dependencies]
-framework-core.workspace = true
-framework-windows.workspace = true
+rustnative-core.workspace = true
+rustnative-windows.workspace = true
 
 [dev-dependencies]
-framework-headless.workspace = true
+rustnative-headless.workspace = true
 serde_json = "1"

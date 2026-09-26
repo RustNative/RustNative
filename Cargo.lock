@@ -6,8 +6,8 @@ version = 4
 name = "adoption-foreign"
 version = "0.1.0"
 dependencies = [
- "framework-core",
- "framework-windows",
+ "rustnative-core",
+ "rustnative-windows",
  "windows-sys",
 ]
 
@@ -16,16 +16,16 @@ name = "adoption-library"
 version = "0.1.0"
 dependencies = [
  "cc",
- "framework-core",
- "framework-interop",
+ "rustnative-core",
+ "rustnative-interop",
 ]
 
 [[package]]
 name = "adoption-subtree"
 version = "0.1.0"
 dependencies = [
- "framework-core",
- "framework-windows",
+ "rustnative-core",
+ "rustnative-windows",
  "windows-sys",
 ]
 
@@ -187,11 +187,11 @@ name = "bench-app"
 version = "0.1.0"
 dependencies = [
  "filter-demo",
- "framework-core",
- "framework-headless",
- "framework-markup",
- "framework-style",
- "framework-windows",
+ "rustnative-core",
+ "rustnative-headless",
+ "rustnative-markup",
+ "rustnative-style",
+ "rustnative-windows",
  "serde_json",
  "windows-sys",
 ]
@@ -356,11 +356,11 @@ checksum = "c8d4a3bb8b1e0c1050499d1815f5ab16d04f0959b233085fb31653fbfc9d98f9"
 name = "collab-notes"
 version = "0.1.0"
 dependencies = [
- "framework-core",
- "framework-headless",
- "framework-server",
- "framework-sync",
- "framework-windows",
+ "rustnative-core",
+ "rustnative-headless",
+ "rustnative-server",
+ "rustnative-sync",
+ "rustnative-windows",
  "serde",
  "serde_json",
  "tokio",
@@ -527,11 +527,11 @@ name = "data-demo"
 version = "0.1.0"
 dependencies = [
  "async-trait",
- "framework-core",
- "framework-data",
- "framework-headless",
- "framework-windows",
  "parking_lot",
+ "rustnative-core",
+ "rustnative-data",
+ "rustnative-headless",
+ "rustnative-windows",
  "serde",
  "serde_json",
  "tokio",
@@ -558,7 +558,7 @@ dependencies = [
 name = "device-desired"
 version = "0.1.0"
 dependencies = [
- "framework-sync",
+ "rustnative-sync",
  "serde",
  "tokio",
 ]
@@ -694,9 +694,9 @@ checksum = "28dea519a9695b9977216879a3ebfddf92f1c08c05d984f8996aecd6ecdc811d"
 name = "filter-demo"
 version = "0.1.0"
 dependencies = [
- "framework-core",
- "framework-headless",
- "framework-windows",
+ "rustnative-core",
+ "rustnative-headless",
+ "rustnative-windows",
 ]
 
 [[package]]
@@ -710,237 +710,6 @@ name = "fnv"
 version = "1.0.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "3f9eec918d3f24069decb9af1554cad7c880e2da24a9afd88aca000531ab82c1"
-
-[[package]]
-name = "framework-build"
-version = "0.1.0"
-dependencies = [
- "framework-i18n",
- "framework-markup",
- "framework-style",
- "quote",
- "serde",
- "sha2",
- "toml",
-]
-
-[[package]]
-name = "framework-components"
-version = "0.1.0"
-dependencies = [
- "framework-build",
- "framework-core",
- "framework-headless",
-]
-
-[[package]]
-name = "framework-conformance"
-version = "0.1.0"
-dependencies = [
- "framework-build",
- "framework-core",
- "framework-headless",
- "framework-markup",
- "proptest",
- "serde_json",
- "trybuild",
-]
-
-[[package]]
-name = "framework-core"
-version = "0.1.0"
-dependencies = [
- "async-trait",
- "criterion",
- "framework-i18n",
- "framework-macros",
- "framework-style",
- "framework-types",
- "futures-core",
- "getrandom 0.3.4",
- "parking_lot",
- "proptest",
- "serde",
- "serde_json",
- "tokio",
-]
-
-[[package]]
-name = "framework-data"
-version = "0.1.0"
-dependencies = [
- "async-trait",
- "framework-core",
- "parking_lot",
- "serde",
- "serde_json",
- "tokio",
-]
-
-[[package]]
-name = "framework-durable"
-version = "0.1.0"
-dependencies = [
- "async-trait",
- "framework-core",
- "framework-server",
- "futures-util",
- "rusqlite",
- "serde",
- "serde_json",
- "tokio",
-]
-
-[[package]]
-name = "framework-headless"
-version = "0.1.0"
-dependencies = [
- "async-trait",
- "framework-core",
- "framework-style",
- "parking_lot",
- "serde",
- "serde_json",
-]
-
-[[package]]
-name = "framework-i18n"
-version = "0.1.0"
-
-[[package]]
-name = "framework-interop"
-version = "0.1.0"
-dependencies = [
- "cc",
-]
-
-[[package]]
-name = "framework-macros"
-version = "0.1.0"
-dependencies = [
- "framework-markup",
- "framework-style",
- "proc-macro2",
- "quote",
- "syn 2.0.119",
-]
-
-[[package]]
-name = "framework-markup"
-version = "0.1.0"
-dependencies = [
- "prettyplease",
- "proc-macro2",
- "quote",
- "serde",
- "serde_json",
- "syn 2.0.119",
-]
-
-[[package]]
-name = "framework-observe"
-version = "0.1.0"
-dependencies = [
- "async-trait",
- "framework-core",
- "framework-observe",
- "framework-server",
- "serde",
- "serde_json",
- "tokio",
-]
-
-[[package]]
-name = "framework-server"
-version = "0.1.0"
-dependencies = [
- "aes-gcm",
- "argon2",
- "async-trait",
- "base64",
- "bytes",
- "framework-core",
- "framework-server-macros",
- "getrandom 0.2.17",
- "hkdf",
- "hmac",
- "http",
- "http-body",
- "http-body-util",
- "hyper",
- "hyper-util",
- "p256",
- "rusqlite",
- "serde",
- "serde_json",
- "sha2",
- "tokio",
- "toml",
- "tower-service",
-]
-
-[[package]]
-name = "framework-server-macros"
-version = "0.1.0"
-dependencies = [
- "proc-macro2",
- "quote",
- "rusqlite",
- "syn 2.0.119",
-]
-
-[[package]]
-name = "framework-style"
-version = "0.1.0"
-dependencies = [
- "framework-types",
- "proc-macro2",
- "quote",
- "serde_json",
-]
-
-[[package]]
-name = "framework-sync"
-version = "0.1.0"
-dependencies = [
- "async-trait",
- "framework-core",
- "framework-server",
- "futures-util",
- "proptest",
- "serde",
- "serde_json",
- "tokio",
- "tokio-tungstenite",
-]
-
-[[package]]
-name = "framework-types"
-version = "0.1.0"
-dependencies = [
- "serde",
-]
-
-[[package]]
-name = "framework-windows"
-version = "0.1.0"
-dependencies = [
- "async-trait",
- "ed25519-dalek",
- "framework-components",
- "framework-conformance",
- "framework-core",
- "framework-data",
- "framework-style",
- "raw-window-handle",
- "serde",
- "serde_json",
- "tokio",
- "windows",
- "windows-core",
- "windows-numerics",
- "windows-sys",
-]
 
 [[package]]
 name = "futures-channel"
@@ -986,11 +755,11 @@ dependencies = [
 name = "gallery"
 version = "0.1.0"
 dependencies = [
- "framework-build",
- "framework-components",
- "framework-core",
- "framework-headless",
- "framework-windows",
+ "rustnative-build",
+ "rustnative-components",
+ "rustnative-core",
+ "rustnative-headless",
+ "rustnative-windows",
 ]
 
 [[package]]
@@ -1099,9 +868,9 @@ checksum = "2304e00983f87ffb38b55b444b5e3b60a884b5d30c0fca7d82fe33449bbe55ea"
 name = "hello-label"
 version = "0.1.0"
 dependencies = [
- "framework-build",
- "framework-core",
- "framework-windows",
+ "rustnative-build",
+ "rustnative-core",
+ "rustnative-windows",
  "serde_json",
 ]
 
@@ -1213,10 +982,10 @@ dependencies = [
 name = "i18n-demo"
 version = "0.1.0"
 dependencies = [
- "framework-build",
- "framework-core",
- "framework-headless",
- "framework-windows",
+ "rustnative-build",
+ "rustnative-core",
+ "rustnative-headless",
+ "rustnative-windows",
 ]
 
 [[package]]
@@ -1286,9 +1055,9 @@ name = "kits"
 version = "0.1.0"
 dependencies = [
  "bytes",
- "framework-core",
- "framework-server",
  "http",
+ "rustnative-core",
+ "rustnative-server",
  "serde",
  "serde_json",
  "tokio",
@@ -1321,10 +1090,10 @@ checksum = "32a66949e030da00e8c7d4434b251670a91556f4144941d37452769c25d58a53"
 name = "live-counter"
 version = "0.1.0"
 dependencies = [
- "framework-core",
- "framework-headless",
- "framework-sync",
- "framework-windows",
+ "rustnative-core",
+ "rustnative-headless",
+ "rustnative-sync",
+ "rustnative-windows",
  "serde_json",
  "tokio",
 ]
@@ -1365,7 +1134,7 @@ dependencies = [
 name = "notes-shared"
 version = "0.1.0"
 dependencies = [
- "framework-core",
+ "rustnative-core",
  "serde",
  "serde_json",
 ]
@@ -1419,7 +1188,7 @@ dependencies = [
 name = "package-battery"
 version = "0.1.0"
 dependencies = [
- "framework-core",
+ "rustnative-core",
  "toml",
  "windows-sys",
 ]
@@ -1570,9 +1339,9 @@ dependencies = [
 name = "product-services"
 version = "0.1.0"
 dependencies = [
- "framework-core",
- "framework-headless",
- "framework-windows",
+ "rustnative-core",
+ "rustnative-headless",
+ "rustnative-windows",
  "serde_json",
 ]
 
@@ -1729,9 +1498,9 @@ dependencies = [
 name = "reference-app"
 version = "0.1.0"
 dependencies = [
- "framework-conformance",
- "framework-core",
- "framework-windows",
+ "rustnative-conformance",
+ "rustnative-core",
+ "rustnative-windows",
 ]
 
 [[package]]
@@ -1809,30 +1578,261 @@ dependencies = [
 ]
 
 [[package]]
+name = "rustnative-build"
+version = "0.1.0"
+dependencies = [
+ "quote",
+ "rustnative-i18n",
+ "rustnative-markup",
+ "rustnative-style",
+ "serde",
+ "sha2",
+ "toml",
+]
+
+[[package]]
 name = "rustnative-cli"
 version = "0.1.0"
 dependencies = [
  "clap",
  "crc32fast",
  "ed25519-dalek",
- "framework-build",
- "framework-core",
- "framework-i18n",
- "framework-interop",
- "framework-markup",
- "framework-server",
- "framework-style",
- "framework-windows",
  "getrandom 0.2.17",
  "prettyplease",
  "proc-macro2",
  "quote",
+ "rustnative-build",
+ "rustnative-core",
+ "rustnative-i18n",
+ "rustnative-interop",
+ "rustnative-markup",
+ "rustnative-server",
+ "rustnative-style",
+ "rustnative-windows",
  "serde",
  "serde_json",
  "sha2",
  "syn 2.0.119",
  "tokio",
  "toml",
+ "windows-sys",
+]
+
+[[package]]
+name = "rustnative-components"
+version = "0.1.0"
+dependencies = [
+ "rustnative-build",
+ "rustnative-core",
+ "rustnative-headless",
+]
+
+[[package]]
+name = "rustnative-conformance"
+version = "0.1.0"
+dependencies = [
+ "proptest",
+ "rustnative-build",
+ "rustnative-core",
+ "rustnative-headless",
+ "rustnative-markup",
+ "serde_json",
+ "trybuild",
+]
+
+[[package]]
+name = "rustnative-core"
+version = "0.1.0"
+dependencies = [
+ "async-trait",
+ "criterion",
+ "futures-core",
+ "getrandom 0.3.4",
+ "parking_lot",
+ "proptest",
+ "rustnative-i18n",
+ "rustnative-macros",
+ "rustnative-style",
+ "rustnative-types",
+ "serde",
+ "serde_json",
+ "tokio",
+]
+
+[[package]]
+name = "rustnative-data"
+version = "0.1.0"
+dependencies = [
+ "async-trait",
+ "parking_lot",
+ "rustnative-core",
+ "serde",
+ "serde_json",
+ "tokio",
+]
+
+[[package]]
+name = "rustnative-durable"
+version = "0.1.0"
+dependencies = [
+ "async-trait",
+ "futures-util",
+ "rusqlite",
+ "rustnative-core",
+ "rustnative-server",
+ "serde",
+ "serde_json",
+ "tokio",
+]
+
+[[package]]
+name = "rustnative-headless"
+version = "0.1.0"
+dependencies = [
+ "async-trait",
+ "parking_lot",
+ "rustnative-core",
+ "rustnative-style",
+ "serde",
+ "serde_json",
+]
+
+[[package]]
+name = "rustnative-i18n"
+version = "0.1.0"
+
+[[package]]
+name = "rustnative-interop"
+version = "0.1.0"
+dependencies = [
+ "cc",
+]
+
+[[package]]
+name = "rustnative-macros"
+version = "0.1.0"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "rustnative-markup",
+ "rustnative-style",
+ "syn 2.0.119",
+]
+
+[[package]]
+name = "rustnative-markup"
+version = "0.1.0"
+dependencies = [
+ "prettyplease",
+ "proc-macro2",
+ "quote",
+ "serde",
+ "serde_json",
+ "syn 2.0.119",
+]
+
+[[package]]
+name = "rustnative-observe"
+version = "0.1.0"
+dependencies = [
+ "async-trait",
+ "rustnative-core",
+ "rustnative-observe",
+ "rustnative-server",
+ "serde",
+ "serde_json",
+ "tokio",
+]
+
+[[package]]
+name = "rustnative-server"
+version = "0.1.0"
+dependencies = [
+ "aes-gcm",
+ "argon2",
+ "async-trait",
+ "base64",
+ "bytes",
+ "getrandom 0.2.17",
+ "hkdf",
+ "hmac",
+ "http",
+ "http-body",
+ "http-body-util",
+ "hyper",
+ "hyper-util",
+ "p256",
+ "rusqlite",
+ "rustnative-core",
+ "rustnative-server-macros",
+ "serde",
+ "serde_json",
+ "sha2",
+ "tokio",
+ "toml",
+ "tower-service",
+]
+
+[[package]]
+name = "rustnative-server-macros"
+version = "0.1.0"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "rusqlite",
+ "syn 2.0.119",
+]
+
+[[package]]
+name = "rustnative-style"
+version = "0.1.0"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "rustnative-types",
+ "serde_json",
+]
+
+[[package]]
+name = "rustnative-sync"
+version = "0.1.0"
+dependencies = [
+ "async-trait",
+ "futures-util",
+ "proptest",
+ "rustnative-core",
+ "rustnative-server",
+ "serde",
+ "serde_json",
+ "tokio",
+ "tokio-tungstenite",
+]
+
+[[package]]
+name = "rustnative-types"
+version = "0.1.0"
+dependencies = [
+ "serde",
+]
+
+[[package]]
+name = "rustnative-windows"
+version = "0.1.0"
+dependencies = [
+ "async-trait",
+ "ed25519-dalek",
+ "raw-window-handle",
+ "rustnative-components",
+ "rustnative-conformance",
+ "rustnative-core",
+ "rustnative-data",
+ "rustnative-style",
+ "serde",
+ "serde_json",
+ "tokio",
+ "windows",
+ "windows-core",
+ "windows-numerics",
  "windows-sys",
 ]
 
@@ -1945,11 +1945,11 @@ dependencies = [
 name = "server-client"
 version = "0.1.0"
 dependencies = [
- "framework-core",
- "framework-headless",
- "framework-server",
- "framework-windows",
  "notes-shared",
+ "rustnative-core",
+ "rustnative-headless",
+ "rustnative-server",
+ "rustnative-windows",
  "serde_json",
  "server-demo",
  "tokio",
@@ -1961,10 +1961,10 @@ version = "0.1.0"
 dependencies = [
  "async-trait",
  "bytes",
- "framework-core",
- "framework-server",
  "http",
  "notes-shared",
+ "rustnative-core",
+ "rustnative-server",
  "serde",
  "serde_json",
  "tokio",
@@ -2044,9 +2044,9 @@ dependencies = [
 name = "span"
 version = "0.1.0"
 dependencies = [
- "framework-core",
- "framework-headless",
- "framework-windows",
+ "rustnative-core",
+ "rustnative-headless",
+ "rustnative-windows",
 ]
 
 [[package]]
@@ -2569,9 +2569,9 @@ name = "workflow-crash"
 version = "0.1.0"
 dependencies = [
  "async-trait",
- "framework-durable",
- "framework-server",
  "rusqlite",
+ "rustnative-durable",
+ "rustnative-server",
  "serde",
  "tokio",
 ]

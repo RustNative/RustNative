@@ -61,7 +61,7 @@
       "render is a function of state, props, and what the context provides",
       "keys name nodes; events and queries find nodes by key"
     ],
-    "trait": "framework_core::Component",
+    "trait": "rustnative_core::Component",
     "types": [
       "Props: PartialEq + Clone",
       "Message"

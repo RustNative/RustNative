@@ -3,12 +3,12 @@
 //! admin pages over your database, for administrator accounts only. It
 //! builds on the auth kit's `Account` (generate that first).
 
-use framework_server::RequestContext;
-use framework_server::ServerApp;
-use framework_server::admin::Admin;
-use framework_server::auth::Policy;
-use framework_server::db::Db;
-use framework_server::db::schema::Schema;
+use rustnative_server::RequestContext;
+use rustnative_server::ServerApp;
+use rustnative_server::admin::Admin;
+use rustnative_server::auth::Policy;
+use rustnative_server::db::Db;
+use rustnative_server::db::schema::Schema;
 
 use super::auth::Account;
 

@@ -1,0 +1,64 @@
+[package]
+name = "rustnative-core"
+version = "0.1.0"
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+description.workspace = true
+repository.workspace = true
+homepage.workspace = true
+readme.workspace = true
+keywords.workspace = true
+categories.workspace = true
+
+[lib]
+name = "rustnative_core"
+path = "src/lib.rs"
+
+[lints]
+workspace = true
+
+[dependencies]
+rustnative-macros = { workspace = true, optional = true }
+rustnative-types = { workspace = true, features = ["serde"] }
+# The style model's declaration vocabulary and token table (Milestone 58).
+rustnative-style.workspace = true
+# Message catalogues and plural rules (Milestone 46).
+rustnative-i18n.workspace = true
+tokio.workspace = true
+parking_lot.workspace = true
+async-trait.workspace = true
+# Milestone 30's persistence serializes component state and navigation
+# stacks; `serde_json` is the on-disk format (readable when debugging a
+# state file, and forgiving of fields added in a later version).
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+# The inspection server's and the development agent's tokens: the operating
+# system's cryptographic random number generator.
+getrandom = "0.3"
+# The stream contract `TaskScope::collect` accepts (Milestone 47).
+futures-core = "0.3"
+
+[features]
+# The markup syntax (`rsx!`, and `.rsx` files, which lower to it). On by
+# default so it is not a second-class opt-in; a feature so a constrained
+# profile can drop the proc-macro dependency — which turns off both
+# carriers together (`PLAN.md` Milestone 53).
+default = ["markup"]
+markup = ["dep:rustnative-macros"]
+# Before Milestone 30 this enabled `Serialize`/`Deserialize` on the id
+# types, ahead of persistence. Persistence is now part of the core, so
+# serde always is; the feature is kept, empty, so a manifest that asks for
+# it still builds.
+serde = []
+
+[dev-dependencies]
+tokio = { workspace = true, features = ["macros", "test-util"] }
+proptest = "1"
+
+[[bench]]
+name = "core_benchmarks"
+harness = false
+
+[dev-dependencies.criterion]
+version = "0.5"

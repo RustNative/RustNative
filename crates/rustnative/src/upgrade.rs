@@ -196,7 +196,7 @@ pub fn run(root: &Path, from: &str, dry_run: bool) -> Result<()> {
     let due: Vec<&Codemod> = CODEMODS
         .iter()
         .filter(|codemod| {
-            framework_core::package::version_matches(&format!(">{from}"), codemod.release)
+            rustnative_core::package::version_matches(&format!(">{from}"), codemod.release)
         })
         .collect();
     if due.is_empty() {

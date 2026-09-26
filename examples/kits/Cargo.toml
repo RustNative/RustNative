@@ -17,8 +17,8 @@ workspace = true
 
 # Milestone 52: the feature kits, compiled and tested as generated.
 [dependencies]
-framework-core.workspace = true
-framework-server.workspace = true
+rustnative-core.workspace = true
+rustnative-server.workspace = true
 serde = { version = "1", features = ["derive"] }
 
 [dev-dependencies]

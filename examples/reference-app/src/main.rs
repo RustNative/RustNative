@@ -4,9 +4,9 @@
 //! pseudo-localized; `--rtl` mirrored.
 #![cfg_attr(windows, windows_subsystem = "windows")]
 
-use framework_conformance::reference::{ReferenceScreen, Variant};
-use framework_core::{Application, Component, Platform, Size, Window};
-use framework_windows::WindowsPlatform;
+use rustnative_conformance::reference::{ReferenceScreen, Variant};
+use rustnative_core::{Application, Component, Platform, Size, Window};
+use rustnative_windows::WindowsPlatform;
 
 fn main() {
     let arguments: Vec<String> = std::env::args().collect();

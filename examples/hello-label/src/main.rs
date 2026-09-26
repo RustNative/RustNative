@@ -3,7 +3,7 @@
 use std::sync::Arc;
 use std::time::Duration;
 
-use framework_core::{
+use rustnative_core::{
     AccessibilityInfo, AccessibilityRole, AccessibleAction, AccessibleActionKind, Alignment,
     AnimatedProperty, AnimatedValue, Animation, AnimationRequests, Application, Callback,
     CheckedState, Color, ColumnStyle, Component, ComponentContext, DrawList, DropEffect,
@@ -12,8 +12,8 @@ use framework_core::{
     PanicPolicy, Persisted, Platform, Point, RectF, RowStyle, Services, Size, SizeMode, TaskHandle,
     Transition, Vec2, VirtualListStyle, VirtualRange, Window, classes,
 };
-use framework_core::{ColorScheme, environment::keys};
-use framework_windows::{FileStateStore, WindowsPlatform};
+use rustnative_core::{ColorScheme, environment::keys};
+use rustnative_windows::{FileStateStore, WindowsPlatform};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 enum AppMessage {
@@ -222,7 +222,7 @@ impl Component for CounterPanel {
             | Event::WindowCloseRequested { .. }
             | Event::WindowStateChanged { .. }
             | Event::MenuAction { .. } => {}
-            // `Event` is `#[non_exhaustive]` (framework-core standards audit
+            // `Event` is `#[non_exhaustive]` (rustnative-core standards audit
             // P2.4): a future new variant lands here by default rather than
             // failing to build every downstream crate.
             _ => {}
@@ -1101,8 +1101,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         Window::new("Rust Native UI", Size::new(640, 360)).with_menu(menu),
         services,
     );
-    // The theme `app.css` describes (`framework_build::compile_styles`).
-    application.set_theme(framework_core::app_theme!());
+    // The theme `app.css` describes (`rustnative_build::compile_styles`).
+    application.set_theme(rustnative_core::app_theme!());
     // A component panic is caught at the Win32 callback boundary regardless
     // (unwinding across `extern "system"` is undefined behavior, so that
     // part is not a policy). What *is* a policy is what happens next, and
@@ -1112,7 +1112,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     //
     // This example opts into closing just the offending window instead,
     // which is the right trade for a multi-window app where the other
-    // windows hold independent state — see `framework_core::panic` for the
+    // windows hold independent state — see `rustnative_core::panic` for the
     // full reasoning.
     application.set_panic_policy(PanicPolicy::CloseWindow);
     application.open_window(

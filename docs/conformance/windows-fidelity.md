@@ -2,7 +2,7 @@
 
 `PLAN.md` Milestone 41: fidelity is measured against the host's own first-party
 applications — never against another backend. Each row is held by a test in
-`framework-windows` (`native::guarantees_integration` unless noted).
+`rustnative-windows` (`native::guarantees_integration` unless noted).
 
 | Convention | What the framework does | Test |
 |---|---|---|

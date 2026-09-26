@@ -17,6 +17,6 @@ workspace = true
 
 # Milestone 55's device example: desired state over MQTT.
 [dependencies]
-framework-sync.workspace = true
+rustnative-sync.workspace = true
 serde = { version = "1", features = ["derive"] }
 tokio = { workspace = true, features = ["net", "rt-multi-thread", "macros", "time"] }

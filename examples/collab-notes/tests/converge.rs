@@ -10,9 +10,9 @@
 use std::sync::{Arc, Mutex};
 
 use collab_notes::{Doc, Editor, EditorProps, merge_policy};
-use framework_core::{Component, Services, Size, Theme, Window};
-use framework_headless::{HeadlessApp, Query};
-use framework_sync::{InMemory, SyncServer};
+use rustnative_core::{Component, Services, Size, Theme, Window};
+use rustnative_headless::{HeadlessApp, Query};
+use rustnative_sync::{InMemory, SyncServer};
 
 fn device(replica: u64, transport: &InMemory) -> HeadlessApp {
     let props =

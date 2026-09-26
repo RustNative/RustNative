@@ -11,8 +11,8 @@
 /// and relinks the shell (`PLAN.md` Milestone 43).
 pub const LIB_RS: &str = r#"//! {{display_name}}: its root component and its previews.
 
-use framework_core::preview::{Preview, PreviewMatrix};
-use framework_core::{Component, Event, Node, NodeId, classes};
+use rustnative_core::preview::{Preview, PreviewMatrix};
+use rustnative_core::{Component, Event, Node, NodeId, classes};
 
 /// The application's name, as people see it.
 pub const APP_NAME: &str = "{{display_name}}";
@@ -71,13 +71,13 @@ pub fn previews() -> Vec<Preview> {
 /// under `rustnative preview`, its preview catalogue.
 pub const MAIN_RS: &str = r#"#![cfg_attr(windows, windows_subsystem = "windows")]
 
-use framework_core::{Application, Component, Platform, Size, Window};
-use framework_windows::WindowsPlatform;
+use rustnative_core::{Application, Component, Platform, Size, Window};
+use rustnative_windows::WindowsPlatform;
 use {{crate_name}}::{APP_ID, APP_NAME, App};
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
-    if let Some(first) = framework_core::preview::requested() {
-        framework_windows::run_catalogue({{crate_name}}::previews(), &first)?;
+    if let Some(first) = rustnative_core::preview::requested() {
+        rustnative_windows::run_catalogue({{crate_name}}::previews(), &first)?;
         return Ok(());
     }
     let mut application = Application::new(
@@ -85,7 +85,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         Window::new(APP_NAME, Size::new(480, 320)),
     );
     // The theme `app.css` describes, compiled by the build script.
-    application.set_theme(framework_core::app_theme!());
+    application.set_theme(rustnative_core::app_theme!());
     WindowsPlatform::new().with_app_id(APP_ID).run(&mut application)?;
     Ok(())
 }
@@ -99,7 +99,7 @@ pub const PREVIEWS_TEST_RS: &str = r#"//! Every preview is a golden test: a chan
 #[test]
 fn every_preview_matches_its_golden() {
     let goldens = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/goldens");
-    framework_headless::preview_goldens(&{{crate_name}}::previews(), &goldens);
+    rustnative_headless::preview_goldens(&{{crate_name}}::previews(), &goldens);
 }
 "#;
 
@@ -128,8 +128,8 @@ pub const BUILD_RS: &str = r"//! Compiles `app.css` into this application's them
 //! (`rustnative.toml`).
 
 fn main() {
-    framework_build::compile_styles();
-    framework_build::embed_resources();
+    rustnative_build::compile_styles();
+    rustnative_build::embed_resources();
 }
 ";
 
@@ -173,7 +173,7 @@ name people see, and its version.
 /// [`LIB_RS`], with its component in `src/app.rsx`.
 pub const MARKUP_LIB_RS: &str = r#"//! {{display_name}}: its root component and its previews.
 
-use framework_core::preview::{Preview, PreviewMatrix};
+use rustnative_core::preview::{Preview, PreviewMatrix};
 
 /// The application's name, as people see it.
 pub const APP_NAME: &str = "{{display_name}}";
@@ -181,8 +181,8 @@ pub const APP_NAME: &str = "{{display_name}}";
 pub const APP_ID: &str = "{{app_id}}";
 
 // The root component is written in markup: see `src/app.rsx`, which the
-// build script lowers with `framework_build::compile_rsx()`.
-framework_core::rsx_mod!(app);
+// build script lowers with `rustnative_build::compile_rsx()`.
+rustnative_core::rsx_mod!(app);
 
 pub use app::App;
 
@@ -201,7 +201,7 @@ pub const MARKUP_MAIN_RS: &str = MAIN_RS;
 pub const MARKUP_APP_RSX: &str = r#"// The application's root component: state, a view of it written in
 // markup, and what events do to it.
 
-use framework_core::{Component, Event, Node, NodeId};
+use rustnative_core::{Component, Event, Node, NodeId};
 
 pub struct App {
     clicks: u32,
@@ -248,8 +248,8 @@ pub const MARKUP_BUILD_RS: &str = r"//! Lowers this application's `.rsx` files, 
 //! application manifest (`rustnative.toml`).
 
 fn main() {
-    framework_build::compile_rsx();
-    framework_build::compile_styles();
-    framework_build::embed_resources();
+    rustnative_build::compile_rsx();
+    rustnative_build::compile_styles();
+    rustnative_build::embed_resources();
 }
 ";

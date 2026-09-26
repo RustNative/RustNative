@@ -182,7 +182,7 @@ one.
 
 - `X-L0-5` `[X]` One ownership module per backend, with the host's memory
   convention written down and asserted in tests — the rule
-  `framework-windows` already follows, applied to every backend before its
+  `rustnative-windows` already follows, applied to every backend before its
   first control is realized.
 - `X-L0-6` `[X]` A documented, safe escape-hatch contract: how application code
   obtains a host object, what it may do with it, what invalidates it, and what

@@ -12,8 +12,8 @@
 use std::time::{Duration, Instant};
 
 use filter_demo::{App, ROWS, dataset, filter};
-use framework_core::{Component, Event, NodeId, Size, Window};
-use framework_headless::{HeadlessApp, Query};
+use rustnative_core::{Component, Event, NodeId, Size, Window};
+use rustnative_headless::{HeadlessApp, Query};
 
 /// The budget a keystroke must be handled in: the headless backend's
 /// `input_latency_ms` (`budgets/headless.toml`), the same promise the bench
@@ -79,11 +79,11 @@ fn the_view_shows_the_previous_matches_while_it_updates() {
     app.application_mut().pump_tasks();
     let status = app
         .application()
-        .components_for(framework_core::WindowId::PRIMARY)
+        .components_for(rustnative_core::WindowId::PRIMARY)
         .map(|tree| {
             let mut found = String::new();
             tree.view().visit(&mut |node, _, _| {
-                if let framework_core::Node::Label(label) = node {
+                if let rustnative_core::Node::Label(label) = node {
                     if label.text().contains("rows match") {
                         found = label.text().to_owned();
                     }
@@ -111,8 +111,8 @@ fn a_hidden_screen_does_no_periodic_work() {
     app.click(&Query::key("open-details")).unwrap();
     let suspended = app
         .application()
-        .components_for(framework_core::WindowId::PRIMARY)
-        .map(framework_core::ComponentTree::suspended_components)
+        .components_for(rustnative_core::WindowId::PRIMARY)
+        .map(rustnative_core::ComponentTree::suspended_components)
         .unwrap();
     assert!(
         suspended.iter().any(|path| path.ends_with("/filter")),

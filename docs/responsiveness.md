@@ -8,7 +8,7 @@
 - `rustnative bench` measures the same keystrokes on the real Windows edit
   control (`filter_input_latency_ms`, `filter_input_latency_max_ms`,
   `filter_results_ms` in `budgets/windows.toml`).
-- `framework-windows`'s `native::responsiveness_integration` shows a hidden
+- `rustnative-windows`'s `native::responsiveness_integration` shows a hidden
   screen's task stopping. It also shows an idle window receiving no messages
   at all for two seconds.
 

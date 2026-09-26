@@ -6,7 +6,7 @@ before anyone relies on it.
 
 | Host | Self-update | How RustNative updates |
 |---|---|---|
-| Windows, portable package (ZIP) | Permitted | `framework_windows::update`: signed manifests (Ed25519, key pinned at build), staged rollout by installation bucket, side-by-side version directories, and a launcher that rolls back a version failing twice before `interactive` |
+| Windows, portable package (ZIP) | Permitted | `rustnative_windows::update`: signed manifests (Ed25519, key pinned at build), staged rollout by installation bucket, side-by-side version directories, and a launcher that rolls back a version failing twice before `interactive` |
 | Windows, MSIX installed from a web page or share | Permitted, through App Installer | `rustnative package windows --format msix --appinstaller <url>` writes the `.appinstaller` file that App Installer checks on launch |
 | Windows, Microsoft Store | **Forbidden**: the Store updates Store applications | The Store's own update; the updater must not run (`Updater` is not constructed for a Store build) |
 | Server (long-lived) | Not applicable: the operator deploys | `rustnative deploy`: immutable revisions, percentage traffic, rollback |

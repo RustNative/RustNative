@@ -10,10 +10,10 @@
 )]
 
 use bytes::Bytes;
-use framework_core::product::Product;
-use framework_server::db::Db;
-use framework_server::{AppService, ServerApp};
 use kits::{admin, auth, commerce};
+use rustnative_core::product::Product;
+use rustnative_server::db::Db;
+use rustnative_server::{AppService, ServerApp};
 
 struct Browser {
     service: AppService,

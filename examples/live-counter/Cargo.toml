@@ -17,11 +17,11 @@ workspace = true
 
 # Milestone 55's server-interactive example.
 [dependencies]
-framework-core.workspace = true
-framework-sync.workspace = true
-framework-windows.workspace = true
+rustnative-core.workspace = true
+rustnative-sync.workspace = true
+rustnative-windows.workspace = true
 serde_json = "1"
 tokio = { workspace = true, features = ["net", "rt-multi-thread", "macros"] }
 
 [dev-dependencies]
-framework-headless.workspace = true
+rustnative-headless.workspace = true

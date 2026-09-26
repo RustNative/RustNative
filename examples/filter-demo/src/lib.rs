@@ -17,7 +17,7 @@
 use std::sync::Arc;
 use std::time::Duration;
 
-use framework_core::{
+use rustnative_core::{
     Callback, Component, ComponentContext, Event, ItemExtent, LayoutStyle, Node, NodeId, SizeMode,
     SuspendRule, TaskScope, VirtualListStyle, VirtualRange,
 };
@@ -109,7 +109,7 @@ impl Component for App {
             "app",
             children,
             LayoutStyle::new().width(SizeMode::Fill).height(SizeMode::Fill),
-            framework_core::ColumnStyle::new(),
+            rustnative_core::ColumnStyle::new(),
         )
     }
 }
@@ -232,7 +232,7 @@ impl Component for FilterScreen {
                 ),
             ],
             LayoutStyle::new().width(SizeMode::Fill).height(SizeMode::Fill),
-            framework_core::ColumnStyle::new(),
+            rustnative_core::ColumnStyle::new(),
         )
     }
 }

@@ -9,7 +9,7 @@ controls and their accessibility. This pattern avoids both problems.
 ## The pattern
 
 1. Build the screen from native nodes: labels, buttons, the controls of
-   `framework_core::control`, and the components of `framework-components`.
+   `rustnative_core::control`, and the components of `rustnative-components`.
 2. Where the design needs something the host does not have, such as a
    chart, a timeline, or a custom gauge, put a `Node::canvas` there. It
    takes a draw list (Milestone 29). On Windows it is drawn with
@@ -29,10 +29,10 @@ neighbours.
 
 ## An example: the library's chart
 
-`framework_components::Chart` follows the pattern exactly:
+`rustnative_components::Chart` follows the pattern exactly:
 
 - The plot is a canvas. Its draw list is built by
-  `framework_core::graphics`, with the palette taken from the theme.
+  `rustnative_core::graphics`, with the palette taken from the theme.
 - Its role is `Table`. Its description says what it plots: "Bar chart of 2
   series over 3 categories…".
 - Every data point is an element named "series, category: value", with its
@@ -40,7 +40,7 @@ neighbours.
 - The arrow keys move a focus through the points, and a status label
   announces each one.
 
-`crates/framework-components/tests/library.rs` asserts every one of these
+`crates/rustnative-components/tests/library.rs` asserts every one of these
 properties.
 
 ## Rules
@@ -65,5 +65,5 @@ properties.
 
 On the embedded and terminal targets (owed; see `BUILD_STATUS.md`), more of
 the tree is drawn. The same behaviour layer
-(`framework_components::behaviour`) and the same accessibility model apply,
+(`rustnative_components::behaviour`) and the same accessibility model apply,
 so the controls behave the same way everywhere.

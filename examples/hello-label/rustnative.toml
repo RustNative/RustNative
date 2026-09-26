@@ -1,4 +1,4 @@
-# The example's own project description, read by `framework-build` (which
+# The example's own project description, read by `rustnative-build` (which
 # `build.rs` runs) and by `rustnative`.
 [app]
 name = "hello-label"

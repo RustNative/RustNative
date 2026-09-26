@@ -12,10 +12,10 @@
 
 use std::sync::Arc;
 
-use framework_core::capability::SurfaceKind;
-use framework_core::product::{Flag, SecureStorage};
-use framework_core::surfaces::{JumpTask, NOTIFICATION, Surfaces, TrayMenuItem};
-use framework_core::{Component, ComponentContext, Event, Node, NodeId};
+use rustnative_core::capability::SurfaceKind;
+use rustnative_core::product::{Flag, SecureStorage};
+use rustnative_core::surfaces::{JumpTask, NOTIFICATION, Surfaces, TrayMenuItem};
+use rustnative_core::{Component, ComponentContext, Event, Node, NodeId};
 
 /// The remotely toggled feature.
 pub const COMPACT: Flag<bool> = Flag::new("compact-layout", false);

@@ -27,7 +27,7 @@ The most important reason is that several architectural choices currently make c
 10. **Native menu handles and some failure paths lack complete RAII ownership.** A production FFI layer should make native resource ownership structurally impossible to leak.
 11. **Accessibility is only partially realized.** The portable semantic model exists, but the Windows backend largely relies on native control defaults and does not implement the custom semantic bridge promised by the architecture. Some focusability transitions are not actually synchronized to native styles.
 12. **The repository's engineering controls are incomplete:** the README documents files that are absent (`CI`, `rustfmt.toml`, `SECURITY.md`, `CONTRIBUTING.md`), there is no visible CI workflow, and `cargo-audit` is incorrectly listed as a rustup component.
-13. **The current source is monolithic and several central types are multi-responsibility objects.** `framework-core/src/lib.rs` and `framework-windows/src/lib.rs` contain thousands of lines spanning many independent responsibilities. This is both a Single Responsibility / cohesion problem and a major maintainability and reviewability problem for a framework with unsafe/native boundaries. The strongest fix is not arbitrary file splitting, but deliberate responsibility boundaries with narrow interfaces.
+13. **The current source is monolithic and several central types are multi-responsibility objects.** `rustnative-core/src/lib.rs` and `rustnative-windows/src/lib.rs` contain thousands of lines spanning many independent responsibilities. This is both a Single Responsibility / cohesion problem and a major maintainability and reviewability problem for a framework with unsafe/native boundaries. The strongest fix is not arbitrary file splitting, but deliberate responsibility boundaries with narrow interfaces.
 14. **The current automated test suite is heavily biased toward core logic.** There is only one Windows-specific test in the backend, and no automated native Windows event-loop/resource/reentrancy suite.
 
 The project should therefore be considered:
@@ -97,8 +97,8 @@ The Windows backend additionally requires actual Windows execution for meaningfu
 
 The workspace contains three members:
 
-- `framework-core`
-- `framework-windows`
+- `rustnative-core`
+- `rustnative-windows`
 - `hello-label`
 
 The root workspace uses:
@@ -114,17 +114,17 @@ The root workspace uses:
 
 Approximate Rust source size inspected:
 
-- `framework-core/src/lib.rs`: very large monolithic module;
-- `framework-windows/src/lib.rs`: very large monolithic native backend;
+- `rustnative-core/src/lib.rs`: very large monolithic module;
+- `rustnative-windows/src/lib.rs`: very large monolithic native backend;
 - example application;
 - core unit tests;
 - lifecycle integration tests.
 
 Static counts from the supplied archive:
 
-- **41** `#[test]` functions in `framework-core/src/lib.rs`;
-- **4** integration tests in `framework-core/tests/component_lifecycle.rs`;
-- **1** Windows-specific test in `framework-windows/src/lib.rs`;
+- **41** `#[test]` functions in `rustnative-core/src/lib.rs`;
+- **4** integration tests in `rustnative-core/tests/component_lifecycle.rs`;
+- **1** Windows-specific test in `rustnative-windows/src/lib.rs`;
 - approximately **9,438 Rust source lines** across the implementation/example/test files.
 
 The test count is already meaningful, but the distribution is not sufficient for a native framework.
@@ -149,7 +149,7 @@ Severity definitions:
 
 ### Evidence
 
-`NodeId::from_key` hashes an arbitrary string into a single `u64` using FNV-1a (`framework-core/src/lib.rs`, around lines 26–38).
+`NodeId::from_key` hashes an arbitrary string into a single `u64` using FNV-1a (`rustnative-core/src/lib.rs`, around lines 26–38).
 
 More importantly, component scoping explicitly leaves node IDs unchanged:
 
@@ -574,7 +574,7 @@ For framework-level guarantees, separately guarantee that **completed/cancelled 
 
 ### Evidence
 
-`framework-core::runtime()` creates a process-global `OnceLock<Runtime>` with exactly two worker threads.
+`rustnative-core::runtime()` creates a process-global `OnceLock<Runtime>` with exactly two worker threads.
 
 ### Problems
 
@@ -1088,7 +1088,7 @@ This matters more for a framework than for a small application. A framework's in
 
 Rust's module privacy system is particularly useful here because private modules and restricted visibility can make responsibility boundaries enforceable rather than merely documented. Rust's API guidance likewise emphasizes APIs that are coherent and easy to understand, while Microsoft's Rust guidance recommends balanced modules and clear subsystem boundaries.
 
-### Core: `framework-core/src/lib.rs`
+### Core: `rustnative-core/src/lib.rs`
 
 The core crate is approximately 4,500+ lines in a single source module and combines multiple independently evolving domains:
 
@@ -1107,12 +1107,12 @@ The core crate is approximately 4,500+ lines in a single source module and combi
 
 The most important responsibility hotspots are (source locations are approximate and refer to the supplied archive):
 
-- `ComponentTree` — `framework-core/src/lib.rs:1344–1850`;
-- `Application` — `framework-core/src/lib.rs:1925–2184`;
-- `Renderer` — `framework-windows/src/lib.rs:974–1677`;
-- `Runtime` — `framework-windows/src/lib.rs:1689–1774`;
-- `WindowRegistry` — `framework-windows/src/lib.rs:1775–1966`;
-- Win32 callback/message handling — `framework-windows/src/lib.rs:2466–2906`.
+- `ComponentTree` — `rustnative-core/src/lib.rs:1344–1850`;
+- `Application` — `rustnative-core/src/lib.rs:1925–2184`;
+- `Renderer` — `rustnative-windows/src/lib.rs:974–1677`;
+- `Runtime` — `rustnative-windows/src/lib.rs:1689–1774`;
+- `WindowRegistry` — `rustnative-windows/src/lib.rs:1775–1966`;
+- Win32 callback/message handling — `rustnative-windows/src/lib.rs:2466–2906`.
 
 #### `ComponentTree`
 
@@ -1201,7 +1201,7 @@ Platform realization
 
 This reduces accidental coupling between the public declarative API and internal reconciliation structures.
 
-### Windows backend: `framework-windows/src/lib.rs`
+### Windows backend: `rustnative-windows/src/lib.rs`
 
 The Windows backend has an even stronger SRP problem because one file combines public platform services and a large native runtime.
 
@@ -1321,7 +1321,7 @@ For example, separate crates for layout, scheduler, component runtime, tree diff
 The strongest target is a **hybrid feature-oriented architecture with explicit coordinators**:
 
 ```text
-framework-core
+rustnative-core
 │
 ├── identity/             owns identity allocation + identity semantics
 ├── component/            owns component lifecycle/state
@@ -1341,7 +1341,7 @@ framework-core
 ├── window/               owns window-domain state/commands
 └── application.rs        thin top-level orchestration facade
 
-framework-windows
+rustnative-windows
 │
 ├── services/
 │   ├── clipboard.rs
@@ -1449,7 +1449,7 @@ This is particularly important for the unsafe Windows layer: reducing the number
 
 ## P2-22 — Core implementation is too monolithic
 
-`framework-core/src/lib.rs` contains unrelated domains including:
+`rustnative-core/src/lib.rs` contains unrelated domains including:
 
 - component lifecycle;
 - services;
@@ -1463,7 +1463,7 @@ This is particularly important for the unsafe Windows layer: reducing the number
 - menus;
 - tests.
 
-`framework-windows/src/lib.rs` similarly contains:
+`rustnative-windows/src/lib.rs` similarly contains:
 
 - platform services;
 - clipboard;
@@ -1485,7 +1485,7 @@ Split into modules before the codebase grows further.
 Suggested core structure:
 
 ```text
-framework-core/src/
+rustnative-core/src/
 ├── lib.rs
 ├── identity.rs
 ├── component/
@@ -1967,9 +1967,9 @@ Rust 2024 is the current modern edition line and is appropriate for a new framew
 
 ## 6.2 Platform boundary is conceptually correct
 
-`framework-core` does not directly import Win32 APIs.
+`rustnative-core` does not directly import Win32 APIs.
 
-The Windows backend is isolated behind `framework-windows`.
+The Windows backend is isolated behind `rustnative-windows`.
 
 That is exactly the right direction for the stated architecture.
 

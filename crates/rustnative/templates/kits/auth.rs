@@ -9,12 +9,12 @@
 
 use std::time::Duration;
 
-use framework_server::auth::password;
-use framework_server::auth::session::{Session, Sessions};
-use framework_server::auth::{Authentication, PRINCIPAL_KEY, Principal};
-use framework_server::config::Secret;
-use framework_server::db::{Db, DbError};
-use framework_server::{Json, ServerApp, ServerError, State, get, post};
+use rustnative_server::auth::password;
+use rustnative_server::auth::session::{Session, Sessions};
+use rustnative_server::auth::{Authentication, PRINCIPAL_KEY, Principal};
+use rustnative_server::config::Secret;
+use rustnative_server::db::{Db, DbError};
+use rustnative_server::{Json, ServerApp, ServerError, State, get, post};
 use serde::{Deserialize, Serialize};
 
 /// A signed-in account.

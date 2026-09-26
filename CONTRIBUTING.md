@@ -14,7 +14,7 @@ cargo deny check
 cargo audit
 ```
 
-Changes to `framework-windows` also need verification on a real Windows
+Changes to `rustnative-windows` also need verification on a real Windows
 runner. Native callback, HWND, COM, menu, dialog, and GDI changes should add
 or update an executable integration test where practical.
 

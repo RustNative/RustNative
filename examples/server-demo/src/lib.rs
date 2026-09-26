@@ -8,7 +8,7 @@
 //!   error:
 //!
 //! ```compile_fail
-//! let _ = framework_server::query!("SELECT titel FROM notes");
+//! let _ = rustnative_server::query!("SELECT titel FROM notes");
 //! ```
 //!
 //! - Jobs: a new note is indexed in the background, durably.
@@ -17,26 +17,26 @@
 
 use std::time::Duration;
 
-use framework_core::Node;
-use framework_server::admin::Admin;
-use framework_server::auth::password;
-use framework_server::auth::session::{Session, Sessions};
-use framework_server::auth::token::TokenSigner;
-use framework_server::auth::{Authentication, PRINCIPAL_KEY, Policy, Principal};
-use framework_server::components::server_component;
-use framework_server::config::{Config, Secret};
-use framework_server::db::migrate::Migrations;
-use framework_server::db::schema::Schema;
-use framework_server::db::{Db, DbError};
-use framework_server::functions::{server_fn, server_fn_with};
-use framework_server::head::{Head, Sitemap};
-use framework_server::jobs::{Job, JobContext, Jobs};
-use framework_server::render::page;
-use framework_server::{
+use notes_shared::{CreateNote, Credentials, ListNotes, NewNote, Note, NoteSummary, SignIn};
+use rustnative_core::Node;
+use rustnative_server::admin::Admin;
+use rustnative_server::auth::password;
+use rustnative_server::auth::session::{Session, Sessions};
+use rustnative_server::auth::token::TokenSigner;
+use rustnative_server::auth::{Authentication, PRINCIPAL_KEY, Policy, Principal};
+use rustnative_server::components::server_component;
+use rustnative_server::config::{Config, Secret};
+use rustnative_server::db::migrate::Migrations;
+use rustnative_server::db::schema::Schema;
+use rustnative_server::db::{Db, DbError};
+use rustnative_server::functions::{server_fn, server_fn_with};
+use rustnative_server::head::{Head, Sitemap};
+use rustnative_server::jobs::{Job, JobContext, Jobs};
+use rustnative_server::render::page;
+use rustnative_server::{
     CspNonce, CsrfToken, Form, Html, IntoResponse, Redirect, RequestContext, Response, ServerApp,
     ServerError, get, post, query,
 };
-use notes_shared::{CreateNote, Credentials, ListNotes, NewNote, Note, NoteSummary, SignIn};
 use serde::{Deserialize, Serialize};
 
 /// Who is signed in.
@@ -89,7 +89,7 @@ impl Default for Settings {
 /// A layer is malformed.
 pub fn settings(
     directory: &std::path::Path,
-) -> Result<(Settings, Vec<String>), framework_server::config::ConfigError> {
+) -> Result<(Settings, Vec<String>), rustnative_server::config::ConfigError> {
     let config = Config::new()
         .defaults(&Settings::default())
         .file(directory.join("server.toml"))?
@@ -180,7 +180,7 @@ fn head() -> Head {
 
 async fn home(
     principal: Option<Principal<User>>,
-    framework_server::State(db): framework_server::State<Db>,
+    rustnative_server::State(db): rustnative_server::State<Db>,
     nonce: CspNonce,
     csrf: CsrfToken,
 ) -> Response {
@@ -200,7 +200,7 @@ async fn home(
 
 async fn sign_in_page(
     session: Session,
-    framework_server::State(db): framework_server::State<Db>,
+    rustnative_server::State(db): rustnative_server::State<Db>,
     Form(credentials): Form<Credentials>,
 ) -> Result<Redirect, ServerError> {
     let user = find_user(&db, &credentials.name, &credentials.password)

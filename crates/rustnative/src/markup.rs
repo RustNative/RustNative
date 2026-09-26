@@ -1,7 +1,7 @@
 //! The markup syntax in the CLI: `rustnative expand` and `rustnative fmt`,
 //! over both carriers — `.rsx` files and `rsx!` calls in `.rs` files.
 //!
-//! Both commands link `framework-markup`, the same parser and lowering the
+//! Both commands link `rustnative-markup`, the same parser and lowering the
 //! `rsx!` macro uses, so what `expand` prints is exactly what the compiler
 //! sees and what `fmt` accepts is exactly what the compiler accepts.
 
@@ -9,9 +9,9 @@ use std::fmt::Write as _;
 use std::path::{Path, PathBuf};
 use std::str::FromStr;
 
-use framework_markup::{CompileOptions, Markup, compile, format_markup, lower};
 use proc_macro2::{TokenStream, TokenTree};
 use quote::quote;
+use rustnative_markup::{CompileOptions, Markup, compile, format_markup, lower};
 
 use crate::error::{Error, Result};
 
@@ -54,7 +54,7 @@ fn find_sites(tokens: TokenStream, name: &str, sites: &mut Vec<MacroSite>) {
                 && matches!(&tokens[index - 1], TokenTree::Punct(p) if p.as_char() == '!')
                 && matches!(&tokens[index - 2], TokenTree::Ident(ident) if ident == name);
             if is_call {
-                // Walk back over a leading path (`::framework_core::rsx!`).
+                // Walk back over a leading path (`::rustnative_core::rsx!`).
                 let mut first = index - 2;
                 while first >= 2
                     && matches!(&tokens[first - 1], TokenTree::Punct(p) if p.as_char() == ':')
@@ -131,10 +131,10 @@ pub fn expand_file(path: &Path) -> Result<String> {
 /// The style file or the input does not compile.
 pub fn expand_style(here: &Path, input: &str, classes: bool) -> Result<String> {
     let project = here.ancestors().find(|dir| dir.join("Cargo.toml").is_file()).unwrap_or(here);
-    let vocabulary = match framework_build::styles::style_file(project) {
+    let vocabulary = match rustnative_build::styles::style_file(project) {
         Some(path) => {
             let source = read(&path)?;
-            framework_style::Vocabulary::with_style_file(&source).map_err(|errors| {
+            rustnative_style::Vocabulary::with_style_file(&source).map_err(|errors| {
                 Error::Usage(
                     errors
                         .iter()
@@ -147,7 +147,7 @@ pub fn expand_style(here: &Path, input: &str, classes: bool) -> Result<String> {
                 )
             })?
         }
-        None => framework_style::Vocabulary::defaults(),
+        None => rustnative_style::Vocabulary::defaults(),
     };
     let lowered = if classes {
         vocabulary.resolve_classes(input)
@@ -340,7 +340,8 @@ mod tests {
             scratch("view.rs", "fn v() -> Node { rsx! { <Label key=\"a\" text=\"Hi\" /> } }\n");
         let expanded = expand_file(&rs).expect("expands");
         assert!(
-            expanded.contains("::framework_core::Node::label_with_layout(\"a\", \"Hi\", __layout)"),
+            expanded
+                .contains("::rustnative_core::Node::label_with_layout(\"a\", \"Hi\", __layout)"),
             "{expanded}"
         );
 

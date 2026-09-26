@@ -8,13 +8,13 @@
 
 use std::sync::Arc;
 
-use framework_core::server_fn::{ServerComponentDef, call};
-use framework_core::wire::WireNode;
-use framework_core::{
-    Component, ComponentContext, Event, HttpRequest, HttpService, Method, Node, NodeId,
-};
 use notes_shared::{
     CreateNote, Credentials, ListNotes, NewNote, Note, NoteSummary, SignIn, notes_view,
+};
+use rustnative_core::server_fn::{ServerComponentDef, call};
+use rustnative_core::wire::WireNode;
+use rustnative_core::{
+    Component, ComponentContext, Event, HttpRequest, HttpService, Method, Node, NodeId,
 };
 
 /// Where the server is, and who signs in.

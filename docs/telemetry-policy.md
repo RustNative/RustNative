@@ -3,7 +3,7 @@
 `PLAN.md` Milestone 51.
 
 - **Off by default.** Nothing leaves the person's machine until they agree.
-  `framework_observe::Telemetry` starts without consent, and the
+  `rustnative_observe::Telemetry` starts without consent, and the
   application stores the person's choice (`to_state` / `from_state`).
 - **What may be sent, with consent:** spans (names, durations, status, and
   the attributes the semantic conventions define), metrics, and crash

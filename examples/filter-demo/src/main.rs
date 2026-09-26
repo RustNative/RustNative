@@ -1,8 +1,8 @@
 #![cfg_attr(windows, windows_subsystem = "windows")]
 
 use filter_demo::App;
-use framework_core::{Application, Component, Platform, Size, Window};
-use framework_windows::WindowsPlatform;
+use rustnative_core::{Application, Component, Platform, Size, Window};
+use rustnative_windows::WindowsPlatform;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut application =

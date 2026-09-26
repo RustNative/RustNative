@@ -18,7 +18,7 @@ use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
 use std::sync::{Arc, Mutex, PoisonError};
 
-use framework_markup::{CompileOptions, SourceMap, compile, element_spec, element_table};
+use rustnative_markup::{CompileOptions, SourceMap, compile, element_spec, element_table};
 use serde_json::{Value, json};
 
 use crate::error::{Error, Result};
@@ -739,7 +739,7 @@ mod tests {
         );
         let lowered_text =
             forwarded.pointer("/params/textDocument/text").and_then(Value::as_str).expect("text");
-        assert!(lowered_text.contains("::framework_core::rsx!(<Column"));
+        assert!(lowered_text.contains("::rustnative_core::rsx!(<Column"));
 
         // A hover on `gap` moves right by the inserted prefix...
         let gap = text.lines().nth(1).expect("line").find("gap").expect("gap");

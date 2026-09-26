@@ -10,12 +10,12 @@
 
 use std::sync::Arc;
 
-use framework_core::capability::SurfaceKind;
-use framework_core::product::{Flags, MemorySecureStorage, SecureStorage};
-use framework_core::surfaces::{NOTIFICATION, SurfaceCommand};
-use framework_core::{Component, Event, Services, Size, Theme, Window, WindowId};
-use framework_headless::{HeadlessApp, Query};
 use product_services::{Product, TOKEN};
+use rustnative_core::capability::SurfaceKind;
+use rustnative_core::product::{Flags, MemorySecureStorage, SecureStorage};
+use rustnative_core::surfaces::{NOTIFICATION, SurfaceCommand};
+use rustnative_core::{Component, Event, Services, Size, Theme, Window, WindowId};
+use rustnative_headless::{HeadlessApp, Query};
 
 fn launch(services: Services) -> HeadlessApp {
     HeadlessApp::launch_with(

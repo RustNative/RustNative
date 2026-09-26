@@ -89,14 +89,14 @@ seed = "fixtures/catalogue.json"
 ```
 
 The application receives it as `RUSTNATIVE_RESOURCE_<NAME>`, which
-`framework_core::dev::resource("uploads")` reads.
+`rustnative_core::dev::resource("uploads")` reads.
 
 ### Errors
 
 A development run is started with `RUSTNATIVE_DEV=1`. In that run, a
 component panic shows the panic message and where it happened. When the code
 was lowered from markup, the position is in the `.rsx` file, found through
-the source map the build writes (`framework_core::dev`).
+the source map the build writes (`rustnative_core::dev`).
 
 ### Tests on save
 
@@ -119,10 +119,10 @@ both contrasts. Widths can be added.
 
 - `rustnative preview` opens the catalogue: the application's own
   executable, run with `RUSTNATIVE_PREVIEW`, showing
-  `framework_core::preview::Catalogue` on the native backend. A toolbar
+  `rustnative_core::preview::Catalogue` on the native backend. A toolbar
   cycles the configuration.
 - `rustnative preview --headless` runs `tests/previews.rs`. That test calls
-  `framework_headless::preview_goldens`, which makes every preview in every
+  `rustnative_headless::preview_goldens`, which makes every preview in every
   configuration a golden test.
   - A new preview's golden is written the first time.
   - A changed preview fails until it is re-blessed with

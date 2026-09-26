@@ -1,7 +1,7 @@
 # Core cost characteristics
 
-`PLAN.md` Milestone 52. Measured by `crates/framework-core/tests/core_costs.rs`
-(`RUSTNATIVE_WRITE_COSTS=1 cargo test -p framework-core --test core_costs --release`),
+`PLAN.md` Milestone 52. Measured by `crates/rustnative-core/tests/core_costs.rs`
+(`RUSTNATIVE_WRITE_COSTS=1 cargo test -p rustnative-core --test core_costs --release`),
 not estimated. The heap figures are checked on every run of the test suite.
 Times are the slowest of 20 runs on the machine that wrote this page, in a
 release build: read them as orders of magnitude, not as budgets.

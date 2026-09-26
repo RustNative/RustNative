@@ -42,8 +42,7 @@ fn text(output: &Output) -> String {
     )
 }
 
-const CARGO: &str =
-    "[package]\nname = \"demo\"\nversion = \"0.1.0\"\n\n[dependencies]\nframework-core = \"0.1\"\n";
+const CARGO: &str = "[package]\nname = \"demo\"\nversion = \"0.1.0\"\n\n[dependencies]\nrustnative-core = \"0.1\"\n";
 
 #[test]
 fn a_package_is_checked_before_it_is_added() {
@@ -81,10 +80,10 @@ fn a_package_is_checked_before_it_is_added() {
 fn kits_are_written_in_order_on_the_server_model() {
     let plain = project("kit-plain", CARGO);
     assert!(
-        text(&run(&plain, &["generate", "kit", "auth"])).contains("framework-server"),
+        text(&run(&plain, &["generate", "kit", "auth"])).contains("rustnative-server"),
         "needs the server model"
     );
-    let root = project("kits", &format!("{CARGO}framework-server = \"0.1\"\n"));
+    let root = project("kits", &format!("{CARGO}rustnative-server = \"0.1\"\n"));
     assert!(
         text(&run(&root, &["generate", "kit", "admin"])).contains("kit auth"),
         "admin builds on auth"

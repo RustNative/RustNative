@@ -8,9 +8,9 @@
     reason = "helper functions in an integration test are test code too: a failed expectation is the test failing"
 )]
 
-use framework_core::{Component, LayoutDirection, Services, Size, Theme, Window};
-use framework_headless::{HeadlessApp, Query};
 use i18n_demo::{Demo, messages, text};
+use rustnative_core::{Component, LayoutDirection, Services, Size, Theme, Window};
+use rustnative_headless::{HeadlessApp, Query};
 
 fn launch() -> HeadlessApp {
     let services = Services::default().with_catalogues(messages::catalogues());

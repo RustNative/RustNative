@@ -409,12 +409,12 @@ impl Cli {
                     what: format!("read {}", file.display()),
                     cause,
                 })?;
-                let idl = framework_interop::parse_idl(&source)
+                let idl = rustnative_interop::parse_idl(&source)
                     .map_err(|error| Error::Usage(format!("{}:{error}", file.display())))?;
                 let text = match lang {
-                    BindgenLanguage::C => framework_interop::generate::c(&idl),
-                    BindgenLanguage::Csharp => framework_interop::generate::csharp(&idl),
-                    BindgenLanguage::Rust => framework_interop::generate::rust(&idl),
+                    BindgenLanguage::C => rustnative_interop::generate::c(&idl),
+                    BindgenLanguage::Csharp => rustnative_interop::generate::csharp(&idl),
+                    BindgenLanguage::Rust => rustnative_interop::generate::rust(&idl),
                 };
                 match out {
                     Some(path) => std::fs::write(&path, text).map_err(|cause| Error::Io {
@@ -459,7 +459,7 @@ impl Cli {
                 )
                 .current_dir(&project.root)
                 .arg("run")
-                .env(framework_core::preview::PREVIEW_VARIABLE, name.unwrap_or_default())
+                .env(rustnative_core::preview::PREVIEW_VARIABLE, name.unwrap_or_default())
                 .status()
                 .map_err(|cause| Error::ToolMissing {
                     tool: "cargo",

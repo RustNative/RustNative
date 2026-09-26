@@ -8,11 +8,11 @@
 use std::sync::{Arc, Mutex};
 
 use collab_notes::{Doc, Editor, EditorProps, merge_policy};
-use framework_core::{Application, Component, Platform, Size, Window};
-use framework_server::ServerApp;
-use framework_sync::SyncServer;
-use framework_sync::http::HttpSync;
-use framework_windows::{WinHttp, WindowsPlatform};
+use rustnative_core::{Application, Component, Platform, Size, Window};
+use rustnative_server::ServerApp;
+use rustnative_sync::SyncServer;
+use rustnative_sync::http::HttpSync;
+use rustnative_windows::{WinHttp, WindowsPlatform};
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let argument = std::env::args().nth(1).unwrap_or_else(|| "1".into());
@@ -20,7 +20,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         let runtime = tokio::runtime::Runtime::new()?;
         return runtime.block_on(async {
             let sync = Arc::new(Mutex::new(SyncServer::new().collection::<Doc>(merge_policy(), 1)));
-            let app = framework_sync::http::server::mount(ServerApp::new(), &sync, |router| {
+            let app = rustnative_sync::http::server::mount(ServerApp::new(), &sync, |router| {
                 router.csrf_exempt().public()
             });
             let listener = tokio::net::TcpListener::bind("127.0.0.1:8090").await?;

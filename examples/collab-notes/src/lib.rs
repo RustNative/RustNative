@@ -10,8 +10,8 @@
 
 use std::sync::Arc;
 
-use framework_core::{Component, ComponentContext, Event, Node, NodeId};
-use framework_sync::{
+use rustnative_core::{Component, ComponentContext, Event, Node, NodeId};
+use rustnative_sync::{
     Clock, ConflictPolicy, Crdt, Record, Rga, SyncError, SyncReport, SyncTransport,
     SyncedCollection,
 };

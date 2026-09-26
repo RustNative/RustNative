@@ -57,7 +57,7 @@ fn the_committed_description_is_current() {
 #[test]
 fn the_event_list_is_the_enums() {
     let source =
-        std::fs::read_to_string(workspace().join("crates/framework-core/src/event.rs")).unwrap();
+        std::fs::read_to_string(workspace().join("crates/rustnative-core/src/event.rs")).unwrap();
     let file = syn::parse_file(&source).unwrap();
     let variants: Vec<String> = file
         .items
@@ -69,5 +69,5 @@ fn the_event_list_is_the_enums() {
             _ => None,
         })
         .unwrap();
-    assert_eq!(variants, framework_core::event::EVENT_NAMES);
+    assert_eq!(variants, rustnative_core::event::EVENT_NAMES);
 }

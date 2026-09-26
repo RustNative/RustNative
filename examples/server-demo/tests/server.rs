@@ -10,13 +10,13 @@
 )]
 
 use bytes::Bytes;
-use framework_core::server_fn::{ServerFnError, call, fetch_component};
-use framework_core::{HttpRequest, HttpService, Node};
-use framework_server::db::Db;
-use framework_server::jobs::Jobs;
-use framework_server::local::InProcess;
-use framework_server::openapi::breaking_changes;
 use notes_shared::{CreateNote, Credentials, ListNotes, NewNote, NoteSummary, SignIn};
+use rustnative_core::server_fn::{ServerFnError, call, fetch_component};
+use rustnative_core::{HttpRequest, HttpService, Node};
+use rustnative_server::db::Db;
+use rustnative_server::jobs::Jobs;
+use rustnative_server::local::InProcess;
+use rustnative_server::openapi::breaking_changes;
 use server_demo::{IndexNote, app, database};
 
 const BASE: &str = "https://notes.example.com";

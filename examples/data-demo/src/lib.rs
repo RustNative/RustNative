@@ -19,15 +19,15 @@ use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};
 use std::time::Duration;
 
-use framework_core::{
+use parking_lot::Mutex;
+use rustnative_core::{
     Component, ComponentContext, Event, HttpRequest, HttpResponse, HttpService, Method, Node,
     NodeId, ServiceError, SupervisionPolicy,
 };
-use framework_data::{
+use rustnative_data::{
     ConflictPolicy, Endpoint, HttpClient, Mutation, MutationError, Page, Pages, Query, QueryClient,
     QueryError, QueryKey, QueryState,
 };
-use parking_lot::Mutex;
 use serde::{Deserialize, Serialize};
 
 /// Tasks per page.
@@ -201,7 +201,7 @@ pub fn tasks_query(http: HttpClient) -> Query<Pages<Task, u32>> {
 #[must_use]
 pub fn make_client(
     http: &HttpClient,
-    store: Option<Arc<dyn framework_core::StateStore>>,
+    store: Option<Arc<dyn rustnative_core::StateStore>>,
 ) -> QueryClient {
     let client = QueryClient::new();
     let client = match store {
@@ -287,7 +287,7 @@ impl Component for Board {
         context.provide_scoped(http);
         self.client = Some(client.clone());
 
-        let status = context.select(client.store(), framework_data::Cache::mutations);
+        let status = context.select(client.store(), rustnative_data::Cache::mutations);
         let loading_more = context.select(client.store(), |cache| cache.loading_more(&tasks_key()));
         let status_text = format!(
             "{} · {} sending · {} queued · {} rejected",

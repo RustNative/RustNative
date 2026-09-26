@@ -6,7 +6,7 @@
 //! The component is the same one a Windows or headless backend would
 //! realize; here nothing realizes it, and the host reads the view instead.
 
-use framework_core::{Component, ComponentTree, Event, Node, NodeId};
+use rustnative_core::{Component, ComponentTree, Event, Node, NodeId};
 
 include!(concat!(env!("OUT_DIR"), "/counter.rs"));
 

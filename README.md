@@ -73,7 +73,7 @@ verified, what it found while doing so, and what is still open.
                            │
               ┌────────────┴────────────┐
               ▼                         ▼
-          framework-core        framework-windows
+          rustnative-core        rustnative-windows
                                           │
                                           ▼
                                     Windows / Win32
@@ -165,8 +165,8 @@ script, beside the one that embeds resources:
 ```rust
 // build.rs
 fn main() {
-    framework_build::embed_resources();
-    framework_build::compile_rsx(); // every .rsx file under src/
+    rustnative_build::embed_resources();
+    rustnative_build::compile_rsx(); // every .rsx file under src/
 }
 ```
 
@@ -339,7 +339,7 @@ RustNative/
 ├── README.md
 │
 ├── crates/
-│   ├── framework-core/
+│   ├── rustnative-core/
 │   │   ├── Cargo.toml
 │   │   ├── src/
 │   │   │   ├── lib.rs              (module map + flat public re-exports)
@@ -364,7 +364,7 @@ RustNative/
 │   │   └── benches/
 │   │       └── core_benchmarks.rs
 │   │
-│   ├── framework-markup/             (Milestone 53: the markup grammar, once)
+│   ├── rustnative-markup/             (Milestone 53: the markup grammar, once)
 │   │   ├── Cargo.toml
 │   │   └── src/
 │   │       ├── lib.rs
@@ -378,9 +378,9 @@ RustNative/
 │   │       ├── source_map.rs         (lowered position <-> .rsx position)
 │   │       └── diagnostics.rs        (spans and messages)
 │   │
-│   ├── framework-macros/             (Milestone 53: `rsx!`, a thin proc-macro
-│   │   │                              shell over framework-markup,
-│   │   │                              re-exported from framework-core)
+│   ├── rustnative-macros/             (Milestone 53: `rsx!`, a thin proc-macro
+│   │   │                              shell over rustnative-markup,
+│   │   │                              re-exported from rustnative-core)
 │   │   ├── Cargo.toml
 │   │   ├── src/lib.rs
 │   │   └── tests/
@@ -390,7 +390,7 @@ RustNative/
 │   │       ├── expansion/            (expansion goldens)
 │   │       └── ui/                   (compile-failure suite, both carriers)
 │   │
-│   ├── framework-style/              (the style vocabulary, once — Milestone 58)
+│   ├── rustnative-style/              (the style vocabulary, once — Milestone 58)
 │   │   ├── Cargo.toml
 │   │   ├── VENDORED.md               (the pinned Tailwind v4 theme)
 │   │   ├── vendor/                   (tailwind-theme-4.1.13.css, licence)
@@ -406,14 +406,14 @@ RustNative/
 │   │       ├── capability.rs         (per-backend tables, unit mappings)
 │   │       └── tokens.rs             (model -> Rust, for the macros)
 │   │
-│   ├── framework-interop/            (library-only mode — Milestone 40:
+│   ├── rustnative-interop/            (library-only mode — Milestone 40:
 │   │                                  the .ril description, C/C#/Rust
 │   │                                  generators, the shims' runtime)
 │   │
-│   ├── framework-build/              (build-script helpers: resources,
+│   ├── rustnative-build/              (build-script helpers: resources,
 │   │                                  `compile_rsx()`, `compile_styles()`)
 │   │
-│   └── framework-windows/
+│   └── rustnative-windows/
 │       ├── Cargo.toml
 │       └── src/
 │           ├── lib.rs              (module map + flat public re-exports)
@@ -454,7 +454,7 @@ RustNative/
     └── win_probes/                  (C ground-truth probes for Win32 behavior)
 ```
 
-### `framework-core`
+### `rustnative-core`
 
 Contains the portable runtime and UI model:
 
@@ -485,12 +485,12 @@ Contains the portable runtime and UI model:
 
 It must not import Windows or any other operating-system API.
 
-### The markup crates: `framework-markup`, `framework-macros`, and `compile_rsx`
+### The markup crates: `rustnative-markup`, `rustnative-macros`, and `compile_rsx`
 
 The markup syntax is three thin pieces over one implementation, all planned for
 Milestone 53:
 
-- **`framework-markup`** owns the grammar, once: one element per `Node`
+- **`rustnative-markup`** owns the grammar, once: one element per `Node`
   constructor — `Column`, `Row`, `Label`, `Button`, `TextInput`, `Canvas`,
   `Surface`, `TabBar`, `VirtualList` — plus component elements, which lower to
   `ComponentContext::child_with_props`; one attribute per builder method or
@@ -500,12 +500,12 @@ Milestone 53:
   diagnostics. It also knows how to read a `.rsx` file: a Rust parser extended
   with one expression form, which finds each markup expression, wraps it in
   `rsx!`, and records the source map.
-- **`framework-macros`** is `rsx!`: a proc-macro shell over
-  `framework-markup`, re-exported from `framework-core` behind a default-on
+- **`rustnative-macros`** is `rsx!`: a proc-macro shell over
+  `rustnative-markup`, re-exported from `rustnative-core` behind a default-on
   `markup` feature — on by default so the syntax is not a second-class opt-in,
   and a feature so the constrained embedded profiles can drop a proc-macro
   dependency they cannot afford.
-- **`framework_build::compile_rsx()`** runs that wrapping step for every
+- **`rustnative_build::compile_rsx()`** runs that wrapping step for every
   `.rsx` file from the build script, and `rustnative` uses the same source map
   to put every diagnostic, editor position, and formatting edit back on the
   `.rsx` file.
@@ -520,24 +520,24 @@ None of it touches the runtime. Markup emits builder calls, so it cannot add
 behaviour the builder syntax does not already have, and the `equivalence`
 tests are what keep that true as the node API grows.
 
-### The style crate: `framework-style`
+### The style crate: `rustnative-style`
 
 Arranged like the markup crates for the same reason — one implementation,
 several callers:
 
-- **`framework-style`** owns the declaration vocabulary (values, units,
+- **`rustnative-style`** owns the declaration vocabulary (values, units,
   `calc()`, colour functions and the one gamut rule, token references), the
   utility-class table compatible with Tailwind CSS v4.1.13 over its vendored
   default theme, the `app.css` directives that survive without a cascade
   (`@theme`, `@utility`, `@apply`, `@custom-variant`), the diagnostics, and
   every shipped backend's capability table and unit mapping.
-- **`classes!` and `styles!`** (in `framework-macros`, re-exported by
-  `framework-core`) compile a class string or declaration block into a
+- **`classes!` and `styles!`** (in `rustnative-macros`, re-exported by
+  `rustnative-core`) compile a class string or declaration block into a
   `DeclarationSet` in a `static`; markup's `class="…"` and `style="…"` lower to
-  them. **`framework_build::compile_styles()`** compiles `app.css` into the
+  them. **`rustnative_build::compile_styles()`** compiles `app.css` into the
   theme `app_theme!()` includes, and `rustnative expand --classes` prints a
   lowering.
-- **`framework-core`** re-exports the model (`style::decl`) and resolves it:
+- **`rustnative-core`** re-exports the model (`style::decl`) and resolves it:
   after every render, and whenever the theme or environment changes, each
   node's declarations are folded into its typed properties.
 
@@ -550,7 +550,7 @@ matcher, no stylesheet, and no class string at run time.
 Milestone 40's adoption ladder, each rung with a worked example under test
 (`docs/interop/adoption-ladder.md`):
 
-- **library-only mode** — `framework-interop`: one interface description
+- **library-only mode** — `rustnative-interop`: one interface description
   (`.ril`) with ownership and threading annotated, from which the C header, C#
   bindings, and Rust implementation shims are generated
   (`rustnative bindgen`); `examples/adoption-library` is driven by a C and a C#
@@ -565,7 +565,7 @@ Milestone 40's adoption ladder, each rung with a worked example under test
 - **the rendering-surface hand-off** — `Node::native_surface`'s lifetime,
   resize, DPI, and present contract, in `docs/interop/surface-handoff.md`.
 
-### `framework-windows`
+### `rustnative-windows`
 
 Owns Windows-specific implementation details:
 
@@ -680,7 +680,7 @@ Each target gets its own adapter over the same core, and each is planned to
 the same depth. The full specifications are in [`PLAN.md`](PLAN.md), section 8.
 
 ```text
-                    framework-core
+                    rustnative-core
                           │
   ┌─────────┬─────────┬───┴─────┬─────────┬─────────┬─────────┐
   ▼         ▼         ▼         ▼         ▼         ▼         ▼
@@ -706,12 +706,12 @@ and restoration contracts, `AccessibilityNodeInfo`, and Gradle/AAB packaging.
 **iOS** (Milestone 36) — `UIView`/UIKit, the scene lifecycle, `UIAccessibility`,
 universal links into the existing deep-link model, and Xcode packaging.
 
-**Web** — a `framework-web` adapter using semantic DOM elements rather than a
+**Web** — a `rustnative-web` adapter using semantic DOM elements rather than a
 canvas, in all three deployment modes, chosen at build time from one
 application:
 
 ```text
-framework-core → framework-web → Rust on the server
+rustnative-core → rustnative-web → Rust on the server
                                       ↓
                     HTML / CSS / compile-time generated JavaScript
                     (+ WebAssembly for subtrees that opt in)
@@ -739,7 +739,7 @@ rendering with client attachment and typed server functions, service workers
 and PWAs, serverless and edge deployment, and the browser development,
 testing, and bundling tooling.
 
-**Terminal** (Milestone 38) — a `framework-tui` adapter realizing the same
+**Terminal** (Milestone 38) — a `rustnative-tui` adapter realizing the same
 tree onto a terminal's cell grid: the Windows console in virtual-terminal
 mode, `termios` and VT sequences elsewhere, Unicode-width text measurement,
 key and mouse protocols, damage-tracked redraw, and terminal state restored
@@ -844,8 +844,8 @@ class. The builder spelling takes the macro — `.with_class(classes!("…"))` �
 exactly that reason: a plain string could not be checked until run time.
 
 Tokens come from one file per project, compiled by the build script
-(`framework_build::compile_styles()`) and applied with
-`application.set_theme(framework_core::app_theme!())`:
+(`rustnative_build::compile_styles()`) and applied with
+`application.set_theme(rustnative_core::app_theme!())`:
 
 ```css
 /* app.css */
@@ -928,7 +928,7 @@ fn render(&mut self, context: &mut ComponentContext<'_, ()>) -> Node {
 ```
 
 Gesture recognition (tap, long press, pan, pinch) and gamepad state diffing
-live in `framework-core`, not in a backend, so every platform agrees on what a
+live in `rustnative-core`, not in a backend, so every platform agrees on what a
 tap is. The Windows backend realizes the rest natively: `WM_POINTER*` for
 touch and pen, top-level mouse capture with lost capture reported as
 `PointerCancel`, IMM32 composition for focusable custom containers, an OLE
@@ -939,7 +939,7 @@ touch and pen, top-level mouse capture with lost capture reported as
 
 The core exposes semantic input events instead of Win32 virtual-key constants. The Windows backend translates native input to those events.
 
-The portable accessibility model (`framework_core::accessibility`) covers
+The portable accessibility model (`rustnative_core::accessibility`) covers
 roles (29, including headings with levels), names, descriptions, text and
 range values, checked/expanded/selected/read-only/required/busy states,
 declared and invoked actions, labelled-by/described-by/controls
@@ -1010,7 +1010,7 @@ context.animations().animate(
 );
 ```
 
-`framework_core::animation::Timeline` evaluates both, and is entirely
+`rustnative_core::animation::Timeline` evaluates both, and is entirely
 platform-free: it turns elapsed time into a per-property value and handles
 repeats, autoreverse, fill modes, and — for springs — carries the current
 velocity into a retarget, so interrupting a motion continues it rather than
@@ -1141,7 +1141,7 @@ either way:
 
 ```rust
 if let Event::SurfaceResized { surface, size, .. } = event {
-    let handle = framework_windows::native_surface(surface); // raw-window-handle 0.6
+    let handle = rustnative_windows::native_surface(surface); // raw-window-handle 0.6
 }
 ```
 
@@ -1265,7 +1265,7 @@ Performance numbers in this project come from the budget files
 `budgets/SCHEMA.md`), not from adjectives. `rustnative bench --target
 <target>` measures them, and `--check` fails the build on a regression beyond
 each key's declared noise. CI runs it on every push. A documentation test
-(`framework-conformance/tests/doc_claims.rs`) rejects a performance claim in
+(`rustnative-conformance/tests/doc_claims.rs`) rejects a performance claim in
 this README or `docs/` that does not point at a budget.
 
 The Windows budgets, per `budgets/windows.toml`:
@@ -1289,7 +1289,7 @@ An application's `build.rs` is one line:
 
 ```rust
 fn main() {
-    framework_build::embed_resources();
+    rustnative_build::embed_resources();
 }
 ```
 
@@ -1300,7 +1300,7 @@ layered child windows (animated opacity) and themed tab controls do not
 behave as documented.
 
 A project written in `.rsx` files adds a second line,
-`framework_build::compile_rsx();` (see
+`rustnative_build::compile_rsx();` (see
 [How `.rsx` files build](#how-rsx-files-build)); nothing about packaging
 differs, because what is packaged is the same compiled program.
 
@@ -1367,15 +1367,15 @@ cargo run -p hello-label
 
 CI (`.github/workflows/ci.yml`) runs all of the above, plus an MSRV check,
 and — importantly — a `windows-latest` job. That job is what actually
-compiles and runs `framework-windows`'s `native` module: it is
+compiles and runs `rustnative-windows`'s `native` module: it is
 `#[cfg(windows)]`-gated, so a Linux-only pipeline silently excludes it.
 
-`framework-core` is covered by unit tests, integration tests, `proptest`
+`rustnative-core` is covered by unit tests, integration tests, `proptest`
 property tests (identity, reconciliation, layout constraints, scroll ranges,
 removal ordering), runnable doc examples on every major public API, and
 `criterion` benchmarks including scaling sweeps at 10/100/1k/10k nodes.
 
-`framework-windows` is covered against **real** Win32: `native::integration`
+`rustnative-windows` is covered against **real** Win32: `native::integration`
 creates genuine top-level windows and drives them through the production
 message loop (`native::harness` replaces only the outermost blocking
 `GetMessageW` with a bounded `PeekMessageW` pump), covering window lifecycle,

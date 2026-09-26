@@ -22,17 +22,17 @@ path = "src/main.rs"
 clap = { version = "4", features = ["derive"] }
 # The markup syntax: `expand`, `fmt`, `lsp`, and `.rsx` diagnostics link the
 # same parser and lowering the `rsx!` macro uses.
-framework-markup.workspace = true
-framework-style.workspace = true
-framework-interop.workspace = true
+rustnative-markup.workspace = true
+rustnative-style.workspace = true
+rustnative-interop.workspace = true
 # `inspect` speaks the runtime's inspection protocol (Milestone 44).
-framework-core.workspace = true
+rustnative-core.workspace = true
 # `i18n` reads catalogues the way the build does (Milestone 46).
-framework-i18n.workspace = true
+rustnative-i18n.workspace = true
 # The style file's location, read the way the build script reads it.
-framework-build.workspace = true
+rustnative-build.workspace = true
 # `db` generates, applies, and squashes migrations (Milestone 49).
-framework-server.workspace = true
+rustnative-server.workspace = true
 prettyplease = "0.2"
 proc-macro2 = { version = "1", features = ["span-locations"] }
 quote = "1"
@@ -57,9 +57,9 @@ sha2 = "0.10"
 
 [target.'cfg(windows)'.dev-dependencies]
 # The packaging tests read a built executable's version resource and
-# manifest back out of it, which is what proves `framework-build` embedded
+# manifest back out of it, which is what proves `rustnative-build` embedded
 # them rather than only writing a script.
 windows-sys = { workspace = true }
 # The update test checks the installed application's updater accepts
 # what `rustnative update manifest` signs.
-framework-windows.workspace = true
+rustnative-windows.workspace = true

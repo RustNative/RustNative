@@ -3,8 +3,8 @@
 //! itself at that point. Run it again without `CRASH` and the order
 //! completes.
 
-use framework_durable::{LocalEngine, Status, WorkflowEngine};
-use framework_server::db::Db;
+use rustnative_durable::{LocalEngine, Status, WorkflowEngine};
+use rustnative_server::db::Db;
 use workflow_crash::{Fulfil, Order, schema};
 
 #[tokio::main(flavor = "current_thread")]

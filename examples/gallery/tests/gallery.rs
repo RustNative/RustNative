@@ -8,9 +8,9 @@
     reason = "helper functions in an integration test are test code too: a failed expectation is the test failing"
 )]
 
-use framework_core::{Component, Services, Size, Window};
-use framework_headless::{HeadlessApp, Query, assert_golden};
 use gallery::{Gallery, theme};
+use rustnative_core::{Component, Services, Size, Window};
+use rustnative_headless::{HeadlessApp, Query, assert_golden};
 
 fn launch() -> HeadlessApp {
     HeadlessApp::launch_with(

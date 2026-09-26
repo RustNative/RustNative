@@ -1,0 +1,113 @@
+[package]
+name = "rustnative-windows"
+version = "0.1.0"
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+description.workspace = true
+repository.workspace = true
+homepage.workspace = true
+readme.workspace = true
+keywords.workspace = true
+categories.workspace = true
+
+[lints]
+workspace = true
+
+[dependencies]
+rustnative-core.workspace = true
+# The data layer's host contracts (Milestone 47): conditions for background
+# work and an image decoder, answered by this backend.
+rustnative-data.workspace = true
+tokio.workspace = true
+async-trait.workspace = true
+# Window placement is saved through the application's state store in the
+# same JSON form persisted component state uses (see `native::lifecycle`).
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+
+[target.'cfg(windows)'.dependencies]
+windows-sys.workspace = true
+# The style capability table and unit mapping this backend answers with.
+rustnative-style.workspace = true
+# Milestone 29's escape hatch: a `native_surface` node's window handle is
+# handed to the application through the ecosystem's standard handle traits,
+# so wgpu, ash, glutin, and friends accept it without an adapter.
+raw-window-handle = "0.6"
+# Used only by `services::dialogs` for the modern `IFileOpenDialog`/
+# `IFileSaveDialog` COM interfaces: `windows-sys` (used everywhere else in
+# this crate) deliberately provides flat FFI bindings only — no COM
+# interface/vtable definitions at all (confirmed by their absence from its
+# own source) — so implementing these by hand against raw `windows-sys`
+# would mean re-deriving each interface's GUID, vtable layout, and calling
+# convention from Microsoft's documentation with no compiler or bindings-
+# crate help catching a mistake. `windows` provides the real, maintained
+# bindings for exactly this; every other file in this crate has no reason
+# to pull in COM interface support it doesn't use, hence this dependency
+# being scoped to the one module that needs it via minimal features below
+# rather than added workspace-wide.
+windows = { version = "0.62", default-features = false, features = [
+    "Win32_Foundation",
+    "Win32_System_Com",
+    # `Win32_System_Variant` and `Win32_UI_Accessibility` are the second
+    # place this crate needs real COM interfaces rather than flat bindings:
+    # `native::rendering::accessibility` uses `IAccPropServices` (Microsoft's
+    # Dynamic Annotation API) to give a standard control an accessible name,
+    # description, or role that differs from what the control reports on its
+    # own — the mechanism that closes the standards audit's P1.16 finding
+    # without writing a full UI Automation provider. `windows-sys` has no
+    # COM interface definitions at all, so as with the file dialogs above,
+    # a `windows-sys`-only implementation would mean hand-deriving the
+    # interface's GUID and vtable layout with no compiler help.
+    # `Win32_System_Ole` is not used directly; it is the feature the
+    # `windows` crate gates `VARIANT` (and therefore
+    # `IAccPropServices::SetHwndProp`) behind.
+    "Win32_System_Ole",
+    "Win32_System_Variant",
+    # Milestone 25's drag-and-drop target (`native::input::drop_target`)
+    # implements OLE's `IDropTarget` and reads `IDataObject` media, which
+    # need the storage-medium (`STGMEDIUM`), global-memory, and
+    # modifier-key-state definitions these gate.
+    "Win32_Graphics_Gdi",
+    "Win32_System_Com_StructuredStorage",
+    "Win32_System_Memory",
+    "Win32_System_SystemServices",
+    "Win32_UI_Accessibility",
+    "Win32_UI_Shell",
+    "Win32_UI_Shell_Common",
+    # Milestone 29's canvas (`native::graphics`): Direct2D draws a
+    # `DrawList`, DirectWrite shapes its text, and WIC provides both image
+    # upload and the offscreen bitmap target the pixel tests read back.
+    # These are COM APIs, so they live here rather than in `windows-sys`.
+    "Win32_Graphics_Direct2D",
+    "Win32_Graphics_Direct2D_Common",
+    "Win32_Graphics_DirectWrite",
+    "Win32_Graphics_Dxgi_Common",
+    # Milestone 51: accelerator answers (`native::accelerator`).
+    "Win32_Graphics_Dxgi",
+    "Win32_Graphics_DXCore",
+    # Milestone 57: the jump list's task titles.
+    "Win32_UI_Shell_PropertiesSystem",
+    "Win32_Graphics_Imaging",
+] }
+# Direct2D takes transforms as `windows_numerics::Matrix3x2`, a type the
+# `windows` crate uses but does not re-export, so it has to be named through
+# the same crate at the exact version `windows` 0.62 depends on — which is
+# also why `windows` above is pinned to 0.62 rather than a range: a range
+# could resolve to a `windows` whose `Matrix3x2` is a different type.
+windows-numerics = { version = "0.3", default-features = false }
+# `windows::core::implement` — used to author COM objects this crate hands
+# *to* the OS (the OLE drop target in `native::input::drop_target`) —
+# expands to paths rooted at `::windows_core`, so the crate that uses the
+# macro must depend on it by that name. Version-locked to `windows` above,
+# which re-exports it.
+windows-core = { version = "0.62", default-features = false }
+# Signed update manifests (Milestone 50).
+ed25519-dalek = "2"
+
+[dev-dependencies]
+# The shared guarantee suites (Milestone 41), run here over the native
+# harness.
+rustnative-conformance.workspace = true
+# Milestone 48: the component library, realized natively.
+rustnative-components.workspace = true

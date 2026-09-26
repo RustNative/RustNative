@@ -18,8 +18,8 @@ workspace = true
 # Milestone 49's example: an authenticated, SQLite-backed, job-processing
 # server whose functions the Windows client calls (examples/server-client).
 [dependencies]
-framework-core.workspace = true
-framework-server.workspace = true
+rustnative-core.workspace = true
+rustnative-server.workspace = true
 notes-shared = { path = "../notes-shared", version = "0.1.0", features = ["server"] }
 async-trait.workspace = true
 serde = { version = "1", features = ["derive"] }

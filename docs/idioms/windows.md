@@ -2,7 +2,7 @@
 
 `PLAN.md` Milestone 48 (`C23`). A control can be the same on every host and
 still behave differently on each: button order, how things are dismissed,
-where destructive actions go. `framework_components::Idioms` carries
+where destructive actions go. `rustnative_components::Idioms` carries
 these differences. Components read them from the environment (`IDIOMS`),
 so a test can supply another host's idioms.
 

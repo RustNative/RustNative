@@ -1,0 +1,29 @@
+[package]
+name = "rustnative-conformance"
+version = "0.1.0"
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+description = "The conformance suites of Rust Native: syntax and style equivalence, invalidation, lifetime, and the guarantees every backend must pass"
+repository.workspace = true
+homepage.workspace = true
+readme.workspace = true
+keywords = ["gui", "testing", "conformance", "native", "framework"]
+categories = ["gui", "development-tools::testing"]
+publish = false
+
+[lints]
+workspace = true
+
+[dependencies]
+rustnative-core.workspace = true
+rustnative-headless.workspace = true
+
+[build-dependencies]
+rustnative-build.workspace = true
+
+[dev-dependencies]
+serde_json = "1"
+rustnative-markup.workspace = true
+proptest = "1"
+trybuild = "1"

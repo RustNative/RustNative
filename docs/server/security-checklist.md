@@ -4,7 +4,7 @@
 them off (`Security`). Shipping without one of them is a defect, not a
 missing feature. Each line names the test that holds it.
 
-| Protection | Default | Test (`crates/framework-server/tests/`) |
+| Protection | Default | Test (`crates/rustnative-server/tests/`) |
 |---|---|---|
 | Request forgery: unsafe methods need the double-submit token (`__Host-csrf` cookie, sent back as `X-CSRF-Token` or the form's `_csrf`); bearer-authenticated requests and routes declared `csrf_exempt` are the only exceptions | on | `app.rs` `unsafe_requests_need_the_forgery_token` |
 | Content security policy: `default-src 'self'`, scripts and styles only with the response's nonce, no objects, no framing, `base-uri 'none'`, `form-action 'self'`; a fresh nonce per response | on | `app.rs` `every_response_carries_the_security_headers` |

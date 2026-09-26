@@ -8,8 +8,8 @@
     reason = "a failed expectation in an integration test is the test failing"
 )]
 
-use framework_core::{Component, Size, Window};
-use framework_headless::{HeadlessApp, Query};
+use rustnative_core::{Component, Size, Window};
+use rustnative_headless::{HeadlessApp, Query};
 use span::{DESKTOP_WINDOW, DEVICE_SCREEN, Thermostat};
 
 fn run(screen: Size) -> HeadlessApp {

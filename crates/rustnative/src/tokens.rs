@@ -18,14 +18,14 @@ pub fn import(here: &Path, file: &Path, out: Option<PathBuf>) -> Result<()> {
     let project = Project::find(here)?;
     let json = std::fs::read_to_string(file)
         .map_err(|cause| Error::Io { what: format!("read {}", file.display()), cause })?;
-    let imported = framework_style::design_tokens::import(&json).map_err(Error::Usage)?;
+    let imported = rustnative_style::design_tokens::import(&json).map_err(Error::Usage)?;
     let style = out
-        .or_else(|| framework_build::styles::style_file(&project.root))
+        .or_else(|| rustnative_build::styles::style_file(&project.root))
         .unwrap_or_else(|| project.root.join("app.css"));
     let existing = std::fs::read_to_string(&style).unwrap_or_default();
-    let updated = framework_style::design_tokens::replace_block(&existing, &imported.css);
+    let updated = rustnative_style::design_tokens::replace_block(&existing, &imported.css);
     // The result must compile, exactly as the build will compile it.
-    framework_build::styles::theme_source(&style, &updated).map_err(Error::Usage)?;
+    rustnative_build::styles::theme_source(&style, &updated).map_err(Error::Usage)?;
     std::fs::write(&style, updated)
         .map_err(|cause| Error::Io { what: format!("write {}", style.display()), cause })?;
     let count = imported.css.lines().filter(|line| line.trim_start().starts_with("--")).count();

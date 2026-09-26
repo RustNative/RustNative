@@ -17,7 +17,7 @@
 
 use std::path::{Path, PathBuf};
 
-use framework_style::Vocabulary;
+use rustnative_style::Vocabulary;
 use serde_json::{Value, json};
 
 use crate::markup_edit::{self, ElementRange};
@@ -186,7 +186,7 @@ pub fn attribute_at(element: &ElementRange, offset: usize) -> Option<&markup_edi
         .find(|attr| (attr.name_start..=attr.name_start + attr.name.len()).contains(&offset))
 }
 
-/// Where `framework-core`'s source is, for a project around `path`.
+/// Where `rustnative-core`'s source is, for a project around `path`.
 fn framework_source(path: &Path) -> Option<PathBuf> {
     let folder = path.parent()?;
     let output =
@@ -199,7 +199,7 @@ fn framework_source(path: &Path) -> Option<PathBuf> {
     let manifest = metadata["packages"]
         .as_array()?
         .iter()
-        .find(|package| package["name"] == "framework-core")?["manifest_path"]
+        .find(|package| package["name"] == "rustnative-core")?["manifest_path"]
         .as_str()?
         .to_owned();
     Some(Path::new(&manifest).parent()?.join("src"))
@@ -409,7 +409,7 @@ mod tests {
         let here = Path::new(env!("CARGO_MANIFEST_DIR")).join("src/lsp_assist.rs");
         let location = builder_method_location("LayoutStyle::width", &here).unwrap();
         let uri = location["uri"].as_str().unwrap();
-        assert!(uri.ends_with("framework-core/src/layout/constraints.rs"), "{uri}");
+        assert!(uri.ends_with("rustnative-core/src/layout/constraints.rs"), "{uri}");
         let line = usize::try_from(location["range"]["start"]["line"].as_u64().unwrap()).unwrap();
         let path = uri.trim_start_matches("file:///");
         let text = std::fs::read_to_string(path).unwrap();

@@ -1,6 +1,6 @@
 # Threat model: servers
 
-`PLAN.md` Milestone 51, for `framework-server` applications.
+`PLAN.md` Milestone 51, for `rustnative-server` applications.
 
 | Entry point | Threat | Mitigation |
 |---|---|---|

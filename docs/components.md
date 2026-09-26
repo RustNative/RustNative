@@ -1,6 +1,6 @@
 # Components
 
-`PLAN.md` Milestone 48. The `framework-components` crate is what
+`PLAN.md` Milestone 48. The `rustnative-components` crate is what
 applications are built from, above the native primitives. Its styles are
 written against semantic role tokens, so one token set restyles all of it
 (`docs/tokens.md`). `examples/gallery` is an application built only from the
@@ -32,7 +32,7 @@ and the button all reach the same place.
 ## The components and their accessibility
 
 Each role below is asserted by the library's tests
-(`crates/framework-components/tests/library.rs`).
+(`crates/rustnative-components/tests/library.rs`).
 
 | Component | Realized as | Semantics |
 |---|---|---|
@@ -63,7 +63,7 @@ Each is the host's own control.
 
 ## The behaviour layer
 
-`framework_components::behaviour` holds focus, keyboard, and selection for
+`rustnative_components::behaviour` holds focus, keyboard, and selection for
 composite controls. None of it depends on appearance (`C19`):
 
 - `ListSelection`: single, multiple, and range selection.
@@ -121,7 +121,7 @@ rsx! {
 
 ## Lists
 
-`framework_data::list` has two parts (`C26`).
+`rustnative_data::list` has two parts (`C26`).
 
 - **`Projection`** is a view over a source slice. It holds the indices,
   never copies of the rows. `filter`, `sort_by`, `sort_by_key`, and
@@ -152,13 +152,13 @@ its detail view.
 - The motion is the arriving node's `Position` transition, or a 250 ms ease
   if it declares none.
 - Under reduced motion, the change is instant.
-- `framework_core::matched_geometry` does the pairing. It is portable.
+- `rustnative_core::matched_geometry` does the pairing. It is portable.
   Windows has no shared-element transition of its own, so its renderer
   animates the pair with its ordinary geometry transitions.
 
 ## Documents
 
-`framework_data::document::DocumentController` owns one document (`C27`).
+`rustnative_data::document::DocumentController` owns one document (`C27`).
 It provides:
 
 - open, save, save as, and revert;
