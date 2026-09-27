@@ -302,6 +302,70 @@ against the Windows backend's shipped state.
 | `C104` Two-way escape ladder for generated projects | **Absent** | 59 |
 | `C105` Artifact composition inspection | **Absent** — budgets enforced without attribution | 59, 42 |
 
+### The visual pipeline and interaction depth (L2–L5)
+
+From [`concepts-surface.md`](concepts-surface.md), scored 2026-09-27.
+
+| Concept | Score | Milestone |
+| --- | --- | --- |
+| `C106` Compositing layers, damage, overdraw | **Partial** — host scrolling and draw-list damage; no portable vocabulary or diagnostics | 60 |
+| `C107` Frame pacing, refresh rate, input latency | **Partial** — timeline and frame-time budgets; no pacing, latency, attribution, or hang detection | 60 |
+| `C108` Colour management and display capability | **Absent** | 60 |
+| `C109` Material effects and backdrop rendering | **Absent** | 60 |
+| `C110` Offscreen rendering and secure capture | **Partial** — headless golden capture only | 60 |
+| `C111` Scroll systems | **Partial** — scrolling, virtualization, scroll anchor; no coordination system | 61 |
+| `C112` Keyboard avoidance and inset choreography | **Absent** | 61 |
+| `C113` Gesture physics and cross-application drag | **Partial** — gestures and animation; no physics conventions or cross-application drag | 61 |
+| `C114` Text editing surface | **Partial** — text input and IME; no traits, autofill, edit menu, or dictation | 61 |
+| `C115` Non-pointer navigation | **Partial** — tab order only | 61 |
+| `C116` Audio session and media controls | **Absent** | 62 |
+| `C117` Capture pipelines and privacy choreography | **Absent** | 62 |
+| `C118` Privacy-preserving pickers and file providers | **Partial** — file dialogs on Windows | 62 |
+| `C119` Background transfer | **Absent** | 62 |
+
+### Trust, compliance, and product operations (L6, L8, L9)
+
+From [`concepts-product.md`](concepts-product.md).
+
+| Concept | Score | Milestone |
+| --- | --- | --- |
+| `C120` Account lifecycle obligations | **Partial** — authentication, sessions, passkeys; no deletion, revocation, device flow, or broker | 63 |
+| `C121` Application integrity attestation | **Absent** | 63 |
+| `C122` Consent, tracking, regional compliance | **Partial** — privacy manifests and telemetry opt-in; no consent contract or residency | 63 |
+| `C123` Portability, backup, device transfer | **Absent** | 63 |
+| `C124` Deferred deep links and link verification | **Partial** — deep links; no association generation, verification, or deferral | 64 |
+| `C125` In-product guidance | **Absent** | 64 |
+| `C126` Typed analytics and metric contract | **Absent** | 64 |
+| `C127` Privacy-safe production diagnostics | **Partial** — development record and replay with redaction | 64 |
+
+### Engineering discipline (L7–L9)
+
+From [`concepts-discipline.md`](concepts-discipline.md).
+
+| Concept | Score | Milestone |
+| --- | --- | --- |
+| `C128` API snapshot diff and version enforcement | **Partial** — policy, codemods, `describe`; no snapshot gate or sealing policy | 65 |
+| `C129` Architecture boundaries as tests | **Absent** — invariants held by review | 65 |
+| `C130` Test health: flakiness, coverage, fuzzing | **Partial** — a full gate; no flakiness detection, coverage gate, fuzzing, or sanitizers | 65 |
+| `C131` Dependency hygiene, provenance, reproducibility | **Partial** — advisory and licence gates, bill of materials | 65 |
+| `C132` Release health gating | **Partial** — staged rollout and rollback; health signals do not gate it | 65 |
+
+### Reach: enterprise, shell, networks, and the field (L6–L8)
+
+From [`concepts-reach.md`](concepts-reach.md).
+
+| Concept | Score | Milestone |
+| --- | --- | --- |
+| `C133` Enterprise distribution and managed configuration | **Absent** | 66 |
+| `C134` Desktop shell integration | **Partial** — protocol schemes in packaging | 66 |
+| `C135` Delta and bandwidth-aware updates | **Absent** — full packages only | 66 |
+| `C136` Offline-first web | **Planned** — Web milestone I | Web I |
+| `C137` Navigation performance on the web | **Absent** | Web J |
+| `C138` Storage partitioning and third-party context | **Partial** — isolation headers and cookie defaults | Web I |
+| `C139` Time synchronization and calibration | **Absent** | 66 |
+| `C140` Field diagnostics and remote support | **Partial** — crash capture and the constrained channel | 66 |
+| `C141` Manufacturing and provisioning | **Absent** | 66 |
+
 ### Embedded and device (L0–L8 on constrained targets)
 
 | Concept | Score | Milestone |

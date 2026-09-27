@@ -57,7 +57,15 @@ Read in this order:
    diagnostics, profiles and credentials, submission, update channels and
    compatibility fingerprinting, pipelines, native-module authoring, universal
    routing, launch assets, playground, device pairing, the escape ladder, and
-   artifact attribution).
+   artifact attribution), [`concepts-surface.md`](concepts-surface.md) (the
+   frame pipeline, scroll and gesture systems, the text editing surface, media,
+   capture, and files), [`concepts-product.md`](concepts-product.md) (the
+   obligations stores and regulators impose, and what a product team needs
+   after the application works),
+   [`concepts-discipline.md`](concepts-discipline.md) (the practices that keep
+   the framework's own promises true), and
+   [`concepts-reach.md`](concepts-reach.md) (managed fleets, desktop shells,
+   constrained networks, the browser's changing rules, and the field).
 5. [`parity-matrix.md`](parity-matrix.md) — where RustNative stands on every
    layer and every concept today, with evidence.
 6. [`gap-plan.md`](gap-plan.md) — the workstreams and proposed milestones that

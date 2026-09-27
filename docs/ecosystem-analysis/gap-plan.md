@@ -23,12 +23,15 @@ Everything else is ordered by what it unblocks.
 ```text
 Tier 0  before the second backend      — per-backend obligations and the seams
 Tier 1  alongside the backend work     — the loop, the guarantees, the
-                                         budgets, and the toolchain layer
+                                         budgets, the toolchain layer,
+                                         interaction depth, and discipline
 Tier 2  before any public release      — the application layer users expect,
-                                         and responsiveness under load
+                                         responsiveness, the visual pipeline,
+                                         media and files, and trust
 Tier 3  with and after the web track   — the server, deployment, ecosystem,
                                          reconciliation beyond the screen,
-                                         durable execution, and surfaces
+                                         durable execution, surfaces,
+                                         product operations, and reach
 ```
 
 Tiers are not strict phases: Tier 1 runs continuously the way `PLAN.md`
@@ -477,6 +480,58 @@ application layer run on a machine with none of the target hardware.
 
 ---
 
+## Milestone 61 — Interaction depth: scrolling, gestures, and text
+
+**Why.** `concepts-surface.md` Part B: the interactions users cannot name and
+notice immediately. A keyboard that covers the field being typed into is the
+most reliable one-star review in mobile software; nested scroll coordination is
+where cross-platform applications are identified as such; and the text editing
+surface is where self-drawing archetypes accumulate their longest-lived defects.
+Tier 1, because a backend without these is not finished.
+
+**Covers.** `C111-1`–`C111-3`, `C112-1`, `C112-2`, `C113-1`, `C113-2`,
+`C114-1`, `C114-2`, `C115-1`.
+
+**Scope.** Nested scroll coordination, snap points, sticky and collapsing
+headers, pull-to-refresh, over-scroll, scroll restoration, and scroll-driven
+animation progress; system insets (keyboard, toolbars, panels) as layout
+properties animated with the host's own curve, with scroll-into-view for the
+focused field; velocity tracking, host-conventional deceleration, rubber
+banding, interruptible gestures, and cross-application drag with typed payloads
+and file promises; input traits, autofill content types, secure and one-time-code
+entry, and the host's edit menu, selection handles, spell checking, and
+dictation; and spatial focus navigation with engagement and input-class-scaled
+focus treatment.
+
+**Done when** the interaction conformance suite passes on every shipped
+backend: a form whose field stays visible as the keyboard animates, a
+collapsing header driven by a nested scroller, an interrupted fling, a field
+that autofills a one-time code, and a screen fully operable by directional
+input.
+
+## Milestone 65 — Engineering discipline
+
+**Why.** `concepts-discipline.md`: the practices that keep this plan's own
+promises true as the codebase grows. Each converts something held by review and
+habit into something a build fails on.
+
+**Covers.** `C128-1`, `C128-2`, `C129-1`, `C130-1`–`C130-3`, `C131-1`–`C131-3`,
+`C132-1`.
+
+**Scope.** A committed public-API snapshot diffed in CI against the declared
+version bump, with a sealing policy; section 2's invariants as executable
+boundary tests; flakiness detection with automatic quarantine, sharding,
+coverage gating on changed code, continuous fuzzing of parsers and manifest
+readers, property tests over reconciliation and layout, and sanitizer runs over
+every unsafe surface; automated dependency updates behind the suite, signed
+build provenance, a mirrored dependency set, and a bit-identical
+reproducibility check; and release-health thresholds over guardrail metrics
+that halt and revert a staged rollout.
+
+**Done when** a breaking change cannot reach a minor release, a platform
+dependency cannot reach the core, an artifact rebuilds bit-identically, and a
+rollout halts itself on a health breach.
+
 # Tier 2 — Before any public release
 
 The application layer every competing archetype has and we do not. These are
@@ -642,6 +697,74 @@ least two backends; a hidden screen performs no periodic work; and an
 embedded reference board shows no periodic wake when idle.
 
 ---
+
+## Milestone 60 — The visual pipeline
+
+**Why.** `concepts-surface.md` Part A: the plan reasons about layout and
+animation but not about frames — compositing and damage, the deadline on a
+variable-refresh display, the colour space a token is in, and how a subtree
+becomes an image.
+
+**Covers.** `C106-1`, `C106-2`, `C107-1`–`C107-3`, `C108-1`, `C108-2`,
+`C109-1`, `C110-1`, `C110-2`.
+
+**Scope.** A portable promote/opaque/damage vocabulary mapped to each host's
+compositor, with layer, damage, and overdraw diagnostics; frame pacing against
+the host's display signal including variable refresh, input timestamped at
+arrival so input-to-present latency is measured, frame-deadline attribution,
+and a hang detector; a declared colour space with conversion at the backend
+boundary and display capability as environment values; surface-role materials
+mapped to each host's material system under reduce-transparency and contrast
+settings; and subtree capture shared by golden tests, share images, export, and
+print, plus a secure-content marker.
+
+**Done when** latency and deadline attribution are in the budget file on two
+backends, a brand colour matches across gamuts, a sheet uses the host's
+material and degrades correctly, and a secure subtree is absent from a
+screenshot.
+
+## Milestone 62 — Media, capture, and files
+
+**Why.** `concepts-surface.md` Part C: the services that turn screens into
+products, and the most common reason a team drops out of a portable framework
+into per-platform code.
+
+**Covers.** `C116-1`, `C116-2`, `C117-1`, `C118-1`, `C119-1`.
+
+**Scope.** An audio session contract (category, focus, ducking, interruption,
+routing, background playback) with now-playing metadata and transport controls;
+camera, microphone, and screen capture as pipelines with permission states and
+host privacy indicators; photo and document pickers, scoped-access bookmarks,
+file providers, and file promises; and background transfer that resumes,
+reports progress, respects metered and low-data policy, and delivers completion
+as an entry point.
+
+**Done when** an example records audio while honouring focus loss, scans a code
+with correct privacy indicators, imports a photo without a library permission,
+and completes a large upload after being backgrounded.
+
+## Milestone 63 — Trust: identity lifecycle, integrity, consent, and portability
+
+**Why.** `concepts-product.md` Part A: obligations imposed by stores,
+regulators, and security reviewers. None is a feature a user asks for; each can
+stop a release, and consent and backup classification are far more expensive to
+retrofit after data exists.
+
+**Covers.** `C120-1`, `C120-2`, `C121-1`, `C122-1`–`C122-3`, `C123-1`,
+`C123-2`.
+
+**Scope.** Account deletion, cross-device session revocation, and a device
+authorization flow in the authentication contract, with sign-in through each
+host's credential broker; platform attestation as a capability with replay
+protection and an observe/degrade/block policy ladder; a typed consent contract
+enforced by telemetry, analytics, and the data layer, tracking authorization
+per host, generated privacy labels and export declarations, and data-residency
+declarations the adapters enforce; and backup classification per store with a
+restore-onto-a-different-device test, plus export and deletion operations.
+
+**Done when** an example deletes an account end to end, refuses to emit
+analytics without consent, carries generated privacy labels, and survives a
+restore onto a different device with credentials excluded and data intact.
 
 # Tier 3 — With and after the web track
 
@@ -912,6 +1035,57 @@ Milestone 49 (server-side validation and sending).
 
 ---
 
+## Milestone 64 — Product operations
+
+**Why.** `concepts-product.md` Part B: what a product team needs once the
+application works — links that survive installation, guidance that teaches,
+instrumentation that cannot drift, and a failure trail that is data rather than
+a recording of someone's screen.
+
+**Covers.** `C124-1`, `C124-2`, `C125-1`, `C125-2`, `C126-1`, `C126-2`,
+`C127-1`.
+
+**Scope.** Association files generated from the route table and verified in CI
+against the live domain, with a deferred deep-link contract; onboarding,
+what's-new tied to version state, coaching marks, and targeted messages with
+frequency caps, plus the host review-request API behind its quota; typed,
+versioned analytics events with generated schema documentation and
+consent-gated emission, and metric definitions read by both dashboards and
+experiments; and a sampled, redacted, consent-gated production diagnostic trail
+that shares its format with the development recorder.
+
+**Done when** a link installs the application and lands on its content, a
+what's-new screen appears once per version, an analytics event cannot be
+emitted without consent or schema, and a crash report carries a replayable
+trail with no user text in it.
+
+## Milestone 66 — Reach: enterprise, shell, constrained networks, and the field
+
+**Why.** `concepts-reach.md`: the mechanisms that decide whether the framework
+can be deployed where applications actually run — a managed fleet, a desktop
+shell, a metered network, a production line. This band is where "every target
+is first-class" is tested hardest.
+
+**Covers.** `C133-1`, `C133-2`, `C134-1`, `C134-2`, `C135-1`, `C135-2`,
+`C139-1`, `C139-2`, `C140-1`, `C141-1`.
+
+**Scope.** A managed-configuration layer with a published schema generated from
+the application's configuration declarations, compliance reporting, kiosk mode,
+and enterprise distribution with offline licence validation; file-type
+associations and protocol handlers registered by packaging, single-instance
+handoff, login items, global hotkeys, badges and progress, and power and
+display events; binary delta updates with a patch-chain policy, resumable
+fetch, and network-aware policy per channel; and the field set — a device time
+contract, a calibration and factory-data store, offline-buffered diagnostics
+with a support bundle and gated remote console, and provisioning contracts for
+per-unit data, a manufacturing test mode, and factory reset.
+
+**Done when** an administrator configures a deployed application without a
+rebuild, a double-clicked document opens in the running instance, an update
+completes over a metered link as a delta, and a field device is diagnosed and
+reset without a site visit.
+
+
 # Dependency order
 
 ```text
@@ -930,9 +1104,14 @@ M42 budgets           ─┼─ continuous, gate each backend's completion
 M43 developer loop    ─┤
 M44 inspection        ─┤
 M45 test infrastructure┤ ──→ required by M46–M48 and M54
-M59 toolchain layer   ─┘ ──→ required by every device backend's release
+M59 toolchain layer   ─┤ ──→ required by every device backend's release
+M61 interaction depth ─┤ ──→ part of every backend's definition of done
+M65 discipline        ─┘ ──→ gates releases and the stability policy
 
-M54 responsiveness ──────────┐
+M60 visual pipeline ─────────┐
+M62 media, capture, files ───┤
+M63 trust and compliance ────┤
+M54 responsiveness ──────────┤
 M46 internationalization ────┤
 M47 state, resilience, data ─┼─→ M49 server model ──┬─→ M55 real time and sync
 M48 components and tokens  ──┘        ↓             ├─→ M56 durable and event-driven
@@ -942,10 +1121,17 @@ M48 components and tokens  ──┘        ↓             ├─→ M56 durabl
                               M51 observability and compliance
                                      ↓
                               M52 the project
+                                     ↓
+                              M64 product operations · M66 reach
 ```
 
-Four concept requirements belong to backend milestones rather than to section
-11, and `PLAN.md` carries them there: partial prerendering (`C06-1`) in Web
+Three web concepts — offline strategies and worker choreography (`C136`),
+navigation performance and route announcements (`C137`), and storage
+partitioning with the embedded-context test (`C138`) — belong to Web milestones
+I and J, and `PLAN.md` carries them there.
+
+Four further concept requirements belong to backend milestones rather than to
+section 11, and `PLAN.md` carries them there: partial prerendering (`C06-1`) in Web
 milestone H; typed peripherals in framework drivers (`C74-1`), asynchronous
 display region transfer (`C91-1`), and the direct-to-display embedded Linux
 profile (`C83-1`) in Milestone 37. The designer non-goal (`C56-2`) is kept with

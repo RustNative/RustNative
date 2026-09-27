@@ -34,9 +34,16 @@ the parts it owes:
 
 - Milestones 33–38: macOS, Linux, Android, iOS, embedded, and terminal.
 - The Web track's milestones A–K.
-- **Milestone 59 — the toolchain and service layer**, added to `PLAN.md` on
-  2026-09-27 after a closer reading of the managed-toolchain archetype
-  (`docs/ecosystem-analysis/concepts-toolchain.md`). Nothing of it is built.
+- **Milestones 59–66**, added to `PLAN.md` on 2026-09-27 as the ecosystem
+  analysis was completed: 59 the toolchain and service layer, 60 the visual
+  pipeline, 61 interaction depth, 62 media, capture, and files, 63 trust and
+  compliance, 64 product operations, 65 engineering discipline, and 66 reach.
+  Nothing of them is built. They come from the concept catalogue's last five
+  documents (`docs/ecosystem-analysis/concepts-toolchain.md`,
+  `concepts-surface.md`, `concepts-product.md`, `concepts-discipline.md`, and
+  `concepts-reach.md`).
+
+  On Milestone 59 specifically:
   Milestones 43, 50, and 52 built the parts of that layer listed in their own
   entries; what 59 adds — the release train and supported-host matrix, project
   diagnostics beyond toolchain installation, build profiles and managed

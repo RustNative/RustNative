@@ -1444,19 +1444,36 @@ production-parity milestones (39–58) in four tiers:
   native inputs, repository-declared pipelines, native-module authoring with
   autolinking, generated launch assets, device pairing, a shareable playground,
   and artifact size attribution — so each device backend inherits a release
-  process instead of inventing one.
+  process instead of inventing one. Milestone 61 adds the interaction depth a
+  backend is not finished without (scroll coordination, keyboard avoidance,
+  gesture physics, the host's text editing surface, directional navigation),
+  and Milestone 65 makes the framework's own promises mechanical: an API
+  snapshot gate, architecture invariants as tests, fuzzing and flakiness
+  control, build provenance and reproducibility, and rollouts that halt on a
+  health breach.
 - **Tier 2 (46–48, 54), before any public release** — internationalization and
   localization, shared state, error boundaries as supervision, the asynchronous
   data layer, forms and validation, a native component library with a
   design-token pipeline, and responsiveness under load: prioritized,
-  interruptible rendering and work that pauses when nobody can see it.
+  interruptible rendering and work that pauses when nobody can see it. Three
+  more join it: Milestone 60, the visual pipeline (compositing and damage,
+  frame pacing with measured input-to-present latency, colour management, host
+  materials, secure capture); Milestone 62, media, capture, and files (audio
+  sessions, camera and screen capture, privacy-preserving pickers, background
+  transfer); and Milestone 63, trust (account deletion and revocation,
+  attestation, a consent contract the data layer enforces, backup
+  classification and data export).
 - **Tier 3 (49–52, 55–57), with and after the Web track** — the server
   application model, deployment and post-ship updates, observability and
   compliance, the stability policy, ecosystem contract, and documentation that
   decide whether the framework gets a second project; reconciliation beyond the
   screen (local-first sync, server-interactive UI, device fleets); durable and
   event-driven execution; and the surfaces beyond the main window — widgets,
-  extensions, push, commerce, secure storage, feature flags.
+  extensions, push, commerce, secure storage, feature flags; product
+  operations (links that survive installation, in-product guidance, typed
+  analytics, privacy-safe diagnostics); and reach (managed fleets, desktop
+  shell integration, delta updates over metered networks, and the field set for
+  devices — time and calibration, support bundles, provisioning).
 
 They come out of the standing analysis in
 [`docs/ecosystem-analysis/`](docs/ecosystem-analysis/), which examines the

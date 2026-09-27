@@ -16,6 +16,10 @@ split into four documents:
 | [`concepts-delivery.md`](concepts-delivery.md) | L7–L9 — engineering loop, build and packaging, isolation and security, ecosystem | C55–C72 |
 | [`concepts-embedded.md`](concepts-embedded.md) | L0–L8 on constrained and device targets — hardware description, scheduling, memory, storage, fleets, robotics, edge inference | C73–C92 |
 | [`concepts-toolchain.md`](concepts-toolchain.md) | L7–L9 — the layer between a repository and an installed, updatable application: release train, diagnostics, profiles and credentials, submission, update channels and fingerprinting, pipelines, native-module authoring, universal routing, launch assets, playground, pairing, escape ladder, artifact attribution | C93–C105 |
+| [`concepts-surface.md`](concepts-surface.md) | L2–L6 — the frame pipeline, scrolling and gesture physics, the text editing surface, non-pointer navigation, and media, capture, and files | C106–C119 |
+| [`concepts-product.md`](concepts-product.md) | L6, L8, L9 — account lifecycle, integrity attestation, consent and regional compliance, portability and backup, deep links and attribution, in-product guidance, typed analytics, privacy-safe diagnostics | C120–C127 |
+| [`concepts-discipline.md`](concepts-discipline.md) | L7–L9 — API surface enforcement, architecture boundary tests, test health, supply chain and reproducibility, release-health gating | C128–C132 |
+| [`concepts-reach.md`](concepts-reach.md) | L6–L8 — enterprise distribution and managed configuration, desktop shell integration, delta and bandwidth-aware updates, offline-first and navigation performance on the web, storage partitioning, device time and calibration, field diagnostics, manufacturing | C133–C141 |
 
 Every concept gets the same treatment:
 
