@@ -399,6 +399,8 @@ pub struct Services {
     push: Option<Arc<dyn crate::product::PushService>>,
     commerce: Option<Arc<dyn crate::product::CommerceService>>,
     packages: Arc<std::collections::BTreeMap<String, Arc<dyn std::any::Any + Send + Sync>>>,
+    extensions:
+        Arc<std::collections::BTreeMap<std::any::TypeId, Arc<dyn std::any::Any + Send + Sync>>>,
 }
 
 impl fmt::Debug for Services {
@@ -422,11 +424,48 @@ impl fmt::Debug for Services {
             .field("surfaces", &self.surfaces)
             .field("flags", &self.flags)
             .field("packages", &self.packages.keys().collect::<Vec<_>>())
+            .field("extensions", &self.extensions.len())
             .finish()
     }
 }
 
 impl Services {
+    /// Returns `self` with `value` as its extension of type `T`, replacing
+    /// any earlier one.
+    ///
+    /// An extension is a value a host constructs for one tree — a request's
+    /// path and session on a server rendering one page, the registry a page
+    /// render collects its interactive subtrees into — and that the
+    /// components in that tree reach through the services they were given,
+    /// never through a global (`PLAN.md` Web milestone H: per-request state).
+    ///
+    /// ```
+    /// use std::sync::Arc;
+    ///
+    /// use rustnative_core::Services;
+    ///
+    /// struct RequestPath(String);
+    /// let services = Services::default().with_extension(Arc::new(RequestPath("/notes".into())));
+    /// assert_eq!(services.extension::<RequestPath>().map(|path| path.0.clone()), Some("/notes".into()));
+    /// assert!(services.extension::<String>().is_none());
+    /// ```
+    #[must_use]
+    pub fn with_extension<T: Send + Sync + 'static>(self, value: Arc<T>) -> Self {
+        let mut extensions = (*self.extensions).clone();
+        extensions.insert(std::any::TypeId::of::<T>(), value);
+        Self { extensions: Arc::new(extensions), ..self }
+    }
+
+    /// The extension of type `T`, if the host set one
+    /// ([`Self::with_extension`]).
+    #[must_use]
+    pub fn extension<T: Send + Sync + 'static>(&self) -> Option<Arc<T>> {
+        self.extensions
+            .get(&std::any::TypeId::of::<T>())
+            .cloned()
+            .and_then(|value| value.downcast::<T>().ok())
+    }
+
     /// Installs a capability package (Milestone 52): checks it supports
     /// `backend` and this framework version, builds its service from a
     /// scope holding only the grants it declares, and keeps the service

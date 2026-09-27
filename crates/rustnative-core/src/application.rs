@@ -210,7 +210,7 @@ impl Application {
         if !self.inspection.active() {
             return self.dispatch_untraced(id, event);
         }
-        let started = std::time::Instant::now();
+        let started = self.scheduler_for(id).map_or_else(Default::default, Scheduler::now);
         self.record_input(id, &event);
         let description = format!("{event:?}");
         let handled = self.dispatch_untraced(id, event);
@@ -471,7 +471,7 @@ impl Application {
     /// Pumps completions for one native window without causing unrelated
     /// windows to rerender.
     pub fn pump_tasks_for(&mut self, id: WindowId) -> bool {
-        let started = std::time::Instant::now();
+        let started = self.scheduler_for(id).map_or_else(Default::default, Scheduler::now);
         let Some(entry) = self.windows.get_mut(&id) else {
             return false;
         };

@@ -45,7 +45,19 @@
     "Printing",
     "SerialPorts",
     "Accelerator(Gpu)",
-    "Accelerator(Npu)"
+    "Accelerator(Npu)",
+    "Http",
+    "WebSocket",
+    "IndexedStorage",
+    "OfflineCache",
+    "FileSystemAccess",
+    "Microphone",
+    "Sensors",
+    "Downloads",
+    "History",
+    "BackgroundWorkers",
+    "ServiceWorker",
+    "Installable"
   ],
   "component": {
     "methods": [

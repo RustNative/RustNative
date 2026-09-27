@@ -140,6 +140,38 @@ table!(HEADLESS, "headless", [
     Display => StyleSupport::Realized,
 ]);
 
+table!(WEB, "Web", [
+    // The one backend whose host speaks the declaration vocabulary
+    // natively: every property is a CSS property, applied by the browser
+    // from the generated stylesheet (`rustnative_web::css`).
+    Foreground => StyleSupport::Realized,
+    Background => StyleSupport::Realized,
+    BorderColor => StyleSupport::Realized,
+    BorderRadius => StyleSupport::Realized,
+    FontSize => StyleSupport::Realized,
+    FontWeight => StyleSupport::Realized,
+    FontFamily => StyleSupport::Approximated(
+        "the whole family list is given to the browser, which uses the first installed family; other backends use \
+         the first family named"
+    ),
+    Shadow => StyleSupport::Realized,
+    Overflow => StyleSupport::Realized,
+    Opacity => StyleSupport::Realized,
+    Display => StyleSupport::Realized,
+]);
+
+/// The Web backend's unit mapping.
+pub const WEB_UNITS: UnitMapping = UnitMapping {
+    backend: "Web",
+    host_unit: "CSS pixels",
+    pixel: "one logical pixel is one CSS pixel; the browser maps CSS pixels to device pixels by its \
+            device-pixel ratio, which follows the display and the page zoom",
+    rem: "the CSS `rem`: the root font size, which the browser sets from the person's text-size setting (16 CSS \
+          pixels by default); declared `rem` lengths reach the browser as `rem`, so they follow that setting live",
+    rounding: "none by the framework: the browser lays out in fractional CSS pixels and snaps to device pixels \
+               itself",
+};
+
 /// The Windows backend's unit mapping.
 pub const WINDOWS_UNITS: UnitMapping = UnitMapping {
     backend: "Windows",
@@ -167,7 +199,7 @@ mod tests {
 
     #[test]
     fn every_shipped_table_answers_every_property() {
-        for table in [WINDOWS, HEADLESS] {
+        for table in [WINDOWS, HEADLESS, WEB] {
             for property in StyleProperty::ALL {
                 assert!(
                     table.entries.iter().any(|(entry, _)| entry == property),

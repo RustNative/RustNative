@@ -420,10 +420,12 @@ pub use permission::{FixedPermissions, Permission, PermissionService, Permission
 pub use persistence::{MemoryStateStore, Persisted, StateStore};
 pub use platform::{Platform, UnsupportedPlatform};
 pub use reconcile::{TreeDiff, TreeNode, TreeOp, TreeSnapshot};
+#[cfg(feature = "threads")]
+pub use scheduler::TokioExecutor;
 pub use scheduler::{
-    Background, Executor, ExecutorHandle, LocalBoxedTask, LocalExecutor, LocalPool, ManualExecutor,
-    Offloaded, Priority, Scheduler, SleepFuture, Supervised, SupervisionPolicy, SuspendRule,
-    TaskFailure, TaskHandle, TaskId, TaskScope, TokioExecutor,
+    Background, Executor, ExecutorHandle, HostExecutor, LocalBoxedTask, LocalExecutor, LocalPool,
+    ManualExecutor, Offloaded, Priority, Scheduler, SleepFuture, Supervised, SupervisionPolicy,
+    SuspendRule, TaskFailure, TaskHandle, TaskId, TaskScope,
 };
 pub use services::{
     CertificatePins, ClipboardService, FileDialogKind, FileDialogRequest, FileDialogService,

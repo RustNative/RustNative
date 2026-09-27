@@ -363,3 +363,68 @@ fn removing_a_child_cancels_its_effect_owned_tasks() {
     let Node::Column(root) = tree.view() else { panic!("expected column root") };
     assert_eq!(root.children().len(), 1, "the child should have been removed from the view");
 }
+
+/// Loads after a delay: one message from a spawned task, then one after a
+/// timer — the shape of a browser subtree's or a request's work.
+struct Loader {
+    stage: &'static str,
+    started: bool,
+}
+
+impl Component for Loader {
+    type Props = NoProps;
+    type Message = &'static str;
+
+    fn new(_props: Self::Props) -> Self {
+        Self { stage: "empty", started: false }
+    }
+    fn props(&self) -> &Self::Props {
+        &NO_PROPS
+    }
+    fn set_props(&mut self, _props: Self::Props) {}
+    fn view(&self) -> Node {
+        Node::label("stage", self.stage)
+    }
+    fn update(&mut self, _event: Event) {}
+    fn message(&mut self, stage: &'static str) {
+        self.stage = stage;
+    }
+    fn render(&mut self, context: &mut ComponentContext<'_, &'static str>) -> Node {
+        if !self.started {
+            self.started = true;
+            context.spawn(async { "loaded" });
+            let delay = context.sleep(Duration::from_millis(250));
+            context.spawn(async move {
+                delay.await;
+                "refreshed"
+            });
+        }
+        self.view()
+    }
+}
+
+fn stage(tree: &ComponentTree) -> String {
+    let Node::Label(label) = tree.view() else { panic!("a label") };
+    label.text().to_owned()
+}
+
+#[test]
+fn a_tree_on_the_host_executor_is_driven_only_by_pump_tasks() {
+    let clock = crate::ManualClock::new();
+    let executor = Arc::new(crate::HostExecutor::new(Arc::new(clock.clone())));
+    let mut tree = ComponentTree::with_scheduler(
+        Loader::new(NoProps),
+        crate::Services::default(),
+        crate::Theme::default(),
+        crate::Scheduler::with_executor(executor.clone()),
+    );
+    assert_eq!(stage(&tree), "empty", "nothing ran before the host pumped");
+    assert!(tree.pump_tasks());
+    assert_eq!(stage(&tree), "loaded");
+    assert_eq!(executor.next_deadline(), Some(Duration::from_millis(250)));
+    assert!(!tree.pump_tasks(), "the timer is not due");
+    clock.advance(Duration::from_millis(250));
+    assert!(tree.pump_tasks());
+    assert_eq!(stage(&tree), "refreshed");
+    assert_eq!(executor.pending_task_count(), 0);
+}

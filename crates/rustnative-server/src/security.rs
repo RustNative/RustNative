@@ -205,7 +205,8 @@ pub(crate) fn secure_headers(headers: &mut HeaderMap, security: &Security, nonce
         "content-security-policy",
         format!(
             "default-src 'self'; script-src 'self' 'nonce-{nonce}'; style-src 'self' 'nonce-{nonce}'; \
-             object-src 'none'; base-uri 'none'; frame-ancestors 'none'; form-action 'self'"
+             img-src 'self' data:; object-src 'none'; base-uri 'none'; frame-ancestors 'none'; \
+             form-action 'self'"
         ),
     );
     set("x-content-type-options", "nosniff".into());

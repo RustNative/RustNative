@@ -19,6 +19,8 @@ workspace = true
 # served by `hyper`).
 [dependencies]
 rustnative-core.workspace = true
+# Pages: the Web backend's renderer, runtime, and client modules.
+rustnative-web.workspace = true
 bytes = "1"
 http = "1"
 http-body = "1"

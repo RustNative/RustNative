@@ -1,0 +1,21 @@
+[package]
+name = "rustnative-web-testing"
+version = "0.1.0"
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+description = "Browser tests for Rust Native's Web backend: a headless Chromium-family browser driven over the DevTools protocol"
+repository.workspace = true
+homepage.workspace = true
+readme.workspace = true
+keywords = ["testing", "web", "browser", "devtools"]
+categories = ["development-tools::testing", "web-programming"]
+
+[lints]
+workspace = true
+
+[dependencies]
+# The DevTools protocol is JSON over one WebSocket; the blocking client
+# keeps a test's steps in order without an async runtime.
+tungstenite = { version = "0.24", default-features = false, features = ["handshake"] }
+serde_json = "1"

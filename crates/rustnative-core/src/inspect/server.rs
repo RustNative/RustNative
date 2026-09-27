@@ -70,13 +70,27 @@ impl std::fmt::Debug for InspectServer {
 ///
 /// The generator is unavailable.
 pub fn new_token() -> io::Result<String> {
-    let mut bytes = [0_u8; 16];
-    getrandom::fill(&mut bytes).map_err(|error| io::Error::other(error.to_string()))?;
+    let bytes = random_bytes()?;
     Ok(bytes.iter().fold(String::with_capacity(32), |mut token, byte| {
         use std::fmt::Write as _;
         let _ = write!(token, "{byte:02x}");
         token
     }))
+}
+
+#[cfg(feature = "os-random")]
+fn random_bytes() -> io::Result<[u8; 16]> {
+    let mut bytes = [0_u8; 16];
+    getrandom::fill(&mut bytes).map_err(|error| io::Error::other(error.to_string()))?;
+    Ok(bytes)
+}
+
+/// The inspection server is a native host's: a build without the operating
+/// system's random source (a browser subtree) has none, and refuses to start
+/// one rather than serve a guessable token.
+#[cfg(not(feature = "os-random"))]
+fn random_bytes() -> io::Result<[u8; 16]> {
+    Err(io::Error::other("this build has no random source for an inspection token"))
 }
 
 impl InspectServer {

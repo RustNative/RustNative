@@ -56,8 +56,9 @@ pub trait ServerFn: 'static {
     }
 }
 
-/// Why a call failed.
-#[derive(Debug, Clone, PartialEq, Eq)]
+/// Why a call failed. Serializable, so a browser's generated client code
+/// and a native client see a failed call as the same value.
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub enum ServerFnError {
     /// The request did not complete.
     Transport(String),

@@ -466,6 +466,16 @@ pub struct ComponentContext<'a, M: Send + 'static> {
 }
 
 impl<M: Send + 'static> ComponentContext<'_, M> {
+    /// This component's identity in its tree: the owner of the nodes its
+    /// view returns ([`crate::NodeId::owner`] — `None` there for the root
+    /// component, whose identity is [`ComponentId::ROOT`]). A host that
+    /// must find a component's subtree in the rendered tree — a server
+    /// marking where an interactive subtree begins — matches on it.
+    #[must_use]
+    pub const fn id(&self) -> ComponentId {
+        self.parent
+    }
+
     /// Creates a typed child-to-parent callback for this component.
     #[must_use]
     pub fn callback<Msg: 'static>(&self) -> Callback<Msg> {

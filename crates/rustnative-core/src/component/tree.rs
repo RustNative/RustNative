@@ -909,6 +909,21 @@ impl ComponentTree {
         self.root_view.clone().expect("component tree must be rendered before its view is read")
     }
 
+    /// The last render's output *before* its declarations were folded into
+    /// typed properties: what [`Self::view`] was resolved from.
+    ///
+    /// A host whose own style engine evaluates the declarations' conditions
+    /// — a browser, which applies `md:` and `dark:` as media queries and
+    /// `hover:` as a pseudo-class — realizes this instead, so a condition is
+    /// decided where it can change (the person's window, their colour
+    /// scheme) rather than frozen at the environment the tree rendered in.
+    /// When nothing in the tree is styled by declarations, the two are the
+    /// same tree.
+    #[must_use]
+    pub fn unresolved_view(&self) -> Node {
+        self.unresolved_root.clone().unwrap_or_else(|| self.view())
+    }
+
     /// Routes `event` to its owning component, re-rendering if it (or any
     /// message it caused to be sent) changed component state. Returns
     /// whether the event was delivered to a component.
@@ -965,6 +980,9 @@ impl ComponentTree {
     /// component, re-rendering if any changed state. Returns whether
     /// anything changed.
     pub fn pump_tasks(&mut self) -> bool {
+        // A host-driven executor runs its ready tasks here; one with its
+        // own threads has already run them.
+        self.scheduler.run_ready();
         self.local.run_until_stalled();
         // Messages a local task sent through a callback.
         let had_messages = !self.message_sink.borrow().is_empty();

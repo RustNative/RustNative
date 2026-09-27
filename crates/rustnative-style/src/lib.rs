@@ -62,7 +62,8 @@ pub mod value;
 pub mod vocabulary;
 
 pub use capability::{
-    HEADLESS, HEADLESS_UNITS, StyleCapabilities, StyleSupport, UnitMapping, WINDOWS, WINDOWS_UNITS,
+    HEADLESS, HEADLESS_UNITS, StyleCapabilities, StyleSupport, UnitMapping, WEB, WEB_UNITS,
+    WINDOWS, WINDOWS_UNITS,
 };
 pub use model::{
     Color, Condition, ConditionEnv, ConditionalDeclaration, Declaration, DeclarationSet, Direction,

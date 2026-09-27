@@ -6,7 +6,7 @@ use std::any::Any;
 use std::cell::{Cell, RefCell};
 use std::collections::{HashMap, HashSet};
 use std::rc::Rc;
-use std::time::{Duration, Instant};
+use std::time::Duration;
 
 use super::{ComponentTree, RenderCause};
 use crate::identity::{ComponentId, NodeId};
@@ -33,7 +33,9 @@ impl ComponentTree {
         if self.deferred_messages.is_empty() {
             return false;
         }
-        let started = Instant::now();
+        // The host clock, through the executor: a target with no system
+        // clock (a browser subtree) still slices deferred work.
+        let started = self.scheduler.now();
         let mut delivered = false;
         while let Some(queued) = self.deferred_messages.pop_front() {
             let target = queued.target;
@@ -57,20 +59,20 @@ impl ComponentTree {
                     delivered = true;
                 }
             }
-            if started.elapsed() >= self.render_budget {
+            if self.scheduler.now().saturating_sub(started) >= self.render_budget {
                 break;
             }
         }
         delivered
     }
 
-    /// Delivers one slice of deferrable messages — as many as fit the
-    /// render budget — and renders. Returns whether anything changed.
+    /// Delivers one slice of deferrable messages â€” as many as fit the
+    /// render budget â€” and renders. Returns whether anything changed.
     ///
     /// A host calls this when no input is waiting, and again (after
     /// handling any input that arrived) while [`Self::has_deferred_work`]:
     /// so deferrable work never delays the response to input, and each
-    /// slice commits whole — a frame never shows half of one.
+    /// slice commits whole â€” a frame never shows half of one.
     pub fn pump_deferred(&mut self) -> bool {
         if !self.deliver_deferred_slice() {
             return false;
@@ -150,7 +152,7 @@ impl ComponentTree {
         paths
     }
 
-    /// The components whose props type compared unequal to its own clone —
+    /// The components whose props type compared unequal to its own clone â€”
     /// they re-render whenever their parent does, because their props can
     /// never be found equal (`C04-1`). Checked in debug builds.
     #[must_use]
@@ -165,7 +167,7 @@ impl ComponentTree {
 pub struct Deferred<T> {
     /// The most recent result, if any has been computed.
     pub current: Option<T>,
-    /// Whether a newer result is being computed — what a component shows
+    /// Whether a newer result is being computed â€” what a component shows
     /// as "stale" or "updating".
     pub pending: bool,
 }
@@ -190,7 +192,7 @@ impl<M: Send + 'static> crate::ComponentContext<'_, M> {
     /// under `key` (`C02`).
     ///
     /// When `input` changes (by value), the computation for the previous
-    /// input is cancelled — superseded work is discarded — and a new one
+    /// input is cancelled â€” superseded work is discarded â€” and a new one
     /// starts. Until it finishes, [`Deferred::current`] is the previous
     /// result and [`Deferred::pending`] is `true`, so the component keeps
     /// showing content and can show that it is updating. The component

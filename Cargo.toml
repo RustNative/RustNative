@@ -41,6 +41,8 @@ rustnative-sync = { path = "crates/rustnative-sync", version = "0.1.0" }
 rustnative-durable = { path = "crates/rustnative-durable", version = "0.1.0" }
 rustnative-observe = { path = "crates/rustnative-observe", version = "0.1.0" }
 rustnative-conformance = { path = "crates/rustnative-conformance", version = "0.1.0" }
+rustnative-web = { path = "crates/rustnative-web", version = "0.1.0" }
+rustnative-web-testing = { path = "crates/rustnative-web-testing", version = "0.1.0" }
 tokio = { version = "1.53", default-features = false, features = ["rt", "rt-multi-thread", "time", "sync"] }
 parking_lot = "0.12"
 async-trait = "0.1"

@@ -1765,6 +1765,7 @@ dependencies = [
  "rusqlite",
  "rustnative-core",
  "rustnative-server-macros",
+ "rustnative-web",
  "serde",
  "serde_json",
  "sha2",
@@ -1813,6 +1814,25 @@ name = "rustnative-types"
 version = "0.1.0"
 dependencies = [
  "serde",
+]
+
+[[package]]
+name = "rustnative-web"
+version = "0.1.0"
+dependencies = [
+ "rustnative-core",
+ "rustnative-style",
+ "rustnative-web-testing",
+ "serde",
+ "serde_json",
+]
+
+[[package]]
+name = "rustnative-web-testing"
+version = "0.1.0"
+dependencies = [
+ "serde_json",
+ "tungstenite",
 ]
 
 [[package]]

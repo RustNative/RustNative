@@ -86,6 +86,36 @@ pub enum Capability {
     /// A hardware accelerator for compute and inference (`C89-1`),
     /// answered from what the machine actually has.
     Accelerator(AcceleratorKind),
+    /// HTTP requests from the application ([`crate::HttpService`]).
+    Http,
+    /// Persistent, bidirectional connections (WebSocket).
+    WebSocket,
+    /// Structured, indexed local storage beyond key-value pairs
+    /// (`IndexedDB` on the web).
+    IndexedStorage,
+    /// A cache of responses the application controls, for working offline
+    /// (Cache Storage on the web).
+    OfflineCache,
+    /// Reading and writing files the person chose, beyond a one-time dialog
+    /// (the File System Access API on the web).
+    FileSystemAccess,
+    /// Capturing audio from a microphone.
+    Microphone,
+    /// Motion, orientation, and ambient sensors.
+    Sensors,
+    /// Handing the person a file to save (a download).
+    Downloads,
+    /// A navigation history the host keeps and the person moves through
+    /// with its own controls (the browser's back and forward).
+    History,
+    /// Running computation on a worker beside the UI thread (Web Workers).
+    BackgroundWorkers,
+    /// A background script that serves requests while offline and delivers
+    /// deferred work (a service worker).
+    ServiceWorker,
+    /// Being installed by the person as an application from where it runs
+    /// (an installable Progressive Web App).
+    Installable,
 }
 
 impl Capability {
@@ -138,6 +168,18 @@ impl Capability {
         Self::SerialPorts,
         Self::Accelerator(AcceleratorKind::Gpu),
         Self::Accelerator(AcceleratorKind::Npu),
+        Self::Http,
+        Self::WebSocket,
+        Self::IndexedStorage,
+        Self::OfflineCache,
+        Self::FileSystemAccess,
+        Self::Microphone,
+        Self::Sensors,
+        Self::Downloads,
+        Self::History,
+        Self::BackgroundWorkers,
+        Self::ServiceWorker,
+        Self::Installable,
     ];
 }
 

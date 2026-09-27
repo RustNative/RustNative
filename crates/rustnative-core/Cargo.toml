@@ -25,7 +25,11 @@ rustnative-types = { workspace = true, features = ["serde"] }
 rustnative-style.workspace = true
 # Message catalogues and plural rules (Milestone 46).
 rustnative-i18n.workspace = true
-tokio.workspace = true
+# The default executor's thread pool (`threads`). Declared here rather than
+# inherited from the workspace, whose entry carries `rt-multi-thread`: an
+# inherited dependency can only add features, and a build for a host with no
+# threads (a browser, a WASI sandbox) must be able to leave the pool out.
+tokio = { version = "1.53", default-features = false, features = ["rt", "rt-multi-thread", "time", "sync"], optional = true }
 parking_lot.workspace = true
 async-trait.workspace = true
 # Milestone 30's persistence serializes component state and navigation
@@ -34,8 +38,8 @@ async-trait.workspace = true
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 # The inspection server's and the development agent's tokens: the operating
-# system's cryptographic random number generator.
-getrandom = "0.3"
+# system's cryptographic random number generator (`os-random`).
+getrandom = { version = "0.3", optional = true }
 # The stream contract `TaskScope::collect` accepts (Milestone 47).
 futures-core = "0.3"
 
@@ -44,8 +48,16 @@ futures-core = "0.3"
 # default so it is not a second-class opt-in; a feature so a constrained
 # profile can drop the proc-macro dependency — which turns off both
 # carriers together (`PLAN.md` Milestone 53).
-default = ["markup"]
+default = ["markup", "threads", "os-random"]
 markup = ["dep:rustnative-macros"]
+# The thread-pool executor (`TokioExecutor`) and the process-wide default
+# built on it. Off for hosts without threads — a browser's WebAssembly
+# subtree, a WASI request — which run on `HostExecutor` instead (Web
+# milestones A and K).
+threads = ["dep:tokio"]
+# The operating system's random source, for the inspection server's token.
+# Off where there is none (`wasm32-unknown-unknown`).
+os-random = ["dep:getrandom"]
 # Before Milestone 30 this enabled `Serialize`/`Deserialize` on the id
 # types, ahead of persistence. Persistence is now part of the core, so
 # serde always is; the feature is kept, empty, so a manifest that asks for

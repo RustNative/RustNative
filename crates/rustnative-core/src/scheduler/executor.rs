@@ -34,8 +34,10 @@
 
 use std::future::Future;
 use std::pin::Pin;
+#[cfg(feature = "threads")]
+use std::sync::OnceLock;
 use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::{Arc, Mutex as StdMutex, OnceLock, PoisonError};
+use std::sync::{Arc, Mutex as StdMutex, PoisonError};
 use std::task::{Context, Poll, Wake, Waker};
 use std::time::Duration;
 
@@ -86,12 +88,21 @@ pub trait Executor: Send + Sync + 'static {
     fn now(&self) -> Duration {
         crate::clock::process_epoch().elapsed()
     }
+
+    /// Polls whatever this executor is ready to run, for an executor its
+    /// host drives ([`super::HostExecutor`]).
+    /// [`crate::ComponentTree::pump_tasks`] calls it before collecting
+    /// completed results. An executor with its own threads has nothing to
+    /// do here; the default does nothing.
+    fn run_ready(&self) {}
 }
 
+#[cfg(feature = "threads")]
 struct TokioHandle {
     abort: tokio::task::AbortHandle,
 }
 
+#[cfg(feature = "threads")]
 impl ExecutorHandle for TokioHandle {
     fn abort(&self) {
         self.abort.abort();
@@ -102,11 +113,17 @@ impl ExecutorHandle for TokioHandle {
 }
 
 /// The default [`Executor`], backed by a Tokio multi-thread runtime.
+///
+/// It exists with the `threads` feature (on by default); a build for a host
+/// without threads — a browser, a WASI sandbox — turns the feature off and
+/// uses [`super::HostExecutor`].
+#[cfg(feature = "threads")]
 #[derive(Clone)]
 pub struct TokioExecutor {
     runtime: Arc<tokio::runtime::Runtime>,
 }
 
+#[cfg(feature = "threads")]
 impl TokioExecutor {
     /// Builds a new, independently owned Tokio runtime with `worker_threads`
     /// workers. Use this when a host wants an executor whose lifetime and
@@ -157,6 +174,7 @@ impl TokioExecutor {
     }
 }
 
+#[cfg(feature = "threads")]
 impl Executor for TokioExecutor {
     fn spawn(&self, future: BoxedTask) -> Box<dyn ExecutorHandle> {
         let join_handle = self.runtime.spawn(future);

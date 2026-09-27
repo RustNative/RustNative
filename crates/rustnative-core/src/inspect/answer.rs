@@ -5,7 +5,6 @@ use std::collections::{BTreeMap, HashMap};
 use std::io;
 use std::net::SocketAddr;
 use std::sync::Arc;
-use std::time::Instant;
 
 use rustnative_style::{SetKind, StyleProperty, StyleSupport};
 
@@ -25,6 +24,7 @@ use crate::identity::{NodeId, WindowId};
 use crate::layout::{LayoutEngine, Rect, SizeMode};
 use crate::node::Node;
 use crate::reconcile::{TreeNode, TreeSnapshot};
+use crate::scheduler::Scheduler;
 use crate::style::{ControlState, StyleOverride, VisualStyle};
 
 /// The environment variable that turns inspection on for a backend's run.
@@ -207,13 +207,16 @@ impl Application {
     pub(crate) fn trace_change(
         &mut self,
         id: WindowId,
-        started: Instant,
+        started: std::time::Duration,
         kind: impl FnOnce(PassInfo) -> TraceKind,
     ) {
         let Some(tree) = self.components_for(id) else { return };
         let pass = tree.last_pass();
         let states = tree.inspected_states();
-        let micros = u64::try_from(started.elapsed().as_micros()).unwrap_or(u64::MAX);
+        // The host clock (through the executor), not the system's: a target
+        // with no system clock still traces.
+        let elapsed = tree.scheduler().now().saturating_sub(started);
+        let micros = u64::try_from(elapsed.as_micros()).unwrap_or(u64::MAX);
         let kind = kind(pass);
         let cause = match &kind {
             TraceKind::Event { event, .. } => event.clone(),
@@ -266,7 +269,7 @@ impl Application {
             }),
             Request::SetState { path, field, value, window: id } => {
                 let id = window(id);
-                let started = Instant::now();
+                let started = self.scheduler_for(id).map_or_else(Default::default, Scheduler::now);
                 let edited =
                     self.components_mut(id).map(|tree| tree.edit_component(path, field, value));
                 match edited {

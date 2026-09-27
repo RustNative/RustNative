@@ -8,13 +8,17 @@
 //! (the P1.5 fix this crate already carried into this rewrite).
 
 mod executor;
+mod host;
 mod local;
 pub mod supervise;
 pub mod suspend;
 
+#[cfg(feature = "threads")]
+pub use executor::TokioExecutor;
 pub use executor::{
-    BoxedSleep as SleepFuture, BoxedTask, Executor, ExecutorHandle, ManualExecutor, TokioExecutor,
+    BoxedSleep as SleepFuture, BoxedTask, Executor, ExecutorHandle, ManualExecutor,
 };
+pub use host::HostExecutor;
 pub use local::{LocalBoxedTask, LocalExecutor, LocalPool};
 pub use supervise::{
     Background, Offloaded, Supervised, SupervisionPolicy, TaskFailure, panic_message,
@@ -313,19 +317,30 @@ impl Default for Scheduler {
 
 impl Scheduler {
     /// Creates a scheduler backed by the process-wide default executor (a
-    /// shared two-worker-thread Tokio runtime — see
-    /// [`TokioExecutor::shared`]). This is what every `ComponentTree`/
-    /// `Application` constructor uses unless [`Self::with_executor`] is
-    /// used instead.
+    /// shared two-worker-thread Tokio runtime — `TokioExecutor::shared`).
+    /// This is what every `ComponentTree`/`Application` constructor uses
+    /// unless [`Self::with_executor`] is used instead.
+    ///
+    /// Without the `threads` feature there is no thread pool to share, and
+    /// the default is a [`HostExecutor`] on the system clock, driven by
+    /// [`crate::ComponentTree::pump_tasks`]; a host whose target has no
+    /// clock passes its own executor instead.
     #[must_use]
     pub fn new() -> Self {
-        Self::with_executor(TokioExecutor::shared())
+        #[cfg(feature = "threads")]
+        {
+            Self::with_executor(TokioExecutor::shared())
+        }
+        #[cfg(not(feature = "threads"))]
+        {
+            Self::with_executor(Arc::new(HostExecutor::new(Arc::new(crate::clock::SystemClock))))
+        }
     }
 
     /// Creates a scheduler backed by a caller-supplied [`Executor`],
     /// addressing the standards audit's P1.7 finding directly: a host can
     /// now give an `Application` its own dedicated executor (see
-    /// [`TokioExecutor::dedicated`]) instead of always sharing the one
+    /// `TokioExecutor::dedicated`) instead of always sharing the one
     /// process-global runtime.
     pub fn with_executor(executor: Arc<dyn Executor>) -> Self {
         Self {
@@ -511,6 +526,12 @@ impl Scheduler {
         self.inner.executor.now()
     }
 
+    /// Lets a host-driven executor poll what it has ready
+    /// ([`Executor::run_ready`]).
+    pub fn run_ready(&self) {
+        self.inner.executor.run_ready();
+    }
+
     pub(crate) fn drain(&self) -> Vec<CompletedTask> {
         self.inner
             .completed
@@ -523,7 +544,7 @@ impl Scheduler {
     /// Returns a cancellable delay measured by *this* scheduler's own
     /// executor, closing the standards audit's P1.18 finding: an earlier
     /// version of this method always read a timer from
-    /// [`TokioExecutor::shared`]'s runtime regardless of which executor a
+    /// `TokioExecutor::shared`'s runtime regardless of which executor a
     /// given `Scheduler` was constructed with, which made it impossible to
     /// deterministically test a component whose behavior depends on a
     /// delay. A `Scheduler` built with [`Self::with_executor`] using

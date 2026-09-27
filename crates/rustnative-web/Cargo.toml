@@ -1,0 +1,29 @@
+[package]
+name = "rustnative-web"
+version = "0.1.0"
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+description = "The Web backend of Rust Native: semantic HTML, CSS, and compile-time generated JavaScript, with WebAssembly for the subtrees that opt in"
+repository.workspace = true
+homepage.workspace = true
+readme.workspace = true
+keywords = ["gui", "web", "html", "native", "framework"]
+categories = ["gui", "web-programming", "wasm"]
+
+[lints]
+workspace = true
+
+# The core without its thread pool or the operating system's random source:
+# this crate also builds for `wasm32-unknown-unknown`, where a WebAssembly
+# subtree runs, and a native build turns both back on through whichever
+# other crate asks for the core's defaults.
+[dependencies]
+rustnative-core = { path = "../rustnative-core", version = "0.1.0", default-features = false, features = ["markup"] }
+rustnative-style.workspace = true
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+
+[dev-dependencies]
+rustnative-core.workspace = true
+rustnative-web-testing.workspace = true
