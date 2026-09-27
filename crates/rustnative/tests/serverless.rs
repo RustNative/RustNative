@@ -527,3 +527,67 @@ fn the_ui_is_the_same_in_every_mode() {
         }
     }
 }
+
+/// A function deployment on this machine: two revisions, each the function
+/// behind its own `serve lambda`, behind `deploy local --target function` —
+/// previewed by name, promoted, and rolled back without a restart.
+#[test]
+fn a_function_deployment_previews_promotes_and_rolls_back() {
+    cargo(&["build", "-p", "web-notes", "--bin", "web-notes-lambda"]);
+    let function = target().join(format!("debug/web-notes-lambda{}", std::env::consts::EXE_SUFFIX));
+    let revision = |port: u16| {
+        let process = Process(
+            Command::new(env!("CARGO_BIN_EXE_rustnative"))
+                .args(["serve", "lambda"])
+                .arg(&function)
+                .args(["--address", &format!("127.0.0.1:{port}")])
+                .env("NOTES_SECRET_KEY", KEY)
+                .stdout(Stdio::null())
+                .spawn()
+                .unwrap(),
+        );
+        wait_for(port);
+        process
+    };
+    let (first, second) = (free_port(), free_port());
+    let _r1 = revision(first);
+    let _r2 = revision(second);
+    let (proxy, control) = (free_port(), free_port());
+    let _deployment = Process(
+        Command::new(env!("CARGO_BIN_EXE_rustnative"))
+            .args(["deploy", "local", "start", "--target", "function"])
+            .args(["--port", &proxy.to_string(), "--control", &control.to_string()])
+            .stdout(Stdio::null())
+            .spawn()
+            .unwrap(),
+    );
+    wait_for(proxy);
+    wait_for(control);
+    let deploy = |arguments: &[&str]| {
+        let status = Command::new(env!("CARGO_BIN_EXE_rustnative"))
+            .args(["deploy", "local"])
+            .args(arguments)
+            .args(["--control", &control.to_string()])
+            .stdout(Stdio::null())
+            .status()
+            .unwrap();
+        assert!(status.success(), "deploy local {arguments:?}");
+    };
+    deploy(&["add", "r1", &format!("127.0.0.1:{first}")]);
+    deploy(&["add", "r2", &format!("127.0.0.1:{second}")]);
+    let served_by = |preview: Option<&str>| {
+        let headers: Vec<(&str, &str)> =
+            preview.map(|name| vec![("x-revision", name)]).unwrap_or_default();
+        let reply = send(proxy, "GET", "/", &headers, "");
+        assert_eq!(reply.status, 200, "{}", reply.body);
+        assert!(reply.body.contains("Sign in"), "{}", reply.body);
+        reply.header("x-served-by").unwrap().to_owned()
+    };
+    assert!(send(control, "GET", "/target", &[], "").body.contains("function runtime"));
+    assert_eq!(served_by(None), "r1", "the first revision takes the traffic");
+    assert_eq!(served_by(Some("r2")), "r2", "a preview, by name");
+    deploy(&["promote", "r2", "--percent", "100"]);
+    assert_eq!(served_by(None), "r2");
+    deploy(&["rollback"]);
+    assert_eq!(served_by(None), "r1");
+}

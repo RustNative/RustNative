@@ -8,8 +8,12 @@
 //! (the same client to the same revision, by a hash of its address), lets
 //! a named revision be previewed with `x-revision`, and moves traffic —
 //! promote, roll back — without restarting anything. [`LocalAdapter`]
-//! drives it; [`container`] writes the descriptions a container platform
-//! takes.
+//! drives it for a [`Target`] — a long-lived server, a static host, a
+//! function runtime, or an edge host (Web milestone K), each revision being
+//! the server, `rustnative serve static`, `serve lambda`, or `serve wagi`
+//! on its own port. [`container`] writes the descriptions a container
+//! platform takes, and [`serverless`] the ones a function runtime (an AWS
+//! SAM template) and an edge host (a Spin manifest) take.
 
 use std::collections::BTreeMap;
 use std::net::SocketAddr;
@@ -33,6 +37,67 @@ pub struct HostLimits {
     pub filesystem: String,
     /// The largest request payload.
     pub payload_bytes: Option<u64>,
+}
+
+/// Where a deployment runs.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum Target {
+    /// A long-lived server.
+    #[default]
+    Server,
+    /// Static files on a static host or content network.
+    Static,
+    /// A function per request, on a function runtime (AWS Lambda's API).
+    Function,
+    /// A WebAssembly module per request, on an edge host (WAGI).
+    Edge,
+}
+
+impl Target {
+    /// Its name.
+    #[must_use]
+    pub const fn name(self) -> &'static str {
+        match self {
+            Self::Server => "local server",
+            Self::Static => "static host",
+            Self::Function => "function runtime",
+            Self::Edge => "edge host",
+        }
+    }
+
+    /// What its host allows each request: the defaults of the emulators,
+    /// which follow the common providers'.
+    #[must_use]
+    pub fn limits(self) -> HostLimits {
+        match self {
+            Self::Server => HostLimits {
+                deadline: None,
+                memory_mb: None,
+                filesystem: "read-write".into(),
+                payload_bytes: Some(1024 * 1024),
+            },
+            Self::Static => HostLimits {
+                deadline: None,
+                memory_mb: None,
+                filesystem: "none".into(),
+                payload_bytes: Some(0),
+            },
+            Self::Function => HostLimits {
+                deadline: Some(Duration::from_secs(10)),
+                memory_mb: Some(128),
+                // `/tmp`, per instance.
+                filesystem: "read-write".into(),
+                payload_bytes: Some(6 * 1024 * 1024),
+            },
+            Self::Edge => HostLimits {
+                deadline: Some(Duration::from_secs(30)),
+                memory_mb: Some(128),
+                filesystem: "none".into(),
+                payload_bytes: Some(6 * 1024 * 1024),
+            },
+        }
+    }
 }
 
 /// One immutable build, serving at an address.
@@ -219,34 +284,43 @@ async fn forward_to(
     Ok(http::Response::from_parts(parts, body))
 }
 
-/// A long-lived deployment on this machine: revisions are processes on
-/// local ports behind a [`TrafficSplitter`].
+/// A deployment on this machine: revisions are processes on local ports
+/// behind a [`TrafficSplitter`] — servers, or, for the other targets, the
+/// emulators serving each revision's artifact.
 #[derive(Clone, Default)]
 pub struct LocalAdapter {
     splitter: TrafficSplitter,
+    target: Target,
 }
 
 impl LocalAdapter {
-    /// An adapter over `splitter`.
+    /// An adapter over `splitter`, for a long-lived server.
     #[must_use]
-    pub const fn new(splitter: TrafficSplitter) -> Self {
-        Self { splitter }
+    pub fn new(splitter: TrafficSplitter) -> Self {
+        Self { splitter, target: Target::Server }
+    }
+
+    /// An adapter for `target`.
+    #[must_use]
+    pub fn for_target(target: Target) -> Self {
+        Self { splitter: TrafficSplitter::new(), target }
+    }
+
+    /// Its target.
+    #[must_use]
+    pub const fn target(&self) -> Target {
+        self.target
     }
 }
 
 #[async_trait::async_trait]
 impl DeploymentAdapter for LocalAdapter {
     fn name(&self) -> &'static str {
-        "local server"
+        self.target.name()
     }
 
     fn limits(&self) -> HostLimits {
-        HostLimits {
-            deadline: None,
-            memory_mb: None,
-            filesystem: "read-write".into(),
-            payload_bytes: Some(1024 * 1024),
-        }
+        self.target.limits()
     }
 
     async fn deploy(&self, revision: Revision) -> Result<(), String> {
@@ -309,15 +383,27 @@ struct Promotion {
 
 impl LocalAdapter {
     /// The control API `rustnative deploy local` speaks, to serve on a
-    /// loopback address only: `GET /status`, `POST /revisions` (a
-    /// [`Revision`]), `POST /promote` (`{ revision, percent }`), and
-    /// `POST /rollback`.
+    /// loopback address only: `GET /status`, `GET /target` (its name and
+    /// limits), `POST /revisions` (a [`Revision`]), `POST /promote`
+    /// (`{ revision, percent }`), and `POST /rollback`.
     #[must_use]
     pub fn control(&self) -> crate::ServerApp {
         let (status, deploying, promoting, rolling) =
             (self.clone(), self.clone(), self.clone(), self.clone());
+        let target = self.target;
         crate::ServerApp::new()
             .security(crate::Security { csrf: false, hsts: false, ..crate::Security::default() })
+            .route(
+                "/target",
+                crate::get(move || async move {
+                    crate::Json(serde_json::json!({
+                        "target": target,
+                        "name": target.name(),
+                        "limits": target.limits(),
+                    }))
+                })
+                .public(),
+            )
             .route(
                 "/status",
                 crate::get(move || {
@@ -453,6 +539,144 @@ pub mod container {
             "# Generated by `rustnative deploy export systemd`.\n[Unit]\nDescription={name}\nAfter=network-online.target\n\n[Service]\nExecStart=/opt/{name}/{binary}\nDynamicUser=yes\nNoNewPrivileges=yes\nProtectSystem=strict\nRestart=on-failure\nEnvironmentFile=-/etc/{name}/environment\n\n[Install]\nWantedBy=multi-user.target\n",
             name = service.name,
             binary = service.binary
+        )
+    }
+}
+
+/// Descriptions for the serverless targets' providers.
+pub mod serverless {
+    use std::fmt::Write as _;
+
+    /// A function, as a function runtime deploys it.
+    #[derive(Debug, Clone, PartialEq, Eq)]
+    pub struct Function {
+        /// The application's name.
+        pub name: String,
+        /// Where the staged function is (`target/web/lambda`, holding
+        /// `bootstrap`).
+        pub code: String,
+        /// Its memory, in megabytes.
+        pub memory_mb: u64,
+        /// Its timeout, in seconds.
+        pub timeout_s: u64,
+        /// Environment variables it needs (names only: values are the
+        /// platform's secrets).
+        pub environment: Vec<String>,
+    }
+
+    /// An AWS SAM template: the function on the `provided.al2023` runtime
+    /// (the binary is `bootstrap`), behind an HTTP API, with a preview
+    /// alias and gradual traffic shifting — the provider's own preview,
+    /// promotion, and rollback.
+    #[must_use]
+    pub fn sam(function: &Function) -> String {
+        let mut environment = String::new();
+        for name in &function.environment {
+            let _ = writeln!(environment, "          {name}: !Ref {}", parameter(name));
+        }
+        let mut parameters = String::new();
+        for name in &function.environment {
+            let _ =
+                writeln!(parameters, "  {}:\n    Type: String\n    NoEcho: true", parameter(name));
+        }
+        let variables = if environment.is_empty() {
+            String::new()
+        } else {
+            format!("      Environment:\n        Variables:\n{environment}")
+        };
+        format!(
+            "# Generated by `rustnative deploy export sam`.\n\
+             AWSTemplateFormatVersion: '2010-09-09'\n\
+             Transform: AWS::Serverless-2016-10-31\n\
+             Description: {name}\n\
+             Parameters:\n{parameters_or_empty}\
+             Resources:\n  \
+               App:\n    \
+                 Type: AWS::Serverless::Function\n    \
+                 Properties:\n      \
+                   CodeUri: {code}\n      \
+                   Handler: bootstrap\n      \
+                   Runtime: provided.al2023\n      \
+                   Architectures: [x86_64]\n      \
+                   MemorySize: {memory}\n      \
+                   Timeout: {timeout}\n      \
+                   AutoPublishAlias: live\n      \
+                   DeploymentPreference:\n        \
+                     Type: Canary10Percent5Minutes\n\
+             {variables}      \
+                   Events:\n        \
+                     Http:\n          \
+                       Type: HttpApi\n\
+             Outputs:\n  \
+               Url:\n    \
+                 Value: !Sub 'https://${{ServerlessHttpApi}}.execute-api.${{AWS::Region}}.amazonaws.com/'\n",
+            name = function.name,
+            parameters_or_empty =
+                if parameters.is_empty() { "  {}\n".to_owned() } else { parameters },
+            code = function.code,
+            memory = function.memory_mb,
+            timeout = function.timeout_s,
+        )
+    }
+
+    /// `NOTES_DATA_KEY` as a template parameter's name: `NotesDataKey`.
+    fn parameter(name: &str) -> String {
+        name.split('_')
+            .map(|word| {
+                let lower = word.to_ascii_lowercase();
+                let mut letters = lower.chars();
+                letters.next().map_or_else(String::new, |first| {
+                    first.to_ascii_uppercase().to_string() + letters.as_str()
+                })
+            })
+            .collect()
+    }
+
+    /// An edge module, as an edge host deploys it.
+    #[derive(Debug, Clone, PartialEq, Eq)]
+    pub struct EdgeModule {
+        /// The application's name.
+        pub name: String,
+        /// The module (`target/web/wagi/<name>.wasm`).
+        pub source: String,
+        /// The hosts it may send HTTP requests to (`https://data.example`).
+        pub outbound: Vec<String>,
+        /// Environment variables it needs (`name = "{{ variable }}"`, so
+        /// values come from the platform's variables).
+        pub environment: Vec<String>,
+    }
+
+    /// A Spin manifest: the module under the WAGI executor on every route.
+    #[must_use]
+    pub fn spin(module: &EdgeModule) -> String {
+        let component = module.name.replace('_', "-");
+        let mut variables = String::new();
+        let mut environment = String::new();
+        for name in &module.environment {
+            let lower = name.to_ascii_lowercase();
+            let _ = writeln!(variables, "{lower} = {{ required = true, secret = true }}");
+            let _ = write!(environment, "{name} = \"{{{{ {lower} }}}}\", ");
+        }
+        let outbound =
+            module.outbound.iter().map(|host| format!("\"{host}\"")).collect::<Vec<_>>().join(", ");
+        format!(
+            "# Generated by `rustnative deploy export spin`.\n\
+             spin_manifest_version = 2\n\n\
+             [application]\n\
+             name = \"{name}\"\n\
+             version = \"0.1.0\"\n\n\
+             [variables]\n{variables}\n\
+             [[trigger.http]]\n\
+             route = \"/...\"\n\
+             component = \"{component}\"\n\
+             executor = {{ type = \"wagi\" }}\n\n\
+             [component.{component}]\n\
+             source = \"{source}\"\n\
+             allowed_outbound_hosts = [{outbound}]\n\
+             environment = {{ {environment} }}\n",
+            name = module.name,
+            source = module.source,
+            environment = environment.trim_end_matches([',', ' ']),
         )
     }
 }

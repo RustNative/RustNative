@@ -189,3 +189,56 @@ fn container_descriptions_ask_only_for_what_is_declared() {
     assert!(kubernetes.contains("key: RUSTNATIVE_RESOURCE_DATA"));
     assert!(container::systemd(&service).contains("DynamicUser=yes"));
 }
+
+#[test]
+fn serverless_descriptions_name_the_artifact_and_its_secrets() {
+    use rustnative_server::deploy::serverless::{EdgeModule, Function, sam, spin};
+    let template = sam(&Function {
+        name: "notes".into(),
+        code: "../target/web/lambda".into(),
+        memory_mb: 256,
+        timeout_s: 15,
+        environment: vec!["NOTES_DATA_KEY".into()],
+    });
+    for line in [
+        "Runtime: provided.al2023",
+        "Handler: bootstrap",
+        "CodeUri: ../target/web/lambda",
+        "MemorySize: 256",
+        "Timeout: 15",
+        "AutoPublishAlias: live",
+        "Type: Canary10Percent5Minutes",
+        "NOTES_DATA_KEY: !Ref NotesDataKey",
+        "NotesDataKey:",
+        "NoEcho: true",
+        "Type: HttpApi",
+    ] {
+        assert!(template.contains(line), "{line}:\n{template}");
+    }
+    let manifest = spin(&EdgeModule {
+        name: "notes".into(),
+        source: "../target/web/wagi/notes.wasm".into(),
+        outbound: vec!["https://data.example.com".into()],
+        environment: vec!["NOTES_DATA_KEY".into()],
+    });
+    let parsed: toml::Value = toml::from_str(&manifest).unwrap();
+    assert_eq!(parsed["spin_manifest_version"].as_integer(), Some(2));
+    let trigger = &parsed["trigger"]["http"][0];
+    assert_eq!(trigger["executor"]["type"].as_str(), Some("wagi"));
+    let component = &parsed["component"]["notes"];
+    assert_eq!(component["source"].as_str(), Some("../target/web/wagi/notes.wasm"));
+    assert_eq!(component["allowed_outbound_hosts"][0].as_str(), Some("https://data.example.com"));
+    assert_eq!(component["environment"]["NOTES_DATA_KEY"].as_str(), Some("{{ notes_data_key }}"));
+    assert_eq!(parsed["variables"]["notes_data_key"]["secret"].as_bool(), Some(true));
+}
+
+#[test]
+fn each_target_states_what_its_host_allows() {
+    use rustnative_server::deploy::Target;
+    let function = LocalAdapter::for_target(Target::Function);
+    assert_eq!(function.name(), "function runtime");
+    assert_eq!(function.limits().payload_bytes, Some(6 * 1024 * 1024));
+    assert_eq!(LocalAdapter::for_target(Target::Edge).limits().filesystem, "none");
+    assert_eq!(LocalAdapter::for_target(Target::Static).limits().payload_bytes, Some(0));
+    assert_eq!(LocalAdapter::default().limits().deadline, None);
+}

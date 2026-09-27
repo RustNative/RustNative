@@ -5,6 +5,7 @@ use std::net::TcpStream;
 use std::path::{Path, PathBuf};
 
 use rustnative_server::deploy::container::{self, Service};
+use rustnative_server::deploy::serverless;
 
 use crate::error::{Error, Result};
 use crate::project::Project;
@@ -14,7 +15,8 @@ use crate::project::Project;
 pub enum DeployCommand {
     /// Write infrastructure descriptions to `deploy/`.
     Export {
-        /// `container`, `compose`, `kubernetes`, `systemd`, or `all`.
+        /// `container`, `compose`, `kubernetes`, `systemd`, `sam` (a
+        /// function), `spin` (an edge module), or `all`.
         target: String,
         /// The port the server listens on.
         #[arg(long, default_value_t = 8080)]
@@ -36,6 +38,10 @@ pub enum DeployCommand {
 pub enum LocalAction {
     /// Run the traffic-splitting proxy (in the foreground).
     Start {
+        /// What the revisions are: servers, or `serve static`, `serve
+        /// lambda`, or `serve wagi` emulators, each on its own port.
+        #[arg(long, value_enum, default_value = "server")]
+        target: DeployTarget,
         /// Where clients connect.
         #[arg(long, default_value_t = 8080)]
         port: u16,
@@ -76,6 +82,30 @@ pub enum LocalAction {
         #[arg(long, default_value_t = 8081)]
         control: u16,
     },
+}
+
+/// What a local deployment's revisions are.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, clap::ValueEnum)]
+pub enum DeployTarget {
+    /// Long-lived servers.
+    Server,
+    /// Static exports, each under `rustnative serve static`.
+    Static,
+    /// Functions, each under `rustnative serve lambda`.
+    Function,
+    /// Edge modules, each under `rustnative serve wagi`.
+    Edge,
+}
+
+impl From<DeployTarget> for rustnative_server::deploy::Target {
+    fn from(target: DeployTarget) -> Self {
+        match target {
+            DeployTarget::Server => Self::Server,
+            DeployTarget::Static => Self::Static,
+            DeployTarget::Function => Self::Function,
+            DeployTarget::Edge => Self::Edge,
+        }
+    }
 }
 
 fn usage(error: impl std::fmt::Display) -> Error {
@@ -150,9 +180,28 @@ pub fn run(here: &Path, command: DeployCommand) -> Result<()> {
             if all || target == "systemd" {
                 emit(&format!("{}.service", service.name), container::systemd(&service))?;
             }
+            if all || target == "sam" {
+                let function = serverless::Function {
+                    name: service.name.clone(),
+                    code: "../target/web/lambda".into(),
+                    memory_mb: 128,
+                    timeout_s: 10,
+                    environment: service.environment.clone(),
+                };
+                emit("template.yaml", serverless::sam(&function))?;
+            }
+            if all || target == "spin" {
+                let module = serverless::EdgeModule {
+                    name: service.name.clone(),
+                    source: format!("../target/web/wagi/{}.wasm", service.binary),
+                    outbound: Vec::new(),
+                    environment: service.environment.clone(),
+                };
+                emit("spin.toml", serverless::spin(&module))?;
+            }
             if !wrote {
                 return Err(usage(format!(
-                    "{target:?}: expected container, compose, kubernetes, systemd, or all"
+                    "{target:?}: expected container, compose, kubernetes, systemd, sam, spin, or all"
                 )));
             }
             if build {
@@ -175,18 +224,22 @@ pub fn run(here: &Path, command: DeployCommand) -> Result<()> {
             Ok(())
         }
         DeployCommand::Local { action } => match action {
-            LocalAction::Start { port, control: control_port } => {
+            LocalAction::Start { target, port, control: control_port } => {
                 let runtime =
                     tokio::runtime::Runtime::new().map_err(io("start the runtime".into()))?;
                 runtime.block_on(async {
-                    let adapter = rustnative_server::deploy::LocalAdapter::default();
+                    let adapter =
+                        rustnative_server::deploy::LocalAdapter::for_target(target.into());
                     let proxy = tokio::net::TcpListener::bind(("0.0.0.0", port))
                         .await
                         .map_err(io(format!("listen on {port}")))?;
                     let controller = tokio::net::TcpListener::bind(("127.0.0.1", control_port))
                         .await
                         .map_err(io(format!("listen on {control_port}")))?;
-                    println!("deploy: serving on port {port}; control on 127.0.0.1:{control_port}");
+                    println!(
+                        "deploy: a {} on port {port}; control on 127.0.0.1:{control_port}",
+                        adapter.target().name()
+                    );
                     tokio::spawn(adapter.splitter().serve(proxy));
                     adapter
                         .control()
