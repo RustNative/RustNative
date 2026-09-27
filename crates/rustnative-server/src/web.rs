@@ -257,6 +257,17 @@ impl crate::ServerApp {
         Ok(self)
     }
 
+    /// Serves `T`'s client module from the start, rather than once a page
+    /// that uses it has rendered. An instance that lives for one request —
+    /// an edge module, a function scaled out — never rendered the page that
+    /// asks for the module, so a serverless application declares each
+    /// client component its pages use.
+    #[must_use]
+    pub fn client<T: rustnative_web::ClientLogic>(self) -> Self {
+        self.web.remember(&[T::MODULE]);
+        self
+    }
+
     /// Makes the application installable and able to work offline
     /// (`rustnative_web::pwa`): every page links the manifest and registers
     /// the service worker.

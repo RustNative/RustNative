@@ -1755,6 +1755,7 @@ dependencies = [
  "rustnative-markup",
  "rustnative-server",
  "rustnative-style",
+ "rustnative-web-testing",
  "rustnative-windows",
  "serde",
  "serde_json",
@@ -1763,6 +1764,7 @@ dependencies = [
  "tokio",
  "toml",
  "wasmi",
+ "web-notes",
  "windows-sys",
 ]
 

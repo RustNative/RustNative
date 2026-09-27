@@ -430,6 +430,7 @@ pub fn app(data: Data, key: [u8; 32]) -> ServerApp {
         .before(before)
         .after(after)
         .before(Authentication::<User>::sessions().middleware())
+        .client::<editor::Editor>()
         .route("/", get(home).public())
         .route("/sign-in", post(sign_in).public())
         .function::<AddNote>(

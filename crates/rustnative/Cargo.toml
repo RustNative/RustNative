@@ -56,6 +56,9 @@ wasmi = { version = "0.46", default-features = false, features = ["std"] }
 
 [dev-dependencies]
 serde_json = "1"
+# The serverless and equivalence tests: the example in every shape, in Edge.
+web-notes = { path = "../../examples/web-notes", version = "0.1.0" }
+rustnative-web-testing.workspace = true
 sha2 = "0.10"
 
 [target.'cfg(windows)'.dev-dependencies]
