@@ -12,6 +12,17 @@ milestone that will do it. The shipped backends are Windows and the headless
 reference backend (Milestone 45); a "done when" that names several backends is
 met on those two, and its other half is listed as owed.
 
+**Crate rename (2026-09-27).** The crates are now named `rustnative-*`, to
+match the project name. Before this, they used the working name
+`framework-*` (for example `framework-core` and `framework-windows`), and
+their Rust paths used `framework_*`. Every entry in this file now uses the new
+names, including entries for milestones built before the rename, so crate
+names in commits before `c6366fc` will not match. Generic uses of the word are
+unchanged, such as "framework-managed" and the CLI's `--framework-path` flag.
+Projects created by `rustnative new` now depend on the `rustnative-*` crates.
+One markup expansion golden was re-blessed: the longer crate path moves one
+call past the pretty-printer's line width.
+
 <!-- milestone entries, newest first -->
 
 ### Milestone 52 — The project around the framework — complete for Windows (device end owed)
