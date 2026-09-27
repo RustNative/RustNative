@@ -310,7 +310,9 @@ fn content_type(path: &Path) -> &'static str {
 /// is its `index.html`), with the headers `_headers` gives it.
 fn answer_static(folder: &Path, rules: &str, path: &str) -> (u16, Vec<(String, String)>, Vec<u8>) {
     let clean = path.split(['?', '#']).next().unwrap_or("/");
-    if clean.split('/').any(|part| part == "..") {
+    // An export's paths never hold `\` or `:`; on Windows either would let
+    // a path leave the folder (`..\`, `C:`), so they are refused with `..`.
+    if clean.contains(['\\', ':']) || clean.split('/').any(|part| part == "..") {
         return (400, Vec::new(), b"bad path".to_vec());
     }
     let mut file = folder.join(clean.trim_start_matches('/'));
@@ -585,6 +587,14 @@ mod tests {
     use super::*;
 
     const RULES: &str = "/*\n  Content-Security-Policy: default-src 'self'\n  X-Frame-Options: DENY\n\n/_rn/*\n  Cache-Control: public, max-age=31536000, immutable\n\n/_rn/w/*\n  ! Cache-Control\n  Cache-Control: no-cache\n\n/game\n  ! Content-Security-Policy\n  Content-Security-Policy: default-src 'self'; script-src 'self' 'wasm-unsafe-eval'\n";
+
+    #[test]
+    fn paths_that_leave_the_folder_are_refused() {
+        let folder = std::env::temp_dir();
+        for path in ["/../x", "/a/../../x", "/..\\x", "/a\\..\\..\\x", "/C:/x", "/x::$DATA"] {
+            assert_eq!(answer_static(&folder, "", path).0, 400, "{path}");
+        }
+    }
 
     #[test]
     fn headers_follow_the_rules_in_order() {

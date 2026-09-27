@@ -33,6 +33,7 @@ pub type Before = Arc<dyn Fn(&mut RequestContext) -> Result<(), ServerError> + S
 /// Runs after the handler: may change the response (set a cookie).
 pub type After = Arc<dyn Fn(&RequestContext, &mut Response) + Send + Sync>;
 
+#[cfg(feature = "serve")]
 /// Answers a request that asks to switch protocols (a WebSocket): the
 /// request as the connection received it, and the peer's address. The
 /// handler returns the `101` response and takes the upgraded connection
@@ -68,6 +69,7 @@ pub struct ServerApp {
     openapi: Option<(String, String)>,
     extra: Vec<(String, Arc<dyn Fn() -> Response + Send + Sync>)>,
     cache: crate::cache::ResponseCache,
+    #[cfg(feature = "serve")]
     upgrades: Vec<(String, Upgrade)>,
     pub(crate) web: Arc<crate::web::WebAssets>,
 }
@@ -95,6 +97,7 @@ impl ServerApp {
             openapi: None,
             extra: Vec::new(),
             cache: crate::cache::ResponseCache::new(),
+            #[cfg(feature = "serve")]
             upgrades: Vec::new(),
             web: Arc::default(),
         }
@@ -107,6 +110,7 @@ impl ServerApp {
         if on { self.development() } else { self }
     }
 
+    #[cfg(feature = "serve")]
     /// Answers protocol upgrades (a WebSocket) at `path` with `handler`,
     /// on the application's own listener. The handler must check what it
     /// needs (the `Origin`, a session); the application's middleware does
@@ -442,6 +446,9 @@ impl AppService {
         let nonce = random_token(16);
         context.insert(CsrfToken(csrf.clone()));
         context.insert(CspNonce(nonce.clone()));
+        if let Some(limits) = parts.extensions.get::<rustnative_web::HostLimits>() {
+            context.insert(limits.clone());
+        }
 
         for middleware in &app.before {
             if let Err(error) = middleware(&mut context) {
@@ -577,6 +584,7 @@ impl AppService {
         }
     }
 
+    #[cfg(feature = "serve")]
     /// Serves the application on `listener` until `shutdown` completes;
     /// requests in flight finish first.
     ///

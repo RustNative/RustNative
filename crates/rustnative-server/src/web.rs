@@ -359,9 +359,8 @@ pub(crate) async fn render_pending(
             } else {
                 let page = page.clone();
                 let cx = cx.clone();
-                let shell =
-                    tokio::task::spawn_blocking(move || page::prerender_shell(&page, &cx)).await;
-                let Ok(shell) = shell else {
+                let shell = blocking(move || page::prerender_shell(&page, &cx)).await;
+                let Some(shell) = shell else {
                     return crate::ServerError::internal("the page's shell did not render")
                         .render(false);
                 };
@@ -375,6 +374,19 @@ pub(crate) async fn render_pending(
         } else {
             None
         };
+        if !threaded() {
+            // One invocation on one thread: the page is rendered whole, in
+            // the order it would have streamed.
+            let mut html = String::new();
+            let rendered = page::render_streamed(page, &cx, shell.as_deref(), &mut |chunk| {
+                html.push_str(&chunk);
+            });
+            web.remember(&rendered.modules);
+            let mut response = Response::new(Bytes::from(html));
+            *response.status_mut() = status;
+            html_headers(&mut response);
+            return response;
+        }
         let mut head = Response::new(Bytes::new());
         *head.status_mut() = status;
         html_headers(&mut head);
@@ -387,8 +399,8 @@ pub(crate) async fn render_pending(
         });
         return response;
     }
-    let rendered = tokio::task::spawn_blocking(move || page::render(page, &cx)).await;
-    let Ok(rendered) = rendered else {
+    let rendered = blocking(move || page::render(page, &cx)).await;
+    let Some(rendered) = rendered else {
         return crate::ServerError::internal("the page did not render").render(false);
     };
     web.remember(&rendered.modules);
@@ -399,6 +411,20 @@ pub(crate) async fn render_pending(
         response.extensions_mut().insert(crate::security::WasmPage);
     }
     response
+}
+
+/// Whether rendering may leave the request's thread for the runtime's
+/// blocking pool (so the runtime keeps driving the render's timers and
+/// sockets); on `wasm32-wasip1` there are no other threads, and a render
+/// runs where it is.
+fn threaded() -> bool {
+    !cfg!(target_family = "wasm") && tokio::runtime::Handle::try_current().is_ok()
+}
+
+/// Runs `work` off the runtime's threads when there are others, in place
+/// when there are not; `None` when it panicked on another thread.
+async fn blocking<T: Send + 'static>(work: impl FnOnce() -> T + Send + 'static) -> Option<T> {
+    if threaded() { tokio::task::spawn_blocking(work).await.ok() } else { Some(work()) }
 }
 
 fn html_headers(response: &mut Response) {

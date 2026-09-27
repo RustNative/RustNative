@@ -18,17 +18,20 @@ workspace = true
 # ecosystem's service abstraction (`tower::Service` over `http` types,
 # served by `hyper`).
 [dependencies]
-rustnative-core.workspace = true
+# The core without its thread pool: the request pipeline also builds for
+# `wasm32-wasip1` (a function per request on an edge host); `serve` turns
+# the pool back on.
+rustnative-core = { path = "../rustnative-core", version = "0.1.0", default-features = false, features = ["markup", "os-random"] }
 # Pages: the Web backend's renderer, runtime, and client modules.
 rustnative-web.workspace = true
 bytes = "1"
 http = "1"
 http-body = "1"
 http-body-util = "0.1"
-hyper = { version = "1", features = ["server", "client", "http1"] }
-hyper-util = { version = "0.1", features = ["tokio"] }
+hyper = { version = "1", features = ["server", "client", "http1"], optional = true }
+hyper-util = { version = "0.1", features = ["tokio"], optional = true }
 tower-service = "0.3"
-tokio = { workspace = true, features = ["net", "time", "sync", "rt", "macros"] }
+tokio = { version = "1.53", default-features = false, features = ["time", "sync", "rt", "macros"] }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 toml = "1"
@@ -36,7 +39,7 @@ getrandom = "0.2"
 base64 = "0.22"
 async-trait.workspace = true
 rustnative-server-macros.workspace = true
-rusqlite = { version = "0.40", default-features = false, features = ["bundled"] }
+rusqlite = { version = "0.40", default-features = false, features = ["bundled"], optional = true }
 aes-gcm = "0.10"
 argon2 = "0.5"
 p256 = { version = "0.13", features = ["ecdsa", "ecdh"] }
@@ -55,7 +58,15 @@ aes-gcm = "0.10"
 hkdf = "0.12"
 
 [features]
-default = ["health", "metrics"]
+default = ["health", "metrics", "serve", "db", "web"]
+# Serving on a socket: the listener, WebSocket upgrades, the local deploy
+# proxy.
+serve = ["dep:hyper", "dep:hyper-util", "tokio/net", "tokio/rt-multi-thread", "rustnative-core/threads"]
+# SQLite: data, jobs, the admin surface, row policies.
+db = ["dep:rusqlite"]
+# Pages (`rustnative_web`): always part of the pipeline; the feature names
+# them for builds that list what they take.
+web = []
 # `/healthz` and `/readyz`.
 health = []
 # `/metrics` in the Prometheus text format.

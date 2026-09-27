@@ -29,6 +29,7 @@
 //! rate limiting, a body size limit, and escaping [`Html`] are on unless an
 //! application turns them off.
 
+#[cfg(feature = "db")]
 pub mod admin;
 pub mod app;
 pub mod assets;
@@ -37,11 +38,14 @@ pub mod body;
 pub mod cache;
 pub mod components;
 pub mod config;
+#[cfg(feature = "db")]
 pub mod db;
+#[cfg(feature = "serve")]
 pub mod deploy;
 pub mod functions;
 pub mod handler;
 pub mod head;
+#[cfg(feature = "db")]
 pub mod jobs;
 pub mod local;
 pub mod openapi;
@@ -51,9 +55,12 @@ pub mod request;
 pub mod response;
 pub mod scope;
 pub mod security;
+pub mod serverless;
 pub mod web;
 
-pub use app::{AppService, RouteInfo, ServerApp, Upgrade};
+#[cfg(feature = "serve")]
+pub use app::Upgrade;
+pub use app::{AppService, RouteInfo, ServerApp};
 pub use body::{Body, Chunks, streamed};
 pub use handler::{Guarded, Handler, MethodRouter, Unguarded, delete, get, patch, post, put};
 pub use request::{Form, FromRequest, Path, Query, RequestContext, State};
