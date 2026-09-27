@@ -30,12 +30,21 @@
 //! ```
 #![deny(missing_docs)]
 
+pub mod client;
 pub mod css;
 pub mod dom;
 pub mod hash;
 pub mod html;
+pub mod jsnode;
 pub mod png;
+pub mod runtime;
 pub mod svg;
+
+pub use client::{Client, ClientLogic, ClientModule, Effects};
+/// Client logic compiled to JavaScript: see [client](mod@client).
+pub use rustnative_web_macros::client;
+/// A typed server function from one `async fn`; see `rustnative_webgen::server`.
+pub use rustnative_web_macros::server;
 
 use rustnative_core::{Node, Theme};
 

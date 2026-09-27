@@ -60,6 +60,7 @@ mod token_table;
 pub mod tokens;
 pub mod value;
 pub mod vocabulary;
+pub mod web;
 
 pub use capability::{
     HEADLESS, HEADLESS_UNITS, StyleCapabilities, StyleSupport, UnitMapping, WEB, WEB_UNITS,

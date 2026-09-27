@@ -1822,9 +1822,20 @@ version = "0.1.0"
 dependencies = [
  "rustnative-core",
  "rustnative-style",
+ "rustnative-web-macros",
  "rustnative-web-testing",
  "serde",
  "serde_json",
+]
+
+[[package]]
+name = "rustnative-web-macros"
+version = "0.1.0"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "rustnative-webgen",
+ "syn 2.0.119",
 ]
 
 [[package]]
@@ -1833,6 +1844,19 @@ version = "0.1.0"
 dependencies = [
  "serde_json",
  "tungstenite",
+]
+
+[[package]]
+name = "rustnative-webgen"
+version = "0.1.0"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "rustnative-markup",
+ "rustnative-style",
+ "rustnative-web-testing",
+ "serde_json",
+ "syn 2.0.119",
 ]
 
 [[package]]

@@ -1,0 +1,29 @@
+[package]
+name = "rustnative-webgen"
+version = "0.1.0"
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+description = "Rust Native's client-subset translator: client logic in restricted Rust, compiled to JavaScript at build time"
+repository.workspace = true
+homepage.workspace = true
+readme.workspace = true
+keywords = ["web", "javascript", "codegen", "native", "framework"]
+categories = ["development-tools::procedural-macro-helpers", "web-programming"]
+
+[lints]
+workspace = true
+
+[dependencies]
+proc-macro2 = { version = "1", features = ["span-locations"] }
+quote = "1"
+syn = { version = "2", features = ["full", "visit", "visit-mut", "extra-traits"] }
+# `rsx!` inside client logic is lowered by the markup crate, then translated.
+rustnative-markup.workspace = true
+# `classes!`/`styles!` inside client logic compile to the same sets the
+# server's realizer names.
+rustnative-style.workspace = true
+serde_json = "1"
+
+[dev-dependencies]
+rustnative-web-testing.workspace = true

@@ -35,9 +35,7 @@
 use std::collections::{BTreeMap, BTreeSet};
 use std::fmt::Write as _;
 
-use rustnative_core::style::decl::{
-    Condition, ConditionalDeclaration, Direction, Keyword, Pointer, Scheme, State, StyleValue,
-};
+use rustnative_core::style::decl::{ConditionalDeclaration, Keyword, StyleValue};
 use rustnative_core::{
     Alignment, ColumnStyle, ComponentStyle, Cursor, DeclarationSet, EdgeInsets, GridStyle,
     LayoutStyle, Overflow, RowStyle, SizeMode, StateStyles, StyleProperty, Theme, Track,
@@ -45,6 +43,10 @@ use rustnative_core::{
 };
 
 use crate::hash::class_name;
+use rustnative_style::web::{SizeValue, condition_css, grouped, size_value, wrap};
+pub use rustnative_style::web::{
+    condition_json, declaration_rules, implies, is_contextual, set_descriptor,
+};
 
 /// How a node's parent lays it out: which axis is the main one, and the
 /// alignment the parent gives children that do not choose their own.
@@ -427,6 +429,10 @@ fn component_rules(selector: &str, style: &ComponentStyle) -> String {
     rules
 }
 
+/// The cascade layers' order, declared first: base, theme, then the four
+/// class families. A page's own unlayered CSS comes after all of them.
+pub const LAYER_ORDER: &str = "@layer rn-base,rn-theme,rn-l,rn-v,rn-d,rn-n;";
+
 /// The fixed base rules every page with framework content carries.
 pub const BASE_CSS: &str = "*,*::before,*::after{box-sizing:border-box}\
 html,body{margin:0}\
@@ -457,140 +463,6 @@ pub fn theme_css(theme: &Theme) -> String {
     out
 }
 
-/// A value as CSS text: tokens stay `var(--…)` references for the
-/// browser to resolve, so a theme change is one re-resolution here too.
-fn value_css(property: StyleProperty, value: &StyleValue) -> String {
-    match (property, value) {
-        // The vocabulary's `overflow-scroll` and `overflow-auto` both mean
-        // "reachable by scrolling"; the typed mapping writes `auto`.
-        (StyleProperty::Overflow, StyleValue::Keyword(Keyword::Scroll)) => "auto".to_owned(),
-        (StyleProperty::FontWeight, StyleValue::Number(weight)) => weight.to_string(),
-        _ => value.to_string(),
-    }
-}
-
-/// The media query and the selector suffix a condition becomes.
-fn condition_css(condition: &Condition) -> (Vec<String>, String) {
-    let mut media = Vec::new();
-    match condition.scheme {
-        Some(Scheme::Dark) => media.push("(prefers-color-scheme: dark)".to_owned()),
-        Some(Scheme::Light) => media.push("(prefers-color-scheme: light)".to_owned()),
-        None => {}
-    }
-    if let Some(width) = condition.min_width {
-        media.push(format!("(min-width: {width}px)"));
-    }
-    match condition.reduced_motion {
-        Some(true) => media.push("(prefers-reduced-motion: reduce)".to_owned()),
-        Some(false) => media.push("(prefers-reduced-motion: no-preference)".to_owned()),
-        None => {}
-    }
-    match condition.pointer {
-        Some(Pointer::Coarse) => media.push("(pointer: coarse)".to_owned()),
-        Some(Pointer::Fine) => media.push("(pointer: fine)".to_owned()),
-        None => {}
-    }
-    let mut selector = String::new();
-    match condition.direction {
-        Some(Direction::Rtl) => selector.push_str(":dir(rtl)"),
-        Some(Direction::Ltr) => selector.push_str(":dir(ltr)"),
-        None => {}
-    }
-    match condition.state {
-        Some(State::Hover) => selector.push_str(":hover"),
-        Some(State::Focus) => selector.push_str(":focus"),
-        Some(State::FocusVisible) => selector.push_str(":focus-visible"),
-        Some(State::Active) => selector.push_str(":active"),
-        Some(State::Disabled) => selector.push_str(":is(:disabled,[aria-disabled=true])"),
-        None => {}
-    }
-    (media, selector)
-}
-
-/// Whether a property's CSS depends on the node's parent (its main axis,
-/// its alignment) or on the node's kind (its display): those go in the
-/// node's own class ([`node_rules`]), everything else in the set's.
-#[must_use]
-pub const fn is_contextual(property: StyleProperty) -> bool {
-    matches!(
-        property,
-        StyleProperty::Width
-            | StyleProperty::Height
-            | StyleProperty::AlignSelf
-            | StyleProperty::Display
-    )
-}
-
-/// Groups declarations by condition, in first-appearance order, keeping
-/// source order within each group (a later one of a property wins).
-fn grouped<'a>(
-    declarations: impl Iterator<Item = &'a ConditionalDeclaration>,
-) -> Vec<(Condition, Vec<&'a ConditionalDeclaration>)> {
-    let mut groups: Vec<(Condition, Vec<&ConditionalDeclaration>)> = Vec::new();
-    for declaration in declarations {
-        match groups.iter_mut().find(|(condition, _)| *condition == declaration.condition) {
-            Some((_, group)) => group.push(declaration),
-            None => groups.push((declaration.condition, vec![declaration])),
-        }
-    }
-    // A larger breakpoint's rule comes later, so it wins where both hold —
-    // whichever order the classes were written in (as Tailwind orders
-    // them).
-    groups.sort_by_key(|(condition, _)| condition.min_width.unwrap_or(0));
-    groups
-}
-
-fn wrap(rules: &mut String, media: &[String], selector: &str, body: &str) {
-    if media.is_empty() {
-        let _ = write!(rules, "&{selector}{{{body}}}");
-    } else {
-        let _ = write!(rules, "@media {}{{&{selector}{{{body}}}}}", media.join(" and "));
-    }
-}
-
-/// A declaration set's context-free declarations as rule text (`&` for the
-/// class), or `None` when it has none. The `classes!` macro computes the
-/// same text at build time for the client modules it writes.
-#[must_use]
-pub fn declaration_rules(set: DeclarationSet) -> Option<String> {
-    let mut rules = String::new();
-    for (condition, group) in grouped(
-        set.declarations()
-            .iter()
-            .filter(|declaration| !is_contextual(declaration.declaration.property)),
-    ) {
-        let (media, selector) = condition_css(&condition);
-        let mut body = String::new();
-        for declaration in group {
-            let property = declaration.declaration.property;
-            let value = value_css(property, &declaration.declaration.value);
-            let _ = write!(body, "{}:{value};", property.css_name());
-        }
-        wrap(&mut rules, &media, &selector, &body);
-    }
-    (!rules.is_empty()).then_some(rules)
-}
-
-/// Whether `other` holds whenever `condition` does: each part `other` sets
-/// is set the same way in `condition`, except a minimum width, which holds
-/// under any larger one.
-#[must_use]
-pub fn implies(condition: &Condition, other: &Condition) -> bool {
-    fn same<T: PartialEq>(a: Option<&T>, b: Option<&T>) -> bool {
-        b.is_none() || a == b
-    }
-    same(condition.state.as_ref(), other.state.as_ref())
-        && same(condition.scheme.as_ref(), other.scheme.as_ref())
-        && same(condition.direction.as_ref(), other.direction.as_ref())
-        && same(condition.reduced_motion.as_ref(), other.reduced_motion.as_ref())
-        && same(condition.pointer.as_ref(), other.pointer.as_ref())
-        && match (condition.min_width, other.min_width) {
-            (_, None) => true,
-            (Some(width), Some(needed)) => width >= needed,
-            (None, Some(_)) => false,
-        }
-}
-
 /// What a node is, for the display its `display:` declarations restore.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Display {
@@ -613,24 +485,6 @@ impl Display {
             Self::Element => "revert",
         }
     }
-}
-
-fn size_value(value: &StyleValue) -> Option<SizeValue> {
-    match value {
-        StyleValue::Keyword(Keyword::Auto) => Some(SizeValue::Auto),
-        StyleValue::Keyword(Keyword::Fill) => Some(SizeValue::Fill),
-        StyleValue::Length(_) | StyleValue::Token(_) | StyleValue::Scaled(..) => {
-            Some(SizeValue::Length(value.to_string()))
-        }
-        _ => None,
-    }
-}
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-enum SizeValue {
-    Auto,
-    Fill,
-    Length(String),
 }
 
 fn size_mode_value(mode: SizeMode) -> SizeValue {
@@ -830,7 +684,15 @@ impl StyleSheet {
             .entry(layer)
             .or_default()
             .entry(class.clone())
-            .or_insert_with(|| text.replace('&', &format!(".{class}")));
+            // Each family of classes is its own cascade layer, so a rule the
+            // runtime inserts later keeps its place in the cascade.
+            .or_insert_with(|| {
+                format!(
+                    "@layer rn-{}{{{}}}",
+                    layer.prefix(),
+                    text.replace('&', &format!(".{class}"))
+                )
+            });
         class
     }
 
@@ -906,9 +768,13 @@ impl StyleSheet {
     /// every collected rule in cascade order.
     #[must_use]
     pub fn css(&self, theme: &Theme) -> String {
-        let mut out = String::from(BASE_CSS);
-        out.push_str(&theme_css(theme));
-        out.push_str(&self.token_css(theme));
+        let mut out = String::from(LAYER_ORDER);
+        let _ = write!(
+            out,
+            "@layer rn-base{{{BASE_CSS}}}@layer rn-theme{{{}{}}}",
+            theme_css(theme),
+            self.token_css(theme)
+        );
         out.push_str(&self.rules_css());
         out
     }

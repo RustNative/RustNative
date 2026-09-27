@@ -9,58 +9,7 @@
 //! arithmetic is `Math.imul`). The runtime's copy is `rn.hash` in
 //! `runtime/rn.js`; `tests/runtime.rs` checks the two agree.
 
-/// `cyrb53` of `text`'s UTF-16 code units: a 53-bit value, so it is exact
-/// as a JavaScript number.
-///
-/// ```
-/// use rustnative_web::hash::cyrb53;
-///
-/// assert_eq!(cyrb53(""), 3_338_908_027_751_811);
-/// assert_ne!(cyrb53("a"), cyrb53("b"));
-/// ```
-#[must_use]
-pub fn cyrb53(text: &str) -> u64 {
-    let mut h1: u32 = 0xdead_beef;
-    let mut h2: u32 = 0x41c6_ce57;
-    for unit in text.encode_utf16() {
-        let unit = u32::from(unit);
-        h1 = (h1 ^ unit).wrapping_mul(2_654_435_761);
-        h2 = (h2 ^ unit).wrapping_mul(1_597_334_677);
-    }
-    h1 = (h1 ^ (h1 >> 16)).wrapping_mul(2_246_822_507);
-    h1 ^= (h2 ^ (h2 >> 13)).wrapping_mul(3_266_489_909);
-    h2 = (h2 ^ (h2 >> 16)).wrapping_mul(2_246_822_507);
-    h2 ^= (h1 ^ (h1 >> 13)).wrapping_mul(3_266_489_909);
-    (u64::from(h2 & 0x001f_ffff) << 32) | u64::from(h1)
-}
-
-/// `prefix` followed by `cyrb53(text)` in base 36 — JavaScript's
-/// `prefix + hash.toString(36)`.
-///
-/// ```
-/// use rustnative_web::hash::class_name;
-///
-/// assert!(class_name("l", "width:10px").starts_with('l'));
-/// assert_eq!(class_name("l", "x"), class_name("l", "x"));
-/// ```
-#[must_use]
-pub fn class_name(prefix: &str, text: &str) -> String {
-    let mut value = cyrb53(text);
-    let mut digits = Vec::new();
-    loop {
-        let digit = u8::try_from(value % 36).unwrap_or(0);
-        digits.push(if digit < 10 { b'0' + digit } else { b'a' + digit - 10 });
-        value /= 36;
-        if value == 0 {
-            break;
-        }
-    }
-    digits.reverse();
-    let mut name = String::with_capacity(prefix.len() + digits.len());
-    name.push_str(prefix);
-    name.extend(digits.into_iter().map(char::from));
-    name
-}
+pub use rustnative_style::web::{class_name, cyrb53};
 
 #[cfg(test)]
 mod tests {

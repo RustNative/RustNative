@@ -21,8 +21,12 @@ workspace = true
 [dependencies]
 rustnative-core = { path = "../rustnative-core", version = "0.1.0", default-features = false, features = ["markup"] }
 rustnative-style.workspace = true
+# #[client] and #[server].
+rustnative-web-macros.workspace = true
 serde = { version = "1", features = ["derive"] }
-serde_json = "1"
+# Exact float parsing: a float crossing between the browser and Rust reads
+# back as the value that was written.
+serde_json = { version = "1", features = ["float_roundtrip"] }
 
 [dev-dependencies]
 rustnative-core.workspace = true

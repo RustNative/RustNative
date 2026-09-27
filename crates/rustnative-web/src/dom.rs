@@ -797,7 +797,10 @@ impl<'a> Realizer<'a> {
         visible_text: Option<&str>,
     ) {
         let role = info.role();
-        if role != native {
+        // A group with no name tells assistive technology nothing: a plain
+        // container stays a plain element.
+        let unnamed_group = role == AccessibilityRole::Group && info.name_hint().is_none();
+        if role != native && !unnamed_group {
             if let Some(name) = aria_role(role) {
                 element.set("role", name);
             }
@@ -827,7 +830,7 @@ impl<'a> Realizer<'a> {
         {
             element.set("tabindex", "-1");
         }
-        let native_value = matches!(element.tag.as_str(), "progress" | "select")
+        let native_value = matches!(element.tag.as_str(), "progress" | "select" | "textarea")
             || (element.tag == "input"
                 && matches!(element.get("type"), Some("range" | "number" | "text" | "date")));
         match info.value() {
