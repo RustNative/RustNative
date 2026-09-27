@@ -8,10 +8,18 @@ implementable depth, not built), **Absent** (not specified anywhere).
 Evidence is `PLAN.md` sections and milestones and `BUILD_STATUS.md` records.
 "Verified" means `PLAN.md` 2.13's meaning: run on the real host.
 
-Current reality: Milestones 1–32 complete and verified on Windows/Win32. Every
-other backend is **Planned**. Scores below are therefore given as
+Current reality (2026-09-27): Milestones 1–32 and, on the Windows backend,
+Milestones 39–58 are built; `BUILD_STATUS.md` records what each pass verified
+and what it owes. Every other backend — macOS, Linux, Android, iOS, embedded,
+terminal — and the Web track's milestones A–K remain **Planned**, so most rows
+below read "Met (Windows), owed elsewhere". Scores are therefore given as
 *core contract* first and *coverage across targets* second, because those two
 numbers differ enormously and averaging them would hide the real position.
+
+**On the layer tables below.** They were written before Milestones 39–58 and
+are refreshed only where this analysis has direct evidence; `BUILD_STATUS.md`
+is authoritative for anything they disagree about. The concept tables were
+refreshed on 2026-09-27 for every concept that milestone set names as built.
 
 ---
 
@@ -255,23 +263,44 @@ milestone column is where [`gap-plan.md`](gap-plan.md) schedules it.
 
 | Concept | Score | Milestone |
 | --- | --- | --- |
-| `C55` Previews and catalogue | **Absent** | 43 |
-| `C56` Structural editing API for designers | **Absent** | 53, 43 |
-| `C57` Generators, codemods, feature kits | **Partial** | 43, 52 |
-| `C58` Dev services, continuous tests, error overlay | **Absent** | 43 |
-| `C59` Development builds | **Absent** | 43 |
+| `C55` Previews and catalogue | **Met** (Windows) | 43 |
+| `C56` Structural editing API for designers | **Met** (Windows) | 53, 43 |
+| `C57` Generators, codemods, feature kits | **Met** (Windows) | 43, 52 |
+| `C58` Dev services, continuous tests, error overlay | **Met** (Windows) | 43 |
+| `C59` Development builds | **Absent** — owed with the device backends | 43, 59 |
 | `C60` Semantics-based test queries | **Absent** | 45 |
-| `C61` Record, replay, time travel | **Absent** | 44 |
-| `C62` Startup phases and profile-guided builds | **Absent** | 42 |
-| `C63` Native projects as generated outputs, config plugins | **Partial** | 50 |
-| `C64` Shared build cache, remote builds | **Absent** | 50 |
+| `C61` Record, replay, time travel | **Met** (Windows) | 44 |
+| `C62` Startup phases and profile-guided builds | **Met** (Windows) | 42 |
+| `C63` Native projects as generated outputs, config plugins | **Partial** — manifest generation yes, plugin hook and the rule not stated | 50, 59 |
+| `C64` Shared build cache, remote builds | **Partial** — local cache yes, remote build and signing no | 50, 59 |
 | `C65` Platform-group crates | **Absent** | 39 |
 | `C66` Generated bindings from one interface description | **Absent** | 40 |
-| `C67` Optional isolated worker process | **Absent** | 51 |
-| `C68` Capability grants distinct from availability | **Absent** | 39 (shape), 51 (enforcement) |
+| `C67` Optional isolated worker process | **Met** (Windows) | 51 |
+| `C68` Capability grants distinct from availability | **Met** (Windows) | 39, 51 |
 | `C69` Web security primitives on by default | **Absent** | 51 |
-| `C70` Vendor-neutral instrumentation | **Absent** | 51 |
-| `C71` Package compatibility metadata and scoping | **Absent** | 52 |
+| `C70` Vendor-neutral instrumentation | **Met** (Windows) | 51 |
+| `C71` Package compatibility metadata and scoping | **Met** (Windows) | 52 |
+
+### The toolchain and service layer (L7–L9)
+
+From [`concepts-toolchain.md`](concepts-toolchain.md), scored 2026-09-27
+against the Windows backend's shipped state.
+
+| Concept | Score | Milestone |
+| --- | --- | --- |
+| `C93` Versioned release train | **Partial** — stability policy, codemods, MSRV, per-package ranges; no platform version, no compatible-version resolution, no host matrix | 59 |
+| `C94` Project and environment diagnostics | **Partial** — `doctor --install`; no dependency, configuration, credential, or drift checks | 59 |
+| `C95` Build profiles and managed credentials | **Absent** — local signing only | 59 |
+| `C96` Store submission as a command | **Absent** | 59 |
+| `C97` Channels, runtime compatibility, native fingerprinting | **Partial** — signed, staged, pinned, rollback-capable updates; no fingerprint gating, channels, embedded fallback, or adoption reporting | 59 |
+| `C98` Pipelines defined in the repository | **Absent** | 59 |
+| `C99` Autolinking and declarative native modules | **Partial** — packages, grants, bindings; no module declaration, no autolinking of native code | 59 |
+| `C100` One router for every target | **Partial** — one router, localized routes; no deep-link generation or static export map | 59, 49 |
+| `C101` Generated launch assets | **Absent** — one icon, embedded as given | 59 |
+| `C102` Shareable playground | **Absent** | 59 |
+| `C103` Device pairing for the development loop | **Partial** — authenticated remote host over loopback; no discovery, pairing, relay, or fan-out | 59, 43 |
+| `C104` Two-way escape ladder for generated projects | **Absent** | 59 |
+| `C105` Artifact composition inspection | **Absent** — budgets enforced without attribution | 59, 42 |
 
 ### Embedded and device (L0–L8 on constrained targets)
 
@@ -293,8 +322,8 @@ milestone column is where [`gap-plan.md`](gap-plan.md) schedules it.
 | `C86` Flow-based integration | **Rejected** | — |
 | `C87` Long-running operations | **Absent** | 56 |
 | `C88` Device-input recording replayed in simulator | **Absent** | 44 |
-| `C89` Accelerator capabilities, model assets | **Absent** | 51, 50 |
-| `C90` On-demand toolchains and board support | **Absent** | 43 |
+| `C89` Accelerator capabilities, model assets | **Met** (Windows) | 51, 50 |
+| `C90` On-demand toolchains and board support | **Partial** — toolchain install yes, board support owed | 43, 59 |
 | `C91` Asynchronous display region transfer | **Absent** | 37 |
 | `C92` Kernel-aware trace output | **Absent** | 44 |
 

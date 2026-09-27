@@ -357,53 +357,129 @@ engine-rendered core and a native UI shell is a real and underserved shape.
 
 ---
 
-## M8 — The managed toolchain layer
+## M8 — The managed toolchain and service layer
 
-**Root (L0–L2).** Not a UI framework: a layer *around* one (usually M3) that
-takes over everything between source code and an installed application —
-native project generation, native dependency management, cloud builds and
-signing, development clients, over-the-air update hosting, and store
-submission. Its root choice is that native project files are build outputs,
-never edited by hand (`C63`).
+The archetype this analysis initially under-read. It was first treated as a
+wrapper around M3; on a closer reading it is the most complete claim to the
+layer *between a repository and an installed, updatable application* that any
+framework family has made — and that is the layer where a framework is most
+often chosen or abandoned for reasons having nothing to do with its runtime.
 
-**Semantics and model (L3–L4).** Unchanged from the framework it wraps, plus a
-file-based router and a curated set of first-party native modules with a single
-versioned release.
+**Root (L0–L2).** It has no runtime of its own and realizes nothing. Its root
+choice is organizational rather than technical: **the native project is a build
+output, not source** (`C63`). Everything else follows. If manifests,
+entitlements, and build files are generated, then a library can contribute to
+them programmatically, an upgrade can regenerate them, a service can build them
+without a developer's machine, and a fingerprint over their inputs can decide
+what an installed build is compatible with.
 
-**Integration (L5–L6).** Configuration plugins let libraries declare their
-native requirements, so installing a capability package configures the native
-projects automatically. First-party modules cover the common device
-capabilities with one consistent API.
+**Semantics and model (L3–L4).** Inherited from the framework it wraps. Its own
+additions are a curated, version-locked library set and a universal router
+(`C100`) whose routes serve native navigation and web URLs from one table.
 
-**Loop and ship (L7–L8).** The defining strength. Development builds separate
-native compilation from the fast loop (`C59`); cloud builds and signing remove
-the need for local platform toolchains (`C64`); update channels, staged rollout,
-and rollback are hosted; store submission is one command.
+**Integration (L5–L6).** A first-party module set covering the common device
+capabilities with one API and one release cadence, plus *autolinking* and a
+declarative native-module authoring layer (`C99`): adding a dependency that
+contains native code requires no project edit, and writing one requires a
+declaration rather than hand-written marshalling.
 
-**Project (L9).** Became the recommended way to start with its underlying
-framework, which is the strongest possible evidence of how much the first hour
-matters.
+**Loop and ship (L7–L8).** The defining band, and the reason the archetype
+exists:
 
-**Strengths.** The first hour and the release process, both nearly solved;
-upgrades that regenerate native projects rather than asking for manual merges;
-a coherent, versioned set of native capabilities.
+- **development builds** (`C59`) split slow native compilation from the fast
+  loop, and **pairing** (`C103`) attaches devices by scanning a code, over the
+  local network or a relay, several at once;
+- **cloud builds with named profiles and managed credentials** (`C95`, `C64`)
+  let a developer produce a signed store build without holding a signing key or
+  owning the platform's hardware;
+- **store submission is a command** (`C96`), with metadata and phased release
+  declared in the repository;
+- **updates go to channels, gated by a fingerprint of native inputs** (`C97`),
+  with an embedded fallback and adoption reporting — the mechanism that makes
+  shipping application code outside the store safe rather than merely possible;
+- **pipelines are declared in the repository** (`C98`) as framework-aware jobs;
+- **launch assets are generated** from one source (`C101`), and bundle
+  composition is inspectable (`C105`).
 
-**Weaknesses.** Anything not expressible through configuration or a plugin
-requires leaving the managed path; hosted services create a commercial
-dependency; build minutes cost money.
+**Project (L9).** A **versioned release train** (`C93`): one platform version
+pinning the library set, the supported host versions, and the toolchain, with a
+cadence, a deprecation window, an upgrade command, and a **diagnostics command**
+(`C94`) that explains why a project cannot build. A **browser playground**
+(`C102`) makes every documentation example runnable from a link, and the
+**escape ladder** (`C104`) lets a team materialize the generated native project
+and still see — and adopt — what generation would have produced.
 
-**Opportunities.** Almost every mechanism here maps onto something `rustnative`
-already owns or plans: generation from `rustnative.toml` (Milestone 32),
-capability packages (`X-ECO-1`), updates (`M-BR-1`), and the developer loop
-(Milestone 43). What this archetype adds is the *rule* that native projects are
-outputs (`C63-1`), the *plugin hook* for native configuration (`C63-2`), and
-the *development build* split (`C59-1`) — and the proof that a toolchain layer,
-not a UI layer, is what converts evaluations into adoptions.
+**Strengths.** It removes the entire class of work mobile developers dislike
+and that has nothing to do with their product: project files, signing,
+credentials, submission, compatibility, device setup, upgrade merges. The first
+hour is a scanned code and a running application; the release process is a
+command; an upgrade is one version number. Compatibility is *computed* rather
+than remembered. It became the recommended way to start with the framework it
+wraps, which is the strongest available evidence that this layer, not the UI
+layer, converts evaluations into adoptions.
 
-**Threats.** It sets the first-hour and release-process bar that every mobile
-framework is now measured against.
+**Weaknesses.** Anything not expressible as configuration or a plugin requires
+leaving the generated path, and leaving it used to be permanent — the
+correction is `C104`, and the fact that a correction was needed is the lesson.
+The hosted halves — builds, updates, submission, playground — are a commercial
+dependency, with cost per build minute and a trust decision about key custody.
+The release train holds back anything that ships faster than it. Its
+fingerprinting guarantee is only as complete as its list of native inputs. And
+all of it sits on a dynamic-runtime substrate (F0.1) whose costs it cannot
+remove: it makes shipping pleasant, not startup fast.
 
-**What we must ship.** `C63-1`, `C63-2`, `C59-1`, `C64-2`, `M-BR-4`.
+**Opportunities for RustNative.** Three, in order of value.
+
+1. *The layer is already ours to take on desktop.* Milestones 43, 50, and 52
+   shipped the developer loop with previews and generators, signed staged
+   updates with rollback, deployment adapters with revisions and traffic
+   splitting, the stability policy with codemods, capability packages with
+   grants, and a machine-readable framework description — on Windows. That is a
+   larger fraction of this archetype's L7–L9 surface than any other framework
+   family has built outside it. What is missing is not the idea but the specific
+   mechanisms catalogued in [`concepts-toolchain.md`](concepts-toolchain.md):
+   profiles and credentials, submission, channels and fingerprint gating,
+   pipelines, the release train, diagnostics, pairing, the playground,
+   generated launch assets, bundle attribution, and the escape ladder.
+2. *Our fingerprint can be better than theirs* (`C97-1`). Compatibility gating
+   is only as good as the knowledge of what affects the native side. Ours is
+   already declarative — the crate graph, `rustnative.toml`, generated manifests
+   and entitlements, capability packages and their grants — so the hash is
+   computable at build time and checkable at update time, and the guarantee is
+   as complete as the declaration rather than as complete as a maintained list.
+3. *Key custody can be a choice rather than a product* (`C95-2`). The archetype
+   ties managed credentials to its hosted service. A credential contract with
+   local, vault, and remote-service backings gives the same developer
+   experience to organizations that cannot hand a signing identity to a vendor
+   — which is most regulated ones.
+
+**Threats.** This archetype sets the bar for the first hour and for the release
+process, and both are judged before any runtime characteristic is measured. Its
+hosted services are genuinely convenient, and a framework that answers "how do
+I ship this?" with a document of manual steps loses to one that answers with a
+command. Most of its mechanisms are also *independent of its substrate*, so
+none of our root-layer advantages diminish them: we cannot out-compile this
+problem.
+
+**Concepts introduced here.** `C93` the versioned release train; `C94` project
+and environment diagnostics; `C95` build profiles and managed credentials;
+`C96` store submission as a command; `C97` update channels, runtime
+compatibility, and native fingerprinting; `C98` pipelines defined in the
+repository; `C99` autolinking and declarative native modules; `C100` one router
+for every target; `C101` generated launch assets; `C102` the shareable
+playground; `C103` device pairing for the development loop; `C104` the two-way
+escape ladder for generated projects; `C105` artifact composition inspection;
+and, from the earlier pass, `C59` development builds, `C63` continuous native
+generation, and `C64` remote builds and caching. Each is analysed on its own
+merits in [`concepts-toolchain.md`](concepts-toolchain.md) and
+[`concepts-delivery.md`](concepts-delivery.md).
+
+**What we must ship.** `C93-1`–`C93-4`, `C94-1`, `C94-2`, `C95-1`–`C95-3`,
+`C96-1`, `C97-1`–`C97-4`, `C98-1`, `C98-2`, `C99-1`, `C99-2`, `C100-1`,
+`C100-2`, `C101-1`, `C102-1`, `C102-2`, `C103-1`, `C104-1`, `C105-1`, plus
+`C59-1`, `C63-1`, `C63-2`, `C64-1`, `C64-2`, and `M-BR-4`. Gathered as
+Milestone 59 in [`gap-plan.md`](gap-plan.md), with the parts belonging to an
+existing milestone routed there.
 
 ---
 

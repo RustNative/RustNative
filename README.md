@@ -1430,14 +1430,21 @@ production-parity milestones (39–58) in four tiers:
   These cost once now and once per backend later. (Milestone numbers are identities, not an
   order — `PLAN.md` section 8 establishes that convention, and section 11
   sequences these three.)
-- **Tier 1 (41–45), continuous, and part of section 8's definition of a
+- **Tier 1 (41–45, 59), continuous, and part of section 8's definition of a
   finished backend** — the conformance suites that turn this framework's
   guarantees into tested ones, including the syntax-equivalence suite that
   keeps the two authoring surfaces from drifting apart, CI-enforced budgets, a
   state-preserving developer loop with previews and development builds, a
   runtime inspection protocol with record and replay, and the headless test
   backend — queried through the accessibility tree — that lets the application
-  layer be tested without one machine per target.
+  layer be tested without one machine per target. Milestone 59 finishes the
+  toolchain layer around all of it: one platform version with a supported-host
+  matrix, project diagnostics, build profiles with credentials the developer
+  never holds, store submission, update channels gated by a fingerprint of the
+  native inputs, repository-declared pipelines, native-module authoring with
+  autolinking, generated launch assets, device pairing, a shareable playground,
+  and artifact size attribution — so each device backend inherits a release
+  process instead of inventing one.
 - **Tier 2 (46–48, 54), before any public release** — internationalization and
   localization, shared state, error boundaries as supervision, the asynchronous
   data layer, forms and validation, a native component library with a

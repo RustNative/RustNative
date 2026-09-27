@@ -22,7 +22,8 @@ Everything else is ordered by what it unblocks.
 
 ```text
 Tier 0  before the second backend      — per-backend obligations and the seams
-Tier 1  alongside the backend work     — the loop, the guarantees, the budgets
+Tier 1  alongside the backend work     — the loop, the guarantees, the
+                                         budgets, and the toolchain layer
 Tier 2  before any public release      — the application layer users expect,
                                          and responsiveness under load
 Tier 3  with and after the web track   — the server, deployment, ecosystem,
@@ -344,6 +345,73 @@ rather than merely fast:
 
 **Done when.** The loop's wall-clock time is in the budget file (M42) and is
 met on every shipped backend.
+
+## Milestone 59 — The toolchain and service layer
+
+**Why.** `mobile.md` M8 on a closer reading: the layer between a repository and
+an installed, updatable application is where a framework is most often chosen
+or abandoned, and it is the one competitive surface where none of our
+root-layer advantages help — the archetype's mechanisms are independent of its
+substrate. Milestones 43, 50, and 52 already built a large part of this layer
+on Windows; this milestone completes it and, critically, defines the contracts
+*before* the device backends arrive, so Milestones 35–37 inherit a release
+process instead of each inventing one.
+
+**Covers.** `C93-1`–`C93-4`, `C94-1`, `C94-2`, `C95-1`–`C95-3`, `C96-1`,
+`C97-1`–`C97-4`, `C98-1`, `C98-2`, `C99-1`, `C99-2`, `C100-1`, `C100-2`,
+`C101-1`, `C102-1`, `C102-2`, `C103-1`, `C104-1`, `C105-1`, and the unfinished
+halves of `C59-1`, `C63-1`, `C63-2`, `C64-1`, `C64-2`, `C90-1`.
+
+**Scope.**
+
+- **The release train** (`C93`): one platform version across the crates, the
+  CLI, the templates, and the package index; a published supported-host matrix
+  per version; `add` resolving the compatible version rather than the newest;
+  `upgrade` moving the train and reporting per dependency what moved and what
+  is held back.
+- **Diagnostics** (`C94`): `doctor` extended to toolchains and platform SDKs,
+  dependency compatibility against the train, configuration against its schema,
+  generated-native drift, and credential material — each failure printed with
+  the command that fixes it, plus a machine-readable report and a CI mode.
+- **Profiles and credentials** (`C95`): named build profiles binding target,
+  configuration variant, environment, secrets, update channel, and distribution
+  intent; a credential contract with local, vault, and remote-service backings,
+  so key custody is a choice rather than a product; secrets resolved per build
+  and proven absent from the artifact.
+- **Submission** (`C96`) as a command per host with a store, with metadata,
+  release notes, and phased-release percentage from the repository.
+- **Compatibility and channels** (`C97`): a fingerprint over declared native
+  inputs recorded in every build and update manifest, with delivery refused on
+  mismatch; channels decoupled from builds so promotion repoints rather than
+  rebuilds; an embedded fallback payload; and adoption reporting under the
+  telemetry policy.
+- **Pipelines** (`C98`): every release step a scriptable command with
+  machine-readable output, plus generated pipeline descriptions for two CI
+  systems — owning the jobs, not the runner.
+- **Extension ergonomics** (`C99`): a native-module declaration generating the
+  portable trait, per-backend glue, manifest contributions, and a headless test
+  double, with the boundary checked on both sides; and autolinking, so adding a
+  package with native code needs no project edit.
+- **One router for every target** (`C100`): native navigation, web URLs, server
+  routes, and each host's deep-link configuration derived from one table, with
+  a static export map.
+- **The rest of the chore layer**: generated launch assets per host from one
+  source (`C101`); a shareable playground that compiles a snippet to the web
+  target, with documentation examples runnable from the same sources
+  (`C102`); device discovery, scannable pairing, relay fallback, and
+  multi-device fan-out for the development host (`C103`); `eject` and
+  `diff-native` with a documented path back (`C104`); and `bundle explain`
+  attributing artifact size per crate, asset, and dependency (`C105`).
+
+**Done when** a device backend can be released end to end without a manual
+step: `doctor` clean, a profile built and signed with a credential the
+developer never handled, submitted, an update published to a channel and
+refused by a build whose fingerprint does not match, and the whole run
+reproducible from a generated pipeline.
+
+**Depends on** Milestone 43 (the loop), Milestone 50 (updates and adapters),
+and Milestone 52 (packages and policy) — each of which it extends rather than
+repeats.
 
 ## Milestone 44 — Inspection and diagnostics
 
@@ -861,7 +929,8 @@ M41 guarantees        ─┐
 M42 budgets           ─┼─ continuous, gate each backend's completion
 M43 developer loop    ─┤
 M44 inspection        ─┤
-M45 test infrastructure┘ ──→ required by M46–M48 and M54
+M45 test infrastructure┤ ──→ required by M46–M48 and M54
+M59 toolchain layer   ─┘ ──→ required by every device backend's release
 
 M54 responsiveness ──────────┐
 M46 internationalization ────┤

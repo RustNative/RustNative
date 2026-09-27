@@ -50,8 +50,14 @@ Read in this order:
    sync, server and API, distributed execution, platform surfaces),
    [`concepts-delivery.md`](concepts-delivery.md) (engineering loop, build and
    packaging, isolation and security, ecosystem, and the concepts deliberately
-   rejected), and [`concepts-embedded.md`](concepts-embedded.md) (hardware,
-   scheduling, memory, storage, fleets, robotics, edge inference).
+   rejected), [`concepts-embedded.md`](concepts-embedded.md) (hardware,
+   scheduling, memory, storage, fleets, robotics, edge inference), and
+   [`concepts-toolchain.md`](concepts-toolchain.md) (the layer between a
+   repository and an installed, updatable application: release trains,
+   diagnostics, profiles and credentials, submission, update channels and
+   compatibility fingerprinting, pipelines, native-module authoring, universal
+   routing, launch assets, playground, device pairing, the escape ladder, and
+   artifact attribution).
 5. [`parity-matrix.md`](parity-matrix.md) — where RustNative stands on every
    layer and every concept today, with evidence.
 6. [`gap-plan.md`](gap-plan.md) — the workstreams and proposed milestones that

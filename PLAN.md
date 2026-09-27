@@ -1003,7 +1003,11 @@ onward, and they are part of this definition rather than separate work:
   safe areas, permission states, gesture arbitration, panic and teardown — or
   answers each as an honest capability;
 - it runs the developer loop of Milestone 43 on its own host, on-device where
-  the host is a device.
+  the host is a device;
+- it releases through Milestone 59's toolchain layer — a named build profile, a
+  credential it does not require the developer to hold, submission where the
+  host has a store, and updates gated by the native-input fingerprint — rather
+  than a release process invented for that backend.
 
 Two of these — macOS and iOS — cannot be verified on the project's current hardware (2.13). They remain fully planned, and each is finished when it runs on an Apple machine, not before.
 
@@ -1060,7 +1064,8 @@ Native Android view hierarchy, lifecycle integration, and a disciplined JNI boun
 - safe areas, display cutouts, foldable hinges, split-screen, and configuration changes handled as layout-model properties (Milestone 39);
 - constrained background work, and asset loading with decode, caching, and lifetime-bound cancellation (Milestone 47);
 - embedding in both directions against `View`/`ViewGroup`, plus the library-only mode in which the application model is linked into an existing Android application with no UI dependency (Milestone 40);
-- over-the-air update support within the host's rules, with signing, staged rollout, rollback, and version pinning (Milestone 50), and store-delivered dynamic feature and asset packs (Milestone 50);
+- over-the-air update support within the host's rules, with signing, staged rollout, rollback, and version pinning (Milestone 50), fingerprint-gated channels and an embedded fallback payload (Milestone 59), and store-delivered dynamic feature and asset packs (Milestone 50);
+- its release path — build profile, managed credential, store submission, update channel, generated launch assets, and device pairing for the development loop — taken from Milestone 59 rather than invented here;
 - home-screen widgets, quick-settings tiles, share targets, remote push, store billing, and keystore-backed secure storage from the surface and product-service contracts (Milestone 57);
 - verification on an emulator and on a physical device, including the lifecycle conformance suite of Milestone 45 — process death and restoration, configuration change, deep-link entry during restoration, and low-memory trim — and a low-end device profile in the budget matrix (Milestone 42).
 
@@ -1079,7 +1084,8 @@ Native UIKit interoperability, sharing the Objective-C interop and Core Text wor
 - the runtime permission model expressed as the portable permission states of Milestone 39, including limited grants, with the host's own request flow behind them;
 - safe areas, display cutouts, split-screen and external displays, and dynamic type as layout-model properties (Milestone 39);
 - embedding in both directions against `UIView`, plus the library-only mode for linking the application model into an existing iOS application (Milestone 40);
-- over-the-air update support within the host's rules — which forbid more here than elsewhere, so the milestone states what is permitted rather than assuming parity with other targets (Milestone 50);
+- over-the-air update support within the host's rules — which forbid more here than elsewhere, so the milestone states what is permitted rather than assuming parity with other targets (Milestone 50), fingerprint-gated (Milestone 59);
+- its release path — build profile, managed credential, store submission, update channel, generated launch assets, and device pairing — taken from Milestone 59 rather than invented here;
 - privacy manifests and data-use declarations generated from the build rather than hand-maintained (Milestone 51);
 - widgets, live activities, share and action extensions, remote push, store billing, and keychain-backed secure storage from the surface and product-service contracts (Milestone 57), each extension a separate target generated from `rustnative.toml` (Milestone 50);
 - verification requires Apple hardware and a developer account (2.13), and includes the lifecycle conformance suite of Milestone 45.
@@ -1626,15 +1632,16 @@ Tier 3 — the server model, deployment and updates, operations, the
 one application, every target, the same semantics
 ```
 
-Tier 1 (Milestones 41–45) — guarantees and conformance suites, budgets, the
-developer loop, inspection, and test infrastructure — runs continuously across
-all of the above and gates each backend's completion rather than following it.
+Tier 1 (Milestones 41–45 and 59) — guarantees and conformance suites, budgets,
+the developer loop, inspection, test infrastructure, and the toolchain and
+service layer — runs continuously across all of the above and gates each
+backend's completion rather than following it.
 
 The cross-cutting work in section 9 — testing, correctness boundaries, performance, tooling, and diagnostics — advances alongside all of it rather than after it, and section 11's Milestones 41–45 are what turn that section's "eventually" list into gates a backend must pass.
 
 ---
 
-# 11. Production-parity milestones (39–58)
+# 11. Production-parity milestones (39–59)
 
 Sections 1–10 specify the framework's architecture and its targets. They do not
 specify the accumulated answers a mature framework is expected to have —
@@ -1661,7 +1668,7 @@ core work shared by the remaining targets
         ↓
 Tier 0   Milestones 53, 58, 39, 40  before the second backend exists
         ↓
-Tier 1   Milestones 41–45           continuous; gates each backend's completion
+Tier 1   Milestones 41–45, 59       continuous; gates each backend's completion
         ↓                           (folded into section 8's definition of done)
 Tier 2   Milestones 46–48, 54       before any public release
         ↓
@@ -1689,7 +1696,9 @@ for the rest (`W-*` web, `D-*` desktop, `M-*` mobile, `E-*` embedded) — and
 (`Cnn-k`) come from the concept catalogue — `concepts-core.md`,
 `concepts-app.md`, `concepts-delivery.md`, and `concepts-embedded.md` — which
 analyses the ideas the competing framework families introduced independently of
-the families themselves, including the ones deliberately rejected. The
+the families themselves, including the ones deliberately rejected, and
+`concepts-toolchain.md`, which covers the layer between a repository and an
+installed, updatable application. The
 identifiers are stable so that a later session can check a milestone against
 the analysis that produced it without re-deriving the argument.
 
@@ -2621,6 +2630,101 @@ by Milestones 35–37: the device and emulator matrix. See `BUILD_STATUS.md`.
 Milestones 41, 42, 46, 47, and 48 all consume it.
 
 ---
+
+## Milestone 59 — The toolchain and service layer
+
+Milestones 43, 50, and 52 built most of the layer between a repository and an
+installed application: the developer loop with previews and generators, signed
+staged updates with rollback, deployment adapters with revisions and traffic
+splitting, capability packages with grants, the stability policy with codemods,
+and a machine-readable description of the framework. All of it on Windows.
+
+This milestone finishes that layer and fixes its contracts before the device
+backends arrive, because a release process invented once per backend is the
+most expensive kind of duplication this plan can still incur. It is the one
+competitive surface where none of the root-layer advantages in section 2 help:
+the mechanisms below are independent of substrate, and a framework that answers
+"how do I ship this?" with a document of manual steps loses to one that answers
+with a command.
+
+Satisfies: `C93-1`–`C93-4`, `C94-1`, `C94-2`, `C95-1`–`C95-3`, `C96-1`,
+`C97-1`–`C97-4`, `C98-1`, `C98-2`, `C99-1`, `C99-2`, `C100-1`, `C100-2`,
+`C101-1`, `C102-1`, `C102-2`, `C103-1`, `C104-1`, `C105-1`, and the unfinished
+halves of `C59-1`, `C63-1`, `C63-2`, `C64-1`, `C64-2`, `C90-1`.
+
+- **the release train** (`C93`): one platform version covering the crates, the
+  CLI, the templates, and the capability-package index, reported by
+  `rustnative describe`; a published supported-host matrix per version —
+  operating-system versions, device APIs, browser baselines, toolchain and
+  MSRV — checked by `doctor`; `rustnative add` resolving the version compatible
+  with the project's platform version rather than the newest published one; and
+  `rustnative upgrade` moving the whole train, running the codemods, and
+  printing what moved, what is held back, and why;
+- **diagnostics** (`C94`): `rustnative doctor` extended from toolchain
+  installation to the whole project — platform SDKs, dependency compatibility
+  against the train, configuration against its schema, generated-native drift,
+  and credential material — printing the fixing command for each finding, with
+  a machine-readable report and a CI mode that fails above a declared severity;
+- **profiles and credentials** (`C95`): named build profiles in
+  `rustnative.toml` binding target, configuration variant, environment values,
+  secrets, update channel, and distribution intent, built with `rustnative
+  build --profile`; a credential contract with three backings — local store,
+  external vault, remote service — so signing material lives where the
+  organization requires rather than where a vendor prefers, with rotation and
+  revocation documented; and secrets resolved per build, never written into the
+  artifact, proven by a build-time check;
+- **submission** (`C96`): `rustnative submit <target> --profile <name>` for each
+  host with a store, with metadata, release notes, and phased-release
+  percentage declared in the repository and review status reported back;
+- **compatibility and channels** (`C97`): a fingerprint computed from the
+  declared native inputs — the crate dependency graph, `rustnative.toml`, the
+  generated manifests and entitlements, and the capability packages with their
+  grants — recorded in every build and every update manifest, with delivery
+  refused on mismatch; update channels decoupled from builds, so promotion
+  repoints a channel instead of rebuilding; an embedded fallback payload in
+  every build, so a withdrawn or failed update returns to a known-good state
+  offline; and adoption reporting per release under Milestone 51's telemetry
+  policy. This is the half of over-the-air updating that Milestone 50 did not
+  build, and it is the half that makes it safe to automate;
+- **pipelines** (`C98`): every release step a scriptable command with
+  machine-readable output — build a profile, run a test matrix, package, sign,
+  submit, publish an update, promote a channel, roll back — plus generated
+  pipeline descriptions for at least two widely used CI systems, refreshed by
+  `rustnative generate pipeline`. The framework owns the jobs; the team's own CI
+  remains the runner, as with deployment (`W-DP-1`);
+- **extension ergonomics** (`C99`): a native-module declaration — functions,
+  properties, events, view types — from which the portable trait, the
+  per-backend glue, the manifest contributions, and a headless test double are
+  generated, with the boundary type-checked on both sides, which a serialized
+  bridge cannot do; and autolinking, so adding a capability package with native
+  code links it and merges its native configuration with no project edit;
+- **one router for every target** (`C100`): native navigation, web URLs, the
+  server route table, and each host's deep-link and universal-link
+  configuration derived from one route table, with a static export map for
+  file-only hosts;
+- **the chore layer**, whose absence is discovered at the worst moment:
+  launch assets — icons at every density and shape, launch screens, store
+  graphics — generated per backend from one declared source and validated
+  against each host's rules (`C101`); a shareable playground that compiles a
+  snippet to the web target and runs it from a link, with documentation
+  examples generated from the same sources as the guides so they cannot drift
+  (`C102`); development-host discovery, scannable pairing, a relay fallback
+  with a documented threat model, and fan-out to several attached devices
+  (`C103`); `rustnative eject` and `rustnative diff-native`, so a team that
+  must hand-edit a generated native project can see its drift and find the way
+  back (`C104`); and `rustnative bundle explain`, attributing artifact size per
+  crate, asset, and dependency with a delta against a baseline, so a failing
+  size budget says what grew (`C105`).
+
+**Done when** a device backend can be released end to end with no manual step:
+`doctor` clean, a named profile built and signed with a credential the
+developer never handled, submitted to its store, an update published to a
+channel and refused by a build whose fingerprint does not match, rolled back to
+the embedded payload, and the whole run reproducible from a generated pipeline
+description.
+
+**Depends on** Milestones 43, 50, and 52, each of which it extends rather than
+repeats, and on the backend whose release it is exercising.
 
 ## Tier 2 — before any public release
 

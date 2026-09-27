@@ -27,12 +27,24 @@ call past the pretty-printer's line width.
 
 ### Milestone 52 — The project around the framework — complete for Windows (device end owed)
 
-With this entry, every milestone and tier in `PLAN.md` is built on the
-Windows backend, except the other backends themselves. The following work
-is owed, and each milestone's own entry names the parts it owes:
+With this entry, every milestone and tier in `PLAN.md` as it stood on
+2026-09-26 is built on the Windows backend, except the other backends
+themselves. The following work is owed, and each milestone's own entry names
+the parts it owes:
 
 - Milestones 33–38: macOS, Linux, Android, iOS, embedded, and terminal.
 - The Web track's milestones A–K.
+- **Milestone 59 — the toolchain and service layer**, added to `PLAN.md` on
+  2026-09-27 after a closer reading of the managed-toolchain archetype
+  (`docs/ecosystem-analysis/concepts-toolchain.md`). Nothing of it is built.
+  Milestones 43, 50, and 52 built the parts of that layer listed in their own
+  entries; what 59 adds — the release train and supported-host matrix, project
+  diagnostics beyond toolchain installation, build profiles and managed
+  credentials, store submission, update channels with fingerprint gating and an
+  embedded fallback, repository-declared pipelines, native-module authoring
+  with autolinking, universal route derivation, generated launch assets, the
+  playground, device pairing, the eject/diff path, and artifact attribution —
+  is not.
 
 **Built.**
 

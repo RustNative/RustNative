@@ -15,6 +15,7 @@ split into four documents:
 | [`concepts-app.md`](concepts-app.md) | L3, L5, L6 — UI system, data and sync, server and API, distributed execution, platform surfaces | C22–C54 |
 | [`concepts-delivery.md`](concepts-delivery.md) | L7–L9 — engineering loop, build and packaging, isolation and security, ecosystem | C55–C72 |
 | [`concepts-embedded.md`](concepts-embedded.md) | L0–L8 on constrained and device targets — hardware description, scheduling, memory, storage, fleets, robotics, edge inference | C73–C92 |
+| [`concepts-toolchain.md`](concepts-toolchain.md) | L7–L9 — the layer between a repository and an installed, updatable application: release train, diagnostics, profiles and credentials, submission, update channels and fingerprinting, pipelines, native-module authoring, universal routing, launch assets, playground, pairing, escape ladder, artifact attribution | C93–C105 |
 
 Every concept gets the same treatment:
 
