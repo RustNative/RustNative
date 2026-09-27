@@ -107,7 +107,6 @@ fn every_platform_without_a_backend_is_refused_by_name() {
         ("android", "Milestone 35"),
         ("ios", "Milestone 36"),
         ("embedded", "Milestone 37"),
-        ("web", "web platform roadmap"),
     ];
     for (platform, mention) in expected {
         let output = rustnative()

@@ -1,0 +1,20 @@
+# The web backend's budgets (`PLAN.md` Web milestone J, `C42-4`). See
+# SCHEMA.md. Measured by `examples/web-bench` in headless Edge on the
+# reference machine, on a throttled profile: CPU x4, 150 ms latency, 1.6 Mb/s.
+target = "web"
+
+[budget]
+# The JavaScript the home route (one island) loads: the runtime and the
+# island's module.
+route_script_kb = { max = 140, tolerance = 0.05 }            # 122.7
+# What ten unrelated routes with a heavy module add to it: nothing, since
+# each route loads only its own modules.
+unrelated_routes_script_growth_kb = { max = 0, tolerance = 0 }  # 0
+# From navigation to the islands being ready, throttled.
+startup_ms = { max = 2500, tolerance = 0.5 }                 # 1880
+# Largest contentful paint, throttled.
+lcp_ms = { max = 1500, tolerance = 0.5 }                     # 916
+# Cumulative layout shift: framework-controlled content reserves its size.
+cls = { max = 0, tolerance = 0 }                             # 0
+# A click's interaction to next paint, throttled.
+inp_ms = { max = 200, tolerance = 0.5 }                      # 32

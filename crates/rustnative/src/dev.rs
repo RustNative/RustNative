@@ -130,7 +130,7 @@ fn walk(directory: &Path, into: &mut BTreeMap<PathBuf, SystemTime>) {
     }
 }
 
-fn scan(root: &Path) -> BTreeMap<PathBuf, SystemTime> {
+pub(crate) fn scan(root: &Path) -> BTreeMap<PathBuf, SystemTime> {
     let mut files = BTreeMap::new();
     for folder in ["src", "locales"] {
         walk(&root.join(folder), &mut files);
@@ -144,7 +144,7 @@ fn scan(root: &Path) -> BTreeMap<PathBuf, SystemTime> {
     files
 }
 
-fn changed(
+pub(crate) fn changed(
     before: &BTreeMap<PathBuf, SystemTime>,
     after: &BTreeMap<PathBuf, SystemTime>,
 ) -> Vec<PathBuf> {
@@ -159,7 +159,7 @@ fn changed(
 
 /// Where Cargo builds the project: `cargo metadata`'s answer, which knows
 /// about workspaces and `CARGO_TARGET_DIR`.
-fn target_dir(root: &Path) -> PathBuf {
+pub(crate) fn target_dir(root: &Path) -> PathBuf {
     let metadata = Command::new(std::env::var_os("CARGO").unwrap_or_else(|| "cargo".into()))
         .current_dir(root)
         .args(["metadata", "--no-deps", "--format-version", "1"])

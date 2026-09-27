@@ -78,6 +78,9 @@ pub struct Config {
     /// The key desktop updates are signed with (`[update]`, Milestone 50).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub update: Option<Update>,
+    /// The web platform (`[web]`, Web milestone J).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub web: Option<crate::web::WebConfig>,
 }
 
 /// The `[package]` table: what goes into the generated native project
@@ -273,6 +276,7 @@ impl Config {
             style: None,
             package: Package::default(),
             update: None,
+            web: None,
         }
     }
 }

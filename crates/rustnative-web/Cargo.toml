@@ -27,6 +27,11 @@ serde = { version = "1", features = ["derive"] }
 # Exact float parsing: a float crossing between the browser and Rust reads
 # back as the value that was written.
 serde_json = { version = "1", features = ["float_roundtrip"] }
+# The loading path (`C42`): responsive images as WebP, and fonts subset to
+# the text they set. Pure Rust, so the crate still builds for the browser.
+image-webp = "0.2"
+subsetter = "0.2"
+skrifa = "0.42"
 
 # A WebAssembly subtree's services, bridged to the browser.
 [target.'cfg(target_arch = "wasm32")'.dependencies]

@@ -301,6 +301,7 @@ mod tests {
             style: None,
             package: crate::config::Package::default(),
             update: None,
+            web: None,
         }
     }
 

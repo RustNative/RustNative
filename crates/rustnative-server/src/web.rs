@@ -65,11 +65,14 @@ impl IntoResponse for Page {
 pub(crate) struct WebAssets {
     modules: Mutex<HashMap<String, &'static ClientModule>>,
     wasm: Mutex<HashMap<String, Bytes>>,
+    pub(crate) images: Arc<rustnative_web::image::ImageStore>,
+    fonts: Mutex<Vec<Arc<rustnative_web::fonts::FontFace>>>,
     shells: Mutex<HashMap<String, Arc<Shell>>>,
     pub(crate) services: Mutex<Services>,
     pub(crate) version: Mutex<Option<String>>,
     pub(crate) pwa: Mutex<Option<Arc<rustnative_web::pwa::Pwa>>>,
     pub(crate) explain: std::sync::atomic::AtomicBool,
+    pub(crate) development: std::sync::atomic::AtomicBool,
 }
 
 impl WebAssets {
@@ -141,6 +144,29 @@ impl WebAssets {
             return Some(response);
         }
         let rest = path.strip_prefix("/_rn/")?;
+        if rest.starts_with("f/") {
+            let fonts = self.fonts.lock().unwrap_or_else(PoisonError::into_inner);
+            let face = fonts.iter().find(|face| face.url == path)?;
+            let mut response = Response::new(Bytes::from(face.bytes.clone()));
+            let headers = response.headers_mut();
+            headers.insert(header::CONTENT_TYPE, HeaderValue::from_static("font/ttf"));
+            headers.insert(
+                header::CACHE_CONTROL,
+                HeaderValue::from_static("public, max-age=31536000, immutable"),
+            );
+            return Some(response);
+        }
+        if rest.starts_with("img/") {
+            let mut response = Response::new(Bytes::from(self.images.get(path)?));
+            let headers = response.headers_mut();
+            headers.insert(header::CONTENT_TYPE, HeaderValue::from_static("image/webp"));
+            // Named by their contents' hash.
+            headers.insert(
+                header::CACHE_CONTROL,
+                HeaderValue::from_static("public, max-age=31536000, immutable"),
+            );
+            return Some(response);
+        }
         if let Some(name) = rest.strip_prefix("w/").and_then(|name| name.strip_suffix(".wasm")) {
             let bytes = self.wasm.lock().unwrap_or_else(PoisonError::into_inner).get(name)?.clone();
             let mut response = Response::new(bytes);
@@ -157,14 +183,28 @@ impl WebAssets {
             Bytes::from(rustnative_web::runtime::worker_js())
         } else {
             let name = rest.strip_prefix("m/")?;
-            Bytes::from_static(
-                self.modules
-                    .lock()
-                    .unwrap_or_else(PoisonError::into_inner)
-                    .get(name)?
-                    .js
-                    .as_bytes(),
-            )
+            let development = self.development.load(std::sync::atomic::Ordering::Relaxed);
+            let modules = self.modules.lock().unwrap_or_else(PoisonError::into_inner);
+            if let Some(module) =
+                name.strip_suffix(".map").and_then(|name| modules.get(name)).filter(|_| development)
+            {
+                let mut response = Response::new(Bytes::from(module.source_map()));
+                response
+                    .headers_mut()
+                    .insert(header::CONTENT_TYPE, HeaderValue::from_static("application/json"));
+                return Some(response);
+            }
+            let module = modules.get(name)?;
+            if development {
+                Bytes::from(format!(
+                    "{}
+//# sourceMappingURL={name}.map
+",
+                    module.js
+                ))
+            } else {
+                Bytes::from_static(module.js.as_bytes())
+            }
         };
         let mut response = Response::new(body);
         let headers = response.headers_mut();
@@ -202,6 +242,21 @@ impl crate::ServerApp {
         self
     }
 
+    /// Uses `font` on every page, subset to printable ASCII and the
+    /// characters of `text` (the application's other text: a language's
+    /// letters, its catalogue's strings), preloaded, with a metric-adjusted
+    /// fallback.
+    ///
+    /// # Errors
+    ///
+    /// The font could not be subset.
+    pub fn font(self, font: &rustnative_web::fonts::Font, text: &str) -> Result<Self, String> {
+        let ascii: String = (' '..='~').collect();
+        let face = font.face(&format!("{ascii}{text}"), "/_rn/")?;
+        self.web.fonts.lock().unwrap_or_else(PoisonError::into_inner).push(Arc::new(face));
+        Ok(self)
+    }
+
     /// Makes the application installable and able to work offline
     /// (`rustnative_web::pwa`): every page links the manifest and registers
     /// the service worker.
@@ -218,6 +273,15 @@ impl crate::ServerApp {
     #[must_use]
     pub fn version(self, version: impl Into<String>) -> Self {
         *self.web.version.lock().unwrap_or_else(PoisonError::into_inner) = Some(version.into());
+        self
+    }
+
+    /// Development mode: client modules link their source maps (served
+    /// beside them), so the browser shows client logic as the Rust it was
+    /// written in. Off in production, where the maps would only cost bytes.
+    #[must_use]
+    pub fn development(self) -> Self {
+        self.web.development.store(true, std::sync::atomic::Ordering::Relaxed);
         self
     }
 
@@ -279,6 +343,10 @@ pub(crate) async fn render_pending(
     cx.base = prefix.to_owned();
     cx.version.clone_from(&web.version.lock().unwrap_or_else(PoisonError::into_inner));
     cx.pwa.clone_from(&web.pwa.lock().unwrap_or_else(PoisonError::into_inner));
+    cx.images = Some(Arc::clone(&web.images));
+    cx.dev = web.development.load(std::sync::atomic::Ordering::Relaxed)
+        && std::env::var_os("RUSTNATIVE_DEV").is_some();
+    cx.fonts.clone_from(&web.fonts.lock().unwrap_or_else(PoisonError::into_inner));
     let status = StatusCode::from_u16(page.response_status()).unwrap_or(StatusCode::OK);
     let web = Arc::clone(web);
     if page.render_strategy() == Strategy::Streamed {
@@ -359,6 +427,14 @@ pub(crate) fn explain(
     let mut cx = PageContext::new(Some(request)).services(services);
     cx.assets = format!("{prefix}/_rn/");
     crate::response::Json(page::explain(&page, &cx)).into_response()
+}
+
+/// Where the application should listen: `RUSTNATIVE_WEB_ADDR` when
+/// `rustnative run web` or `rustnative dev web` started it, `default`
+/// otherwise.
+#[must_use]
+pub fn address(default: &str) -> String {
+    std::env::var("RUSTNATIVE_WEB_ADDR").unwrap_or_else(|_| default.to_owned())
 }
 
 /// The `[web.pwa]` table of an application's `rustnative.toml`, if it has

@@ -210,7 +210,7 @@ fn is_focusable_tag(tag: &str) -> bool {
 /// interactive islands (by their index in the page data), which nodes are
 /// forms that post without JavaScript, and the request-forgery token those
 /// forms carry.
-#[derive(Debug, Clone, Default, PartialEq, Eq)]
+#[derive(Debug, Clone, Default)]
 pub struct Marks {
     /// Island owners, with each island's index.
     pub islands: HashMap<ComponentId, usize>,
@@ -223,6 +223,9 @@ pub struct Marks {
     /// Islands are rendered by the browser (a client-only page): their
     /// markup is left empty for it.
     pub client_only: bool,
+    /// Where images go as responsive files (`crate::image`); without it,
+    /// images are inlined.
+    pub images: Option<std::sync::Arc<crate::image::ImageStore>>,
 }
 
 /// Converts core nodes to [`Element`]s, collecting the stylesheet rules
@@ -237,6 +240,8 @@ pub struct Realizer<'a> {
     island: Option<ComponentId>,
     flows: Vec<(usize, Flow)>,
     forms: usize,
+    /// Whether an image has been placed yet (the first is fetched first).
+    placed_image: bool,
 }
 
 impl std::fmt::Debug for Realizer<'_> {
@@ -276,6 +281,7 @@ impl<'a> Realizer<'a> {
             island: None,
             flows: Vec::new(),
             forms: 0,
+            placed_image: false,
         }
     }
 
@@ -747,8 +753,31 @@ impl<'a> Realizer<'a> {
                 )
             }
             Control::Image { image } => {
-                let element = Element::new("img")
-                    .attr("src", crate::png::data_uri(image))
+                let store = self.marks.images.clone().filter(|_| {
+                    // An island's images are the browser realizer's, which
+                    // inlines them: the two must agree.
+                    self.island.is_none()
+                        && image.width() * image.height() > crate::image::INLINE_PIXELS
+                });
+                let mut element = Element::new("img");
+                if let Some(store) = store {
+                    let (src, srcset) = store.add(image);
+                    let sizes = match node.layout().width {
+                        rustnative_core::SizeMode::Fixed(width) => format!("{width}px"),
+                        _ => "100vw".to_owned(),
+                    };
+                    element = element.attr("src", src).attr("srcset", srcset).attr("sizes", sizes);
+                    element = if self.placed_image {
+                        element.attr("loading", "lazy")
+                    } else {
+                        element.attr("fetchpriority", "high")
+                    };
+                    element = element.attr("decoding", "async");
+                    self.placed_image = true;
+                } else {
+                    element = element.attr("src", crate::png::data_uri(image));
+                }
+                let element = element
                     .attr("width", image.width().to_string())
                     .attr("height", image.height().to_string())
                     .attr("alt", node.accessibility().name_hint().unwrap_or_default());

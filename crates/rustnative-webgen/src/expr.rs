@@ -320,12 +320,17 @@ impl Cx<'_> {
                 self.w.line(&format!("continue{label};"), Some(span));
                 Ok(())
             }
-            _ => self.expr(expr, None).map(|value| {
-                let js = self.flush(value);
-                if !js.is_empty() && js != "undefined" && js != "null" {
-                    self.w.line(&format!("{js};"), Some(span));
-                }
-            }),
+            _ => {
+                let mark = self.w.mark();
+                let result = self.expr(expr, None).map(|value| {
+                    let js = self.flush(value);
+                    if !js.is_empty() && js != "undefined" && js != "null" {
+                        self.w.line(&format!("{js};"), Some(span));
+                    }
+                });
+                self.w.attribute(mark, span);
+                result
+            }
         };
         let _ = result;
     }

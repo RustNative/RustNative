@@ -33,6 +33,8 @@ pub enum BenchTarget {
     Windows,
     /// The headless reference backend.
     Headless,
+    /// The web backend, in headless Edge (`examples/web-bench`).
+    Web,
 }
 
 impl BenchTarget {
@@ -40,6 +42,15 @@ impl BenchTarget {
         match self {
             Self::Windows => "windows",
             Self::Headless => "headless",
+            Self::Web => "web",
+        }
+    }
+
+    /// The package whose binary runs this target's scenarios.
+    const fn package(self) -> &'static str {
+        match self {
+            Self::Windows | Self::Headless => "bench-app",
+            Self::Web => "web-bench",
         }
     }
 
@@ -55,6 +66,7 @@ impl BenchTarget {
                 ("compile", 1),
             ],
             Self::Headless => &[("headless", 3), ("core", 1), ("compile", 1)],
+            Self::Web => &[("web", 3)],
         }
     }
 }
@@ -294,10 +306,13 @@ pub fn run(
 
     println!("bench: building the scenarios (release)");
     let mut command = cargo();
-    command.current_dir(&root).args(["build", "--release", "-p", "bench-app"]);
+    command.current_dir(&root).args(["build", "--release", "-p", target.package()]);
     checked("cargo", command)?;
-    let exe =
-        root.join("target/release").join(format!("bench-app{}", std::env::consts::EXE_SUFFIX));
+    let exe = root.join("target/release").join(format!(
+        "{}{}",
+        target.package(),
+        std::env::consts::EXE_SUFFIX
+    ));
 
     let mut measured = BTreeMap::new();
     for (scenario, runs) in target.scenarios() {
@@ -361,6 +376,27 @@ pub fn run(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn the_web_budget_fails_an_inflated_route() {
+        let text = include_str!("../../../budgets/web.toml");
+        let budgets: BudgetFile = toml::from_str(text).unwrap();
+        let measured = |route: f64, growth: f64| {
+            BTreeMap::from([
+                ("route_script_kb".to_owned(), route),
+                ("unrelated_routes_script_growth_kb".to_owned(), growth),
+                ("startup_ms".to_owned(), 1800.0),
+                ("lcp_ms".to_owned(), 900.0),
+                ("cls".to_owned(), 0.0),
+                ("inp_ms".to_owned(), 30.0),
+            ])
+        };
+        assert!(judge(&budgets, &measured(122.7, 0.0), false).passes());
+        // A module inflated past the route's budget fails the build.
+        assert!(!judge(&budgets, &measured(200.0, 0.0), false).passes());
+        // So does a route that grows because others were added.
+        assert!(!judge(&budgets, &measured(122.7, 0.5), false).passes());
+    }
 
     fn budgets() -> BudgetFile {
         toml::from_str(

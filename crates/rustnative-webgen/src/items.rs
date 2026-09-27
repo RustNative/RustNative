@@ -577,6 +577,49 @@ impl syn::visit_mut::VisitMut for Literals<'_> {
         }
         syn::visit_mut::visit_expr_mut(self, expr);
     }
+
+    // An operand inside a macro's arguments (`format!("{}", n + 1)`) is a
+    // placeholder in its tokens.
+    fn visit_macro_mut(&mut self, mac: &mut syn::Macro) {
+        mac.tokens = self.tokens(std::mem::take(&mut mac.tokens));
+    }
+}
+
+impl Literals<'_> {
+    fn tokens(&self, tokens: proc_macro2::TokenStream) -> proc_macro2::TokenStream {
+        tokens
+            .into_iter()
+            .flat_map(|token| -> Vec<proc_macro2::TokenTree> {
+                match token {
+                    proc_macro2::TokenTree::Ident(ident) => {
+                        let literal = ident
+                            .to_string()
+                            .strip_prefix("__rn_lit_")
+                            .and_then(|index| index.parse::<usize>().ok())
+                            .and_then(|index| self.0.get(index))
+                            .and_then(|literal| literal.parse::<proc_macro2::TokenStream>().ok());
+                        match literal {
+                            Some(literal) => literal
+                                .into_iter()
+                                .map(|mut token| {
+                                    token.set_span(ident.span());
+                                    token
+                                })
+                                .collect(),
+                            None => vec![proc_macro2::TokenTree::Ident(ident)],
+                        }
+                    }
+                    proc_macro2::TokenTree::Group(group) => {
+                        let mut inner =
+                            proc_macro2::Group::new(group.delimiter(), self.tokens(group.stream()));
+                        inner.set_span(group.span());
+                        vec![proc_macro2::TokenTree::Group(inner)]
+                    }
+                    other => vec![other],
+                }
+            })
+            .collect()
+    }
 }
 
 /// Translates one function (or method of `self_ty`) into `w`.

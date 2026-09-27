@@ -36,6 +36,7 @@ impl Platform {
     pub const fn backend(self) -> Option<&'static str> {
         match self {
             Self::Windows => Some("rustnative-windows"),
+            Self::Web => Some("rustnative-web"),
             _ => None,
         }
     }
@@ -77,7 +78,7 @@ mod tests {
     use super::*;
 
     #[test]
-    fn only_windows_has_a_backend_and_every_other_names_its_milestone() {
+    fn windows_and_web_have_backends_and_every_other_names_its_milestone() {
         assert_eq!(Platform::Windows.backend(), Some("rustnative-windows"));
         for platform in
             [Platform::Macos, Platform::Linux, Platform::Android, Platform::Ios, Platform::Embedded]

@@ -1007,6 +1007,11 @@ pub fn browser_or_skip(test: &str) -> Option<Browser> {
     match Browser::launch() {
         Ok(Some(browser)) => Some(browser),
         Ok(None) => {
+            // `rustnative test --browser`: the browser tests must run.
+            assert!(
+                std::env::var_os("RUSTNATIVE_BROWSER_REQUIRED").is_none(),
+                "{test}: no Chromium-family browser, and the browser tests are required (set RUSTNATIVE_BROWSER)"
+            );
             eprintln!("skipped {test}: no Chromium-family browser (set RUSTNATIVE_BROWSER)");
             None
         }

@@ -98,6 +98,13 @@ impl ServerApp {
             upgrades: Vec::new(),
             web: Arc::default(),
         }
+        // Under `rustnative dev web`: source maps, and pages that follow
+        // the rebuilds.
+        .development_if(std::env::var_os("RUSTNATIVE_DEV").is_some())
+    }
+
+    fn development_if(self, on: bool) -> Self {
+        if on { self.development() } else { self }
     }
 
     /// Answers protocol upgrades (a WebSocket) at `path` with `handler`,

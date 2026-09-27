@@ -1,7 +1,8 @@
 # Budget files
 
 `PLAN.md` Milestone 42. There is one file per shipped target:
-`windows.toml` and `headless.toml`. `rustnative bench --target <target>`
+`windows.toml`, `headless.toml`, and `web.toml` (measured by
+`examples/web-bench` in headless Edge on a throttled profile). `rustnative bench --target <target>`
 measures the target and compares the results with its file. With `--check`,
 the command fails when a measurement is over budget, just as a failing test
 fails the build. CI runs it on every push (`.github/workflows/ci.yml`, job
@@ -104,3 +105,15 @@ target that does not exist yet:
 A budget is changed in the same commit as the change that moves it. The
 commit says why. The measured values are recorded next to each key, as
 comments.
+
+## Web keys (`web.toml`)
+
+| Key | Meaning |
+|---|---|
+| `route_script_kb` | The JavaScript the home route (one island) loads: the runtime and its island's module. |
+| `unrelated_routes_script_growth_kb` | What ten unrelated routes, each with a heavy module, add to it (0: each route loads only its own modules). |
+| `startup_ms` | Navigation to the islands being ready, on CPU x4, 150 ms latency, 1.6 Mb/s. |
+| `lcp_ms` | Largest contentful paint on that profile. |
+| `cls` | Cumulative layout shift (framework-controlled content reserves its size). |
+| `inp_ms` | A click's interaction to next paint on that profile. |
+

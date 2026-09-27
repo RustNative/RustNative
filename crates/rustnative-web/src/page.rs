@@ -227,6 +227,18 @@ pub struct PageContext {
     /// The application's offline and install settings, when it has them:
     /// every page then links the manifest and registers the service worker.
     pub pwa: Option<Arc<crate::pwa::Pwa>>,
+    /// Link the page's stylesheet as a file rather than inlining it: a
+    /// static host serves one policy for every page, so it has no nonce to
+    /// give an inline style (a static export).
+    pub external_css: bool,
+    /// Where images become responsive files; without it they are inlined.
+    pub images: Option<Arc<crate::image::ImageStore>>,
+    /// The site's fonts, subset: every page preloads them and carries their
+    /// faces.
+    pub fonts: Vec<Arc<crate::fonts::FontFace>>,
+    /// A development server's page: the runtime listens for rebuilds
+    /// (`/_rn/dev`) and reloads, or shows the build's errors.
+    pub dev: bool,
 }
 
 impl std::fmt::Debug for PageContext {
@@ -250,6 +262,10 @@ impl PageContext {
             clock: Arc::new(SystemClock),
             version: None,
             pwa: None,
+            external_css: false,
+            images: None,
+            fonts: Vec::new(),
+            dev: false,
         }
     }
 
@@ -287,6 +303,9 @@ pub struct RenderedPage {
     /// Whether it has a WebAssembly subtree (its policy then allows
     /// `'wasm-unsafe-eval'`).
     pub wasm: bool,
+    /// With [`PageContext::external_css`], the stylesheet it links: its
+    /// address and its text.
+    pub stylesheet: Option<(String, String)>,
 }
 
 /// Wakes a request thread blocked on its render's tasks.
@@ -390,6 +409,7 @@ impl Session {
             csrf: self.csrf.clone(),
             forms: self.render.forms(),
             links: self.render.links(),
+            images: cx.images.clone(),
             client_only: self.strategy == Strategy::ClientOnly,
             ..Marks::default()
         };
@@ -494,14 +514,40 @@ fn document_start(document: &Document, cx: &PageContext, css: &str, preload: &[S
     if let Some(pwa) = &cx.pwa {
         out.push_str(&pwa.head());
     }
+    for face in &cx.fonts {
+        out.push_str("<link rel=\"preload\" as=\"font\" type=\"font/ttf\" crossorigin href=\"");
+        escape_into(&mut out, &face.url);
+        out.push_str("\">");
+    }
     for url in preload {
         out.push_str("<link rel=\"modulepreload\" href=\"");
         escape_into(&mut out, url);
         out.push_str("\">");
     }
-    style(&mut out, nonce, css);
+    if cx.external_css {
+        out.push_str("<link rel=\"stylesheet\" href=\"");
+        escape_into(&mut out, &stylesheet_url(cx, css));
+        out.push_str("\">");
+    } else {
+        style(&mut out, nonce, css);
+    }
     out.push_str("</head><body>");
     out
+}
+
+/// `css` with the site's font faces first.
+fn with_fonts(cx: &PageContext, css: String) -> String {
+    if cx.fonts.is_empty() {
+        return css;
+    }
+    let mut out: String = cx.fonts.iter().map(|face| face.css.as_str()).collect();
+    out.push_str(&css);
+    out
+}
+
+/// Where a page's stylesheet is, as a file: its contents' hash names it.
+fn stylesheet_url(cx: &PageContext, css: &str) -> String {
+    format!("{}c/{}.css", cx.assets, crate::hash::class_name("", css))
 }
 
 fn style(out: &mut String, nonce: &str, css: &str) {
@@ -526,6 +572,7 @@ fn document_end(out: &mut String, cx: &PageContext, specs: &[Value]) {
                 "assets": cx.assets,
                 "version": cx.version,
                 "sw": cx.pwa.as_ref().map(|_| crate::pwa::SERVICE_WORKER),
+                "dev": cx.dev,
             },
             "islands": specs,
         });
@@ -549,12 +596,13 @@ pub fn render(page: Page, cx: &PageContext) -> RenderedPage {
     let mut session = Session::start(&build, theme, strategy, cx);
     session.settle(budget);
     let (element, specs, modules, wasm) = session.realize(cx);
-    let css = session.sheet.css(&session.theme);
+    let css = with_fonts(cx, session.sheet.css(&session.theme));
     let preload: Vec<String> = modules.iter().map(|module| module.url(&cx.assets)).collect();
     let mut html = document_start(&document, cx, &css, &preload);
     render_into(&mut html, &element);
     document_end(&mut html, cx, &specs);
-    RenderedPage { html, status, modules, dynamic: session.render.is_dynamic(), wasm }
+    let stylesheet = cx.external_css.then(|| (stylesheet_url(cx, &css), css));
+    RenderedPage { html, status, modules, dynamic: session.render.is_dynamic(), wasm, stylesheet }
 }
 
 /// A page's static shell (`C06-1`): the document up to its first hole
@@ -717,6 +765,7 @@ pub fn render_streamed(
         modules,
         dynamic: session.render.is_dynamic(),
         wasm,
+        stylesheet: None,
     }
 }
 

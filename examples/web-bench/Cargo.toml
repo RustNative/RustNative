@@ -1,0 +1,27 @@
+[package]
+name = "web-bench"
+version = "0.1.0"
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+description.workspace = true
+repository.workspace = true
+homepage.workspace = true
+readme.workspace = true
+keywords.workspace = true
+categories.workspace = true
+publish = false
+
+[lints]
+workspace = true
+
+# The web budget scenarios (`PLAN.md` Web milestone J): what `rustnative
+# bench --target web` measures against `budgets/web.toml`.
+[dependencies]
+rustnative-core.workspace = true
+rustnative-web.workspace = true
+rustnative-server.workspace = true
+rustnative-web-testing.workspace = true
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+tokio = { workspace = true, features = ["rt-multi-thread", "net"] }

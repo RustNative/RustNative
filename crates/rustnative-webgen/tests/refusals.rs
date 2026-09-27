@@ -51,11 +51,34 @@ fn the_subset_accepts_ordinary_client_logic() {
             if target == rustnative_core::NodeId::from_key("add") {
                 self.count += 1;
                 self.items.push(self.count * 2);
-                self.text = format!("{} items", self.items.len());
+                self.text = format!("{} items, {} next", self.items.len(), self.items.len() + 1);
             }
         }
     });
     assert!(errors.is_empty(), "{errors:?}");
+}
+
+#[test]
+fn a_literal_inside_a_macros_arguments_gets_its_type() {
+    let module = quote! {
+        mod sample {
+            use rustnative_core::{Event, Node};
+            use rustnative_web::Effects;
+            #[derive(Clone, Default, PartialEq, serde::Serialize, serde::Deserialize)]
+            pub struct State { pub text: String, pub items: Vec<i32> }
+            impl State {
+                pub fn update(&mut self, _event: Event, _fx: &mut Effects<()>) {
+                    self.text = format!("{}", self.items.len() + 1);
+                }
+                pub fn view(&self) -> Node { Node::label("x", "x") }
+            }
+        }
+    };
+    let mut module: syn::ItemMod = syn::parse2(module).unwrap();
+    rustnative_webgen::translate(&mut module).unwrap();
+    let rust = quote!(#module).to_string();
+    assert!(!rust.contains("__rn_lit"), "{rust}");
+    assert!(rust.contains("1usize") || rust.contains("1_usize"), "{rust}");
 }
 
 #[test]

@@ -95,6 +95,64 @@ impl ClientModule {
     pub fn url(&self, base: &str) -> String {
         format!("{base}m/{}.{}.js", self.name, self.hash())
     }
+
+    /// Its source map (Source Map v3): each generated line to the line of
+    /// Rust it came from, so a browser's debugger and error stacks show the
+    /// client logic as written. Served beside the module in development.
+    #[must_use]
+    pub fn source_map(&self) -> String {
+        let mut mappings = String::new();
+        let mut previous_line: i64 = 0;
+        for (index, line) in self.lines.iter().enumerate() {
+            if index > 0 {
+                mappings.push(';');
+            }
+            // A line with no span of its own belongs to the statement before
+            // it (a statement can expand to several lines).
+            let line = if *line == 0 {
+                if index == 0
+                    || previous_line == 0 && self.lines[..index].iter().all(|line| *line == 0)
+                {
+                    continue;
+                }
+                previous_line
+            } else {
+                i64::from(*line) - 1
+            };
+            // generated column 0, source 0 (a delta of 0 after the first),
+            // source line as a delta, source column 0.
+            vlq(&mut mappings, 0);
+            vlq(&mut mappings, 0);
+            vlq(&mut mappings, line - previous_line);
+            vlq(&mut mappings, 0);
+            previous_line = line;
+        }
+        serde_json::json!({
+            "version": 3,
+            "file": format!("{}.{}.js", self.name, self.hash()),
+            "sources": [self.file.replace('\\', "/")],
+            "names": [],
+            "mappings": mappings,
+        })
+        .to_string()
+    }
+}
+
+/// Appends `value` as a Base64 VLQ (the source map encoding).
+fn vlq(out: &mut String, value: i64) {
+    const DIGITS: &[u8; 64] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+    let mut rest = if value < 0 { ((-value) << 1) | 1 } else { value << 1 };
+    loop {
+        let mut digit = rest & 0b1_1111;
+        rest >>= 5;
+        if rest > 0 {
+            digit |= 0b10_0000;
+        }
+        out.push(char::from(DIGITS[usize::try_from(digit).unwrap_or(0)]));
+        if rest == 0 {
+            break;
+        }
+    }
 }
 
 /// A client component's logic; implemented by `#[client]`.

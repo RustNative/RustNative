@@ -1562,7 +1562,11 @@ export class Island {
       this.scheduled = false;
       this.render();
       const effects = this.effects.splice(0);
-      for (const [kind, args] of effects) perform(this, kind, args);
+      for (const [kind, args] of effects) {
+        // A custom element's published values are DOM events on it.
+        if (this.element && kind === "publish") this.element.dispatchEvent(new CustomEvent(args[0], { detail: clone(args[1]), bubbles: true, composed: true }));
+        perform(this, kind, args);
+      }
     });
   }
 
@@ -2389,6 +2393,7 @@ export async function start(restored = null) {
   const runtime = await import(import.meta.url);
   navigation();
   serviceWorker();
+  development();
   if (restored === null && history.state && history.state.rn && (arrivedByHistory() || restoring(history.state.rn))) {
     const saved = savedEntry(history.state.rn);
     if (saved) restored = saved.states;
@@ -2498,16 +2503,25 @@ export async function go(url, push = true) {
   if (target.origin !== location.origin) { location.assign(target.href); return; }
   let response;
   try {
-    response = await fetch(target.href, { headers: { accept: "text/html" }, credentials: "same-origin" });
+    const early = prefetched.get(target.href);
+    prefetched.delete(target.href);
+    response = (early && await early) || await fetch(target.href, { headers: { accept: "text/html" }, credentials: "same-origin" });
   } catch (_) {
     location.assign(target.href);
     return;
   }
   if (!(response.headers.get("content-type") || "").includes("text/html")) { location.assign(target.href); return; }
   const next = new DOMParser().parseFromString(await response.text(), "text/html");
+  prefetches = 0;
   saveEntry();
   teardown();
   for (const style of next.querySelectorAll("style")) adoptCss(style.textContent);
+  // A stylesheet the next page links (a static export's): linked here too,
+  // once.
+  for (const link of next.querySelectorAll('link[rel="stylesheet"]')) {
+    const href = link.getAttribute("href");
+    if (href && !document.head.querySelector(`link[rel="stylesheet"][href="${CSS.escape(href)}"]`)) document.head.appendChild(document.importNode(link, true));
+  }
   document.title = next.title;
   for (const selector of HEAD_KEYED) {
     document.head.querySelectorAll(selector).forEach((node) => node.remove());
@@ -2527,6 +2541,34 @@ export async function go(url, push = true) {
   else if (target.hash) document.getElementById(decodeURIComponent(target.hash.slice(1)))?.scrollIntoView();
   else if (push) scrollTo(0, 0);
   document.dispatchEvent(new CustomEvent("rn:navigated", { detail: { url: address } }));
+}
+
+// Prefetching (`C42-3`): a same-origin link is fetched ahead when the
+// pointer rests on it or it scrolls into view — at most a few per page, and
+// never when the person asked to save data.
+const prefetched = new Map();
+const PREFETCH_LIMIT = 6;
+let prefetches = 0;
+let observer = null;
+
+function prefetch(link) {
+  if (!link || !link.href || link.target || link.hasAttribute("download")) return;
+  if (navigator.connection && navigator.connection.saveData) return;
+  const url = new URL(link.href, location.href);
+  url.hash = "";
+  if (url.origin !== location.origin || url.href === new URL(location.href).href || prefetched.has(url.href) || prefetches >= PREFETCH_LIMIT) return;
+  prefetches++;
+  prefetched.set(url.href, fetch(url.href, { headers: { accept: "text/html" }, credentials: "same-origin" }).catch(() => null));
+  document.dispatchEvent(new CustomEvent("rn:prefetch", { detail: { url: url.href } }));
+}
+
+function watchLinks() {
+  if (typeof IntersectionObserver === "undefined") return;
+  observer?.disconnect();
+  observer = new IntersectionObserver((entries) => {
+    for (const entry of entries) if (entry.isIntersecting) { prefetch(entry.target); observer.unobserve(entry.target); }
+  });
+  for (const link of document.querySelectorAll("a[href]")) if (!link.getAttribute("href").startsWith("#")) observer.observe(link);
 }
 
 /// Installs navigation once: links and `fx.navigate` stay in the page,
@@ -2550,11 +2592,136 @@ function navigation() {
     go(url.href, true);
   });
   window.addEventListener("popstate", (event) => { if (event.state && event.state.rn) go(location.href, false); });
+  document.addEventListener("pointerover", (event) => { if (event.target.closest) prefetch(event.target.closest("a[href]")); });
+  document.addEventListener("rn:ready", watchLinks);
   window.addEventListener("pagehide", saveEntry);
   document.addEventListener("visibilitychange", () => {
     const value = document.visibilityState === "hidden" ? "Suspending" : "Resuming";
     for (const island of islands) if (island instanceof Island) island.dispatch({ type: "Lifecycle", value });
   });
+}
+
+// ---------------------------------------------- custom elements (C43) ----
+
+let elements = 0;
+
+function attributeName(field) {
+  return field.replace(/_/g, "-");
+}
+
+function parseAttribute(value, like) {
+  if (typeof like === "number") return value === null ? like : Number(value);
+  if (typeof like === "boolean") return value !== null && value !== "false";
+  if (typeof like === "string") return value ?? "";
+  try { return value === null ? like : JSON.parse(value); } catch (_) { return like; }
+}
+
+/// Defines `<tag>` over a client component: its state's fields are the
+/// element's attributes (kebab-case) and properties, its published values
+/// (`fx.publish`) are DOM events on it, and it renders in light DOM, so
+/// labels and `aria-*` references keep working across it.
+export async function defineElement(tag, make, initial, fns = {}, css = "") {
+  const runtime = await import(import.meta.url);
+  if (css) adoptCss(css);
+  const module = make(runtime, fns);
+  const fields = Object.keys(initial);
+  class RustNativeElement extends HTMLElement {
+    static get observedAttributes() { return fields.map(attributeName); }
+
+    connectedCallback() {
+      if (this.island) return;
+      const state = clone(initial);
+      for (const field of fields) {
+        const value = this.getAttribute(attributeName(field));
+        if (value !== null) state[field] = parseAttribute(value, initial[field]);
+      }
+      for (const field of fields) {
+        // A property set before the element was defined.
+        if (Object.prototype.hasOwnProperty.call(this, field)) { state[field] = this[field]; delete this[field]; }
+      }
+      const root = document.createElement("div");
+      this.appendChild(root);
+      const island = new Island(-1, module, state, root, { t: "root" });
+      island.scope = `${tag}-${elements++}-`;
+      island.element = this;
+      this.island = island;
+      island.attach(true);
+    }
+
+    attributeChangedCallback(name, old, value) {
+      if (!this.island || old === value) return;
+      const field = fields.find((candidate) => attributeName(candidate) === name);
+      this.island.state[field] = parseAttribute(value, initial[field]);
+      this.island.schedule();
+    }
+  }
+  for (const field of fields) {
+    Object.defineProperty(RustNativeElement.prototype, field, {
+      get() { return this.island ? this.island.state[field] : undefined; },
+      set(value) { if (this.island) { this.island.state[field] = value; this.island.schedule(); } },
+      configurable: true,
+    });
+  }
+  if (!customElements.get(tag)) customElements.define(tag, RustNativeElement);
+}
+
+// ------------------------------------------------ user metrics (C42) ----
+
+const vitals = { lcp: null, cls: 0, inp: null, ready: null };
+if (typeof PerformanceObserver !== "undefined" && typeof document !== "undefined") {
+  const observe = (type, take, options = {}) => {
+    try { new PerformanceObserver((list) => { for (const entry of list.getEntries()) take(entry); }).observe({ type, buffered: true, ...options }); } catch (_) { /* not measured here */ }
+  };
+  observe("largest-contentful-paint", (entry) => { vitals.lcp = entry.renderTime || entry.loadTime || entry.startTime; });
+  observe("layout-shift", (entry) => { if (!entry.hadRecentInput) vitals.cls += entry.value; });
+  observe("event", (entry) => { if (entry.interactionId) vitals.inp = Math.max(vitals.inp ?? 0, entry.duration); }, { durationThreshold: 16 });
+  document.addEventListener("rn:ready", () => { vitals.ready ??= performance.now(); });
+}
+
+/// The page's user-centric metrics so far: largest contentful paint,
+/// cumulative layout shift, interaction to next paint (all in
+/// milliseconds but the shift), and when its islands were ready.
+export function metrics() {
+  return { ...vitals };
+}
+
+// ------------------------------------------------- development (J) ----
+
+let developing = false;
+
+/// Under `rustnative dev web`: a rebuild reloads the page with its islands'
+/// state; a failed one shows its errors over the page until fixed.
+function development() {
+  if (!config.dev || developing || typeof EventSource === "undefined") return;
+  developing = true;
+  const events = new EventSource("/_rn/dev");
+  let connected = false;
+  events.addEventListener("ready", () => {
+    // A reconnection after the server restarted means a new build.
+    if (connected) reloadKeepingState();
+    connected = true;
+  });
+  events.addEventListener("reload", reloadKeepingState);
+  events.addEventListener("error", (event) => {
+    if (typeof event.data !== "string") return;
+    let overlay = document.getElementById("rn-dev-overlay");
+    if (!overlay) {
+      overlay = document.createElement("pre");
+      overlay.id = "rn-dev-overlay";
+      overlay.setAttribute("role", "alert");
+      Object.assign(overlay.style, { position: "fixed", inset: "0", margin: "0", padding: "24px", overflow: "auto", background: "rgba(20, 0, 0, 0.92)", color: "#ffd7d7", font: "14px/1.5 monospace", zIndex: "2147483647", whiteSpace: "pre-wrap" });
+      document.body.appendChild(overlay);
+    }
+    overlay.textContent = `The build failed:
+
+${event.data}`;
+  });
+}
+
+function reloadKeepingState() {
+  saveEntry();
+  try { sessionStorage.setItem("rn:restore", current); } catch (_) { /* the state starts again */ }
+  location.reload();
 }
 
 // ----------------------------------------------------- offline (I) ----

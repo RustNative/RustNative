@@ -26,6 +26,19 @@ impl Writer {
         }
     }
 
+    /// Where the next line will be written.
+    pub fn mark(&self) -> usize {
+        self.lines.len()
+    }
+
+    /// Attributes the lines written since `mark` that have no span of their
+    /// own to `span` (the statement they were written for).
+    pub fn attribute(&mut self, mark: usize, span: Span) {
+        for (_, line_span) in self.lines.iter_mut().skip(mark) {
+            line_span.get_or_insert(span);
+        }
+    }
+
     pub fn open(&mut self, text: &str, span: Option<Span>) {
         self.line(text, span);
         self.indent += 1;

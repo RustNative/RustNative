@@ -242,6 +242,19 @@ enum Command {
         /// and CI builds (`C64`); without it installed, builds uncached.
         #[arg(long)]
         cache: bool,
+        /// For `web`: how it is deployed.
+        #[arg(long, value_enum, default_value = "server")]
+        mode: crate::web::WebMode,
+        /// For `web --mode serverless`: where it runs.
+        #[arg(long, value_enum)]
+        host: Option<crate::web::WebHost>,
+    },
+    /// Serve a build locally as its host would (`rustnative serve static
+    /// target/web/client`).
+    Serve {
+        /// What to serve.
+        #[command(subcommand)]
+        command: ServeCommand,
     },
     /// Build and run the application.
     Run {
@@ -262,6 +275,10 @@ enum Command {
         /// Run the tests again on every save (`rustnative test --watch`).
         #[arg(long)]
         watch: bool,
+        /// Require the browser tests to run: fail, rather than skip, when
+        /// no browser is installed.
+        #[arg(long)]
+        browser: bool,
         /// Arguments passed through to `cargo test`, flags included
         /// (`rustnative test --offline -- --nocapture`).
         #[arg(trailing_var_arg = true, allow_hyphen_values = true)]
@@ -360,7 +377,22 @@ impl Cli {
                 println!("  rustnative run windows");
                 Ok(())
             }
-            Command::Build { platform, release, pgo, cache } => {
+            Command::Build { platform: Platform::Web, release, mode, host, .. } => {
+                crate::web::build(&Project::find(&here)?, mode, host, release).map(|_| ())
+            }
+            Command::Run { platform: Platform::Web, release } => {
+                crate::web::run(&Project::find(&here)?, release)
+            }
+            Command::Dev { platform: Platform::Web, once, .. } => {
+                crate::web::dev(&Project::find(&here)?, once)
+            }
+            Command::Package { platform: Platform::Web, .. } => {
+                crate::web::package(&Project::find(&here)?).map(|_| ())
+            }
+            Command::Serve { command: ServeCommand::Static { folder, address, requests } } => {
+                crate::web::serve_static(&folder, address, requests)
+            }
+            Command::Build { platform, release, pgo, cache, .. } => {
                 if pgo {
                     if platform.backend().is_none() {
                         return Err(Error::NoBackend {
@@ -381,8 +413,12 @@ impl Cli {
             }
             Command::Run { platform, release } => cargo_for(platform, &here, "run", release, &[]),
             Command::Check { platform } => cargo_for(platform, &here, "check", false, &[]),
-            Command::Test { watch, arguments } => {
+            Command::Test { watch, browser, arguments } => {
                 let project = Project::find(&here)?;
+                if browser {
+                    // SAFETY: set before any thread of this process starts.
+                    unsafe { std::env::set_var("RUSTNATIVE_BROWSER_REQUIRED", "1") };
+                }
                 let mut command = vec!["test".to_owned()];
                 command.extend(arguments);
                 if watch {
@@ -634,6 +670,23 @@ fn cargo_for(
     // Structured diagnostics, so positions in lowered `.rsx` files are
     // reported in the `.rsx` file (see `diagnostics`).
     crate::diagnostics::run_cargo(&project.root, &arguments)
+}
+
+/// `rustnative serve`.
+#[derive(Debug, clap::Subcommand)]
+pub enum ServeCommand {
+    /// A static export, with the headers its `_headers` gives each file.
+    Static {
+        /// The export's folder.
+        #[arg(default_value = "target/web/client")]
+        folder: PathBuf,
+        /// Where to listen.
+        #[arg(long, default_value = "127.0.0.1:8080")]
+        address: std::net::SocketAddr,
+        /// Stop after this many requests (for tests).
+        #[arg(long, hide = true)]
+        requests: Option<usize>,
+    },
 }
 
 /// The languages `rustnative bindgen` writes.

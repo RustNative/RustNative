@@ -54,6 +54,7 @@ mod project;
 mod tokens;
 mod toolchain;
 mod upgrade;
+mod web;
 
 use std::process::ExitCode;
 
