@@ -220,3 +220,29 @@ async fn the_permissions_policy_opens_only_declared_capabilities() {
         assert!(policy.contains(feature), "{feature} in {policy}");
     }
 }
+
+#[tokio::test]
+async fn an_offline_application_is_configured_from_rustnative_toml() {
+    let text = "[web.pwa]\nname = \"Notes\"\nshort_name = \"N\"\ntheme_color = \"#112233\"\n";
+    let pwa = rustnative_server::web::pwa_config(text).unwrap().expect("the table");
+    assert_eq!(
+        (pwa.name.as_str(), pwa.theme_color.as_str(), pwa.start_url.as_str()),
+        ("Notes", "#112233", "/")
+    );
+    assert_eq!(rustnative_server::web::pwa_config("port = 1").unwrap(), None);
+
+    let service = app().pwa(pwa).into_service();
+    let get = |path: &'static str| {
+        let service = service.clone();
+        async move { service.handle(http::Request::get(path).body(Bytes::new()).unwrap(), None).await }
+    };
+    let manifest = get("/manifest.webmanifest").await;
+    assert_eq!(manifest.headers()["content-type"], "application/manifest+json");
+    let worker = get("/_rn/sw.js").await;
+    assert_eq!(worker.headers()["service-worker-allowed"], "/");
+    assert!(std::str::from_utf8(worker.body()).unwrap().contains("const VERSION = \"build-2\";"));
+    let page = String::from_utf8(get("/whole").await.body().to_vec()).unwrap();
+    assert!(page.contains("<link rel=\"manifest\" href=\"/manifest.webmanifest\">"), "{page}");
+    assert!(page.contains("\"sw\":\"/_rn/sw.js\""), "every page registers the worker: {page}");
+    assert_eq!(get("/_rn/icon-192.png").await.headers()["content-type"], "image/png");
+}

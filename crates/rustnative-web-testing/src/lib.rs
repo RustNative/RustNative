@@ -300,7 +300,12 @@ impl Browser {
             connection.call(Some(&session), domain, &json!({}))?;
         }
         drop(connection);
-        Ok(Page { connection: Arc::clone(&self.connection), session, target: target_id })
+        Ok(Page {
+            connection: Arc::clone(&self.connection),
+            session,
+            target: target_id,
+            workers: Mutex::new(HashMap::new()),
+        })
     }
 }
 
@@ -340,6 +345,8 @@ pub struct Page {
     connection: Arc<Mutex<Connection>>,
     session: String,
     target: String,
+    /// Sessions on service workers, whose network this page emulates.
+    workers: Mutex<HashMap<String, String>>,
 }
 
 impl std::fmt::Debug for Page {
@@ -732,6 +739,52 @@ impl Page {
             "Network.emulateNetworkConditions",
             json!({ "offline": offline, "latency": 0, "downloadThroughput": -1, "uploadThroughput": -1 }),
         )?;
+        Ok(())
+    }
+
+    /// Emulates the network as offline (or not) for this page and for every
+    /// service worker the browser runs — whose requests a page's own
+    /// emulation does not reach.
+    ///
+    /// # Errors
+    ///
+    /// The browser refused.
+    pub fn set_offline_everywhere(&self, offline: bool) -> Result<()> {
+        self.set_offline(offline)?;
+        let mut connection = self.connection.lock().unwrap_or_else(PoisonError::into_inner);
+        let targets = connection.call(None, "Target.getTargets", &json!({}))?;
+        let workers: Vec<String> = targets["targetInfos"]
+            .as_array()
+            .into_iter()
+            .flatten()
+            .filter(|target| target["type"] == "service_worker")
+            .filter_map(|target| target["targetId"].as_str().map(str::to_owned))
+            .collect();
+        let mut sessions = self.workers.lock().unwrap_or_else(PoisonError::into_inner);
+        for target in workers {
+            // One session per worker: emulation set through a session stays
+            // until that session changes it.
+            let session = if let Some(session) = sessions.get(&target) {
+                session.clone()
+            } else {
+                let attached = connection.call(
+                    None,
+                    "Target.attachToTarget",
+                    &json!({ "targetId": target, "flatten": true }),
+                )?;
+                let Some(session) = attached["sessionId"].as_str().map(str::to_owned) else {
+                    continue;
+                };
+                connection.call(Some(&session), "Network.enable", &json!({}))?;
+                sessions.insert(target, session.clone());
+                session
+            };
+            connection.call(
+                Some(&session),
+                "Network.emulateNetworkConditions",
+                &json!({ "offline": offline, "latency": 0, "downloadThroughput": -1, "uploadThroughput": -1 }),
+            )?;
+        }
         Ok(())
     }
 

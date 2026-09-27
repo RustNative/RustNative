@@ -299,8 +299,8 @@ impl ServerApp {
     }
 }
 
-struct Inner {
-    app: ServerApp,
+pub(crate) struct Inner {
+    pub(crate) app: ServerApp,
     limiter: RateLimiter,
     requests: AtomicU64,
     errors: AtomicU64,
@@ -309,7 +309,7 @@ struct Inner {
 
 /// A running application: a `tower::Service` over `http` requests.
 #[derive(Clone)]
-pub struct AppService(Arc<Inner>);
+pub struct AppService(pub(crate) Arc<Inner>);
 
 impl AppService {
     /// Answers `request`, whose body is already read. `client` is the

@@ -1198,7 +1198,9 @@ export function normalize(element) {
   const out = { t: element.t };
   if (element.k !== undefined && element.k !== null) out.k = element.k;
   if (element.a && element.a.length) out.a = element.a.map(([name, value]) => [name, value]);
-  if (element.c && element.c.length) out.c = element.c.map(normalize);
+  // An empty text is no node once parsed: it is no child here either.
+  const children = (element.c || []).filter((child) => child !== "");
+  if (children.length) out.c = children.map(normalize);
   return out;
 }
 
@@ -2386,7 +2388,8 @@ export async function start(restored = null) {
   // Generated modules receive this runtime's own namespace.
   const runtime = await import(import.meta.url);
   navigation();
-  if (restored === null && history.state && history.state.rn && arrivedByHistory()) {
+  serviceWorker();
+  if (restored === null && history.state && history.state.rn && (arrivedByHistory() || restoring(history.state.rn))) {
     const saved = savedEntry(history.state.rn);
     if (saved) restored = saved.states;
   }
@@ -2552,6 +2555,61 @@ function navigation() {
     const value = document.visibilityState === "hidden" ? "Suspending" : "Resuming";
     for (const island of islands) if (island instanceof Island) island.dispatch({ type: "Lifecycle", value });
   });
+}
+
+// ----------------------------------------------------- offline (I) ----
+
+let registration = null;
+let updating = false;
+
+/// Whether this load is the reload of an applied update, for entry `id`.
+function restoring(id) {
+  try {
+    if (sessionStorage.getItem("rn:restore") !== id) return false;
+    sessionStorage.removeItem("rn:restore");
+    return true;
+  } catch (_) {
+    return false;
+  }
+}
+
+/// Registers the application's service worker, announces a new build's
+/// waiting worker (`rn:update`), and has the worker deliver calls queued
+/// offline whenever the page is online.
+function serviceWorker() {
+  if (!config.sw || typeof navigator === "undefined" || !navigator.serviceWorker || registration) return;
+  const announce = () => {
+    document.documentElement.setAttribute("data-rn-update", "");
+    document.dispatchEvent(new CustomEvent("rn:update"));
+  };
+  navigator.serviceWorker.register(config.sw, { scope: "/" }).then((found) => {
+    registration = found;
+    if (found.waiting && navigator.serviceWorker.controller) announce();
+    found.addEventListener("updatefound", () => {
+      const next = found.installing;
+      if (next) next.addEventListener("statechange", () => { if (next.state === "installed" && navigator.serviceWorker.controller) announce(); });
+    });
+  }, (error) => console.error("rn: the service worker did not register", error));
+  navigator.serviceWorker.addEventListener("controllerchange", () => { if (updating) location.reload(); });
+  const replay = () => { if (navigator.serviceWorker.controller) navigator.serviceWorker.controller.postMessage("rn:replay"); };
+  window.addEventListener("online", replay);
+  if (navigator.onLine) replay();
+}
+
+/// Asks the server for a new build now (the browser also checks on its own).
+export async function checkUpdate() {
+  if (registration) await registration.update();
+}
+
+/// Applies a waiting build: the page reloads, and its islands come back
+/// with the state they had.
+export function applyUpdate() {
+  if (!registration || !registration.waiting) return false;
+  updating = true;
+  saveEntry();
+  try { sessionStorage.setItem("rn:restore", current); } catch (_) { /* storage refused: the state starts again */ }
+  registration.waiting.postMessage("rn:apply-update");
+  return true;
 }
 
 if (typeof document !== "undefined" && document.getElementById("rn-data")) {

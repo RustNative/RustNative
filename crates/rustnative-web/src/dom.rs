@@ -95,10 +95,14 @@ impl Element {
         if on { self.attr(name, "") } else { self }
     }
 
-    /// Adds a text child.
+    /// Adds a text child; an empty text adds none (the document it becomes
+    /// would parse with no node there).
     #[must_use]
     pub fn text(mut self, text: impl Into<String>) -> Self {
-        self.children.push(Child::Text(text.into()));
+        let text = text.into();
+        if !text.is_empty() {
+            self.children.push(Child::Text(text));
+        }
         self
     }
 

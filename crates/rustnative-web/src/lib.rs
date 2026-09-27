@@ -71,6 +71,7 @@ pub mod live;
 pub mod page;
 pub mod pending;
 pub mod png;
+pub mod pwa;
 pub mod request;
 pub mod runtime;
 pub mod svg;

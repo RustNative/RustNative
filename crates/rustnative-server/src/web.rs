@@ -68,6 +68,7 @@ pub(crate) struct WebAssets {
     shells: Mutex<HashMap<String, Arc<Shell>>>,
     pub(crate) services: Mutex<Services>,
     pub(crate) version: Mutex<Option<String>>,
+    pub(crate) pwa: Mutex<Option<Arc<rustnative_web::pwa::Pwa>>>,
     pub(crate) explain: std::sync::atomic::AtomicBool,
 }
 
@@ -79,8 +80,66 @@ impl WebAssets {
         }
     }
 
+    /// The build's version: the application's, or the runtime's own.
+    fn version(&self) -> String {
+        self.version.lock().unwrap_or_else(PoisonError::into_inner).clone().unwrap_or_else(|| {
+            rustnative_web::hash::class_name("", rustnative_web::runtime::RUNTIME_JS)
+        })
+    }
+
+    /// The offline application's own addresses: the manifest, the service
+    /// worker, the offline page, and the framework's icons.
+    fn pwa_asset(&self, path: &str) -> Option<Response> {
+        use rustnative_web::pwa;
+        let config = self.pwa.lock().unwrap_or_else(PoisonError::into_inner).clone()?;
+        let (body, kind, cache): (Bytes, &'static str, &'static str) = match path {
+            "/manifest.webmanifest" => (
+                Bytes::from(config.manifest().to_string()),
+                "application/manifest+json",
+                "no-cache",
+            ),
+            pwa::SERVICE_WORKER => {
+                let mut assets = vec![
+                    rustnative_web::runtime::runtime_url("/_rn/"),
+                    rustnative_web::runtime::worker_url("/_rn/"),
+                    config.start_url.clone(),
+                ];
+                let modules = self.modules.lock().unwrap_or_else(PoisonError::into_inner);
+                assets.extend(modules.keys().map(|name| format!("/_rn/m/{name}")));
+                drop(modules);
+                (
+                    Bytes::from(config.service_worker(&self.version(), &assets)),
+                    "text/javascript; charset=utf-8",
+                    "no-cache",
+                )
+            }
+            pwa::OFFLINE => {
+                (Bytes::from(config.offline_page()), "text/html; charset=utf-8", "no-cache")
+            }
+            "/_rn/icon-192.png" => {
+                (Bytes::from(config.icon_png(192)), "image/png", "public, max-age=86400")
+            }
+            "/_rn/icon-512.png" => {
+                (Bytes::from(config.icon_png(512)), "image/png", "public, max-age=86400")
+            }
+            _ => return None,
+        };
+        let mut response = Response::new(body);
+        let headers = response.headers_mut();
+        headers.insert(header::CONTENT_TYPE, HeaderValue::from_static(kind));
+        headers.insert(header::CACHE_CONTROL, HeaderValue::from_static(cache));
+        if path == pwa::SERVICE_WORKER {
+            // Served below `/_rn/`, it controls the whole origin.
+            headers.insert("service-worker-allowed", HeaderValue::from_static("/"));
+        }
+        Some(response)
+    }
+
     /// A framework asset at `path` (below `/_rn/`), if there is one.
     pub(crate) fn asset(&self, path: &str) -> Option<Response> {
+        if let Some(response) = self.pwa_asset(path) {
+            return Some(response);
+        }
         let rest = path.strip_prefix("/_rn/")?;
         if let Some(name) = rest.strip_prefix("w/").and_then(|name| name.strip_suffix(".wasm")) {
             let bytes = self.wasm.lock().unwrap_or_else(PoisonError::into_inner).get(name)?.clone();
@@ -140,6 +199,15 @@ impl crate::ServerApp {
             .lock()
             .unwrap_or_else(PoisonError::into_inner)
             .insert(name.to_owned(), bytes.into());
+        self
+    }
+
+    /// Makes the application installable and able to work offline
+    /// (`rustnative_web::pwa`): every page links the manifest and registers
+    /// the service worker.
+    #[must_use]
+    pub fn pwa(self, pwa: rustnative_web::pwa::Pwa) -> Self {
+        *self.web.pwa.lock().unwrap_or_else(PoisonError::into_inner) = Some(Arc::new(pwa));
         self
     }
 
@@ -210,6 +278,7 @@ pub(crate) async fn render_pending(
     cx.assets = format!("{prefix}/_rn/");
     cx.base = prefix.to_owned();
     cx.version.clone_from(&web.version.lock().unwrap_or_else(PoisonError::into_inner));
+    cx.pwa.clone_from(&web.pwa.lock().unwrap_or_else(PoisonError::into_inner));
     let status = StatusCode::from_u16(page.response_status()).unwrap_or(StatusCode::OK);
     let web = Arc::clone(web);
     if page.render_strategy() == Strategy::Streamed {
@@ -290,4 +359,35 @@ pub(crate) fn explain(
     let mut cx = PageContext::new(Some(request)).services(services);
     cx.assets = format!("{prefix}/_rn/");
     crate::response::Json(page::explain(&page, &cx)).into_response()
+}
+
+/// The `[web.pwa]` table of an application's `rustnative.toml`, if it has
+/// one.
+///
+/// # Errors
+///
+/// The document is not valid TOML, or the table is not a valid [`Pwa`].
+///
+/// [`Pwa`]: rustnative_web::pwa::Pwa
+pub fn pwa_config(
+    text: &str,
+) -> Result<Option<rustnative_web::pwa::Pwa>, crate::config::ConfigError> {
+    let document: toml::Value =
+        toml::from_str(text).map_err(|error| crate::config::ConfigError(error.to_string()))?;
+    let Some(table) = document.get("web").and_then(|web| web.get("pwa")) else { return Ok(None) };
+    table
+        .clone()
+        .try_into()
+        .map(Some)
+        .map_err(|error| crate::config::ConfigError(error.to_string()))
+}
+
+impl crate::AppService {
+    /// Replaces the build's version while the application runs — a deploy
+    /// in place: pages of the old build are told to reload on their next
+    /// server call, and offline applications get the new service worker.
+    pub fn set_version(&self, version: impl Into<String>) {
+        *self.0.app.web.version.lock().unwrap_or_else(PoisonError::into_inner) =
+            Some(version.into());
+    }
 }

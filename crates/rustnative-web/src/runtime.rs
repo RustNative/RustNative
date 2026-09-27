@@ -10,6 +10,10 @@
 /// `rn.js`.
 pub const RUNTIME_JS: &str = include_str!("runtime/rn.js");
 
+/// `sw.js`, the service worker (`crate::pwa`), before its build's
+/// values are written in.
+pub const SW_JS: &str = include_str!("runtime/sw.js");
+
 /// The runtime's URL below `base` (`/_rn/`): its name carries its hash, so
 /// it is cached forever and replaced by a new URL when it changes.
 #[must_use]

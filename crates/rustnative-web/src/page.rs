@@ -224,6 +224,9 @@ pub struct PageContext {
     pub clock: Arc<dyn Clock>,
     /// The build's version, which the runtime sends with server calls.
     pub version: Option<String>,
+    /// The application's offline and install settings, when it has them:
+    /// every page then links the manifest and registers the service worker.
+    pub pwa: Option<Arc<crate::pwa::Pwa>>,
 }
 
 impl std::fmt::Debug for PageContext {
@@ -246,6 +249,7 @@ impl PageContext {
             base: String::new(),
             clock: Arc::new(SystemClock),
             version: None,
+            pwa: None,
         }
     }
 
@@ -474,7 +478,8 @@ struct Document {
     rtl: bool,
 }
 
-fn document_start(document: &Document, nonce: &str, css: &str, preload: &[String]) -> String {
+fn document_start(document: &Document, cx: &PageContext, css: &str, preload: &[String]) -> String {
+    let nonce = cx.nonce();
     let mut out = String::from("<!doctype html><html");
     if let Some(lang) = &document.lang {
         out.push_str(" lang=\"");
@@ -486,6 +491,9 @@ fn document_start(document: &Document, nonce: &str, css: &str, preload: &[String
     }
     out.push_str("><head><meta charset=\"utf-8\"><meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">");
     out.push_str(&document.head.render(nonce));
+    if let Some(pwa) = &cx.pwa {
+        out.push_str(&pwa.head());
+    }
     for url in preload {
         out.push_str("<link rel=\"modulepreload\" href=\"");
         escape_into(&mut out, url);
@@ -509,9 +517,16 @@ fn style(out: &mut String, nonce: &str, css: &str) {
 /// The page data and the runtime script, when there are islands; then the
 /// end of the document.
 fn document_end(out: &mut String, cx: &PageContext, specs: &[Value]) {
-    if !specs.is_empty() {
+    // An offline-capable application registers its service worker from
+    // every page, so it ships the runtime even where nothing is interactive.
+    if !specs.is_empty() || cx.pwa.is_some() {
         let data = json!({
-            "config": { "base": cx.base, "assets": cx.assets, "version": cx.version },
+            "config": {
+                "base": cx.base,
+                "assets": cx.assets,
+                "version": cx.version,
+                "sw": cx.pwa.as_ref().map(|_| crate::pwa::SERVICE_WORKER),
+            },
             "islands": specs,
         });
         out.push_str("<script type=\"application/json\" id=\"rn-data\">");
@@ -536,7 +551,7 @@ pub fn render(page: Page, cx: &PageContext) -> RenderedPage {
     let (element, specs, modules, wasm) = session.realize(cx);
     let css = session.sheet.css(&session.theme);
     let preload: Vec<String> = modules.iter().map(|module| module.url(&cx.assets)).collect();
-    let mut html = document_start(&document, cx.nonce(), &css, &preload);
+    let mut html = document_start(&document, cx, &css, &preload);
     render_into(&mut html, &element);
     document_end(&mut html, cx, &specs);
     RenderedPage { html, status, modules, dynamic: session.render.is_dynamic(), wasm }
@@ -594,7 +609,7 @@ pub fn prerender_shell(page: &Page, cx: &PageContext) -> Shell {
     session.tree.pump_tasks();
     let (element, _, _, _) = session.realize(&cx);
     let css = session.sheet.css(&session.theme);
-    let mut html = document_start(&document, "", &css, &[]);
+    let mut html = document_start(&document, &cx, &css, &[]);
     render_into(&mut html, &element);
     let holes = boundary_ids(&session.render)
         .into_iter()
@@ -630,7 +645,7 @@ pub fn render_streamed(
     } else {
         let (element, _, _, _) = session.realize(cx);
         let css = session.sheet.css(&session.theme);
-        first = document_start(&document, &nonce, &css, &[]);
+        first = document_start(&document, cx, &css, &[]);
         render_into(&mut first, &element);
         sent = session.sheet.classes().map(str::to_owned).collect();
         let unresolved = session.render.unresolved();
