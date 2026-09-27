@@ -150,7 +150,9 @@ milestone had recorded as owed:
   - README, and the owed lines in the server, sync, durable, deploy, i18n,
     and adoption-ladder guides.
 
-**Verified.** All browser suites run in headless Edge on this machine:
+**Verified.** The full gate passes on the final commit: fmt, clippy with
+all features, every workspace test (205 suites), docs, MSRV 1.85, and
+`cargo deny`. All browser suites run in headless Edge on this machine:
 `pages_in_a_browser`, `input_navigation_and_services_in_a_browser`,
 `webassembly_subtrees_in_a_browser`, `an_offline_application_in_a_browser`,
 `the_loading_path_in_a_browser`, `rustnative-web/tests/{browser_dom,

@@ -9,7 +9,7 @@
 //! - **Instances**: each request starts an instance from storage, handles
 //!   its one message, and ends — the instance lives as long as the request,
 //!   which is what an edge host guarantees.
-//! - **Storage**: the host's key-value store ([`KvBackend`], through the
+//! - **Storage**: the host's key-value store (`KvBackend`, on `wasm32-wasip1`, through the
 //!   `rn_kv` import): `actor/{id}/{key}` for values, `alarm/{id}` for the
 //!   alarm. On a provider, its per-object storage takes the same three
 //!   operations.
