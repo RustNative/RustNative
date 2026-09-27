@@ -253,3 +253,182 @@ fn main() {
     rustnative_build::embed_resources();
 }
 ";
+
+/// The web template's `src/lib.rs` (`rustnative new --web`): a page with an
+/// interactive island, served by the application and exportable as static
+/// files.
+pub const WEB_LIB_RS: &str = r#"//! {{display_name}}: its pages, its interactive parts, and the application
+//! that serves them.
+//!
+//! - `counter` is a client component: it runs in the browser (compiled to
+//!   JavaScript) and its first view is rendered on the server.
+//! - [`app`] serves the pages; [`site`] is the same page as static files.
+
+use rustnative_core::{Component, ComponentContext, Event, Node};
+use rustnative_server::{ServerApp, get};
+use rustnative_web::{Client, Head, Page};
+
+#[rustnative_web::client]
+pub mod counter {
+    use rustnative_core::{Event, Node, NodeId};
+    use rustnative_web::Effects;
+    use serde::{Deserialize, Serialize};
+
+    /// A counter: the page's interactive part.
+    #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+    pub struct Counter {
+        /// How many times the button was pressed.
+        pub clicks: u32,
+    }
+
+    impl Counter {
+        /// Counts presses.
+        pub fn update(&mut self, event: Event, fx: &mut Effects<()>) {
+            let _ = fx;
+            if let Event::Click { target } = event {
+                if target == NodeId::from_key("click") {
+                    self.clicks += 1;
+                }
+            }
+        }
+
+        /// The count and the button.
+        #[must_use]
+        pub fn view(&self) -> Node {
+            Node::column(
+                "counter",
+                [
+                    Node::label("count", format!("Clicked {} times", self.clicks)),
+                    Node::button("click", "Click me"),
+                ],
+            )
+        }
+    }
+}
+
+/// The home page: a greeting, and the counter.
+pub struct Home;
+
+impl Component for Home {
+    type Props = ();
+    type Message = ();
+    fn new((): ()) -> Self {
+        Self
+    }
+    fn props(&self) -> &() {
+        &()
+    }
+    fn set_props(&mut self, (): ()) {}
+    fn view(&self) -> Node {
+        Node::column("home", [])
+    }
+    fn update(&mut self, _: Event) {}
+    fn render(&mut self, context: &mut ComponentContext<'_, ()>) -> Node {
+        let counter = context.child_with_props::<Client<counter::Counter>, _>(
+            "counter",
+            counter::Counter::default(),
+            Client::new,
+        );
+        Node::column("home", [Node::label("greeting", "Hello from {{display_name}}"), counter])
+    }
+}
+
+/// The home page.
+#[must_use]
+pub fn home() -> Page {
+    Page::new::<Home>(Head::new("{{display_name}}", "{{display_name}}, on the Web."), ()).lang("en")
+}
+
+/// The application: its routes and the client components its pages use.
+#[must_use]
+pub fn app() -> ServerApp {
+    ServerApp::new().client::<counter::Counter>().route("/", get(|| async { home() }).public())
+}
+
+/// The same pages as static files (`rustnative build web --mode client`).
+#[must_use]
+pub fn site() -> rustnative_web::export::Site {
+    rustnative_web::export::Site::new().page("/", home)
+}
+"#;
+
+/// The web template's `src/main.rs`: serves the application, or writes
+/// the static site when `rustnative build web --mode client` asks.
+pub const WEB_MAIN_RS: &str = r#"//! Serves {{display_name}} (`rustnative run web`, `rustnative dev web`), or
+//! writes it as static files (`rustnative build web --mode client`).
+
+#[tokio::main]
+async fn main() -> std::process::ExitCode {
+    if rustnative_web::export::export_folder().is_some() {
+        return rustnative_web::export::run(&{{crate_name}}::site());
+    }
+    let address = rustnative_server::web::address("127.0.0.1:3000");
+    let listener = match tokio::net::TcpListener::bind(&address).await {
+        Ok(listener) => listener,
+        Err(error) => {
+            eprintln!("could not listen on {address}: {error}");
+            return std::process::ExitCode::FAILURE;
+        }
+    };
+    println!("{{name}}: http://{address}");
+    match {{crate_name}}::app().into_service().serve(listener, std::future::pending()).await {
+        Ok(()) => std::process::ExitCode::SUCCESS,
+        Err(error) => {
+            eprintln!("{error}");
+            std::process::ExitCode::FAILURE
+        }
+    }
+}
+"#;
+
+/// The web template's test: the page renders on the server, with its
+/// island marked for the browser.
+pub const WEB_TEST_RS: &str = r#"//! The home page, rendered as the server renders it.
+
+#[tokio::test]
+async fn the_home_page_greets_and_counts() {
+    let service = {{crate_name}}::app().into_service();
+    let request = http::Request::get("/").body(bytes::Bytes::new()).unwrap();
+    let response = service.handle(request, None).await;
+    assert_eq!(response.status(), 200);
+    let html = String::from_utf8(response.body().to_vec()).unwrap();
+    assert!(html.contains("Hello from {{display_name}}"), "{html}");
+    assert!(html.contains("data-rn-i=\"0\""), "the counter is an island: {html}");
+}
+"#;
+
+/// The web template's `Cargo.toml`.
+pub const WEB_CARGO_TOML: &str = r#"[package]
+name = "{{name}}"
+version = "{{version}}"
+edition = "2024"
+rust-version = "1.85"
+publish = false
+
+[dependencies]
+{{dependencies}}serde = { version = "1", features = ["derive"] }
+tokio = { version = "1.53", features = ["rt-multi-thread", "macros", "net"] }
+
+[dev-dependencies]
+http = "1"
+bytes = "1"
+"#;
+
+/// The web template's `README.md`.
+pub const WEB_README: &str = r"# {{display_name}}
+
+A [Rust Native](https://github.com/<org>/RustNative) web application.
+
+```sh
+rustnative dev web                        # serve it, rebuild and reload on save
+rustnative run web                        # serve it
+rustnative build web --mode client        # static files in target/web/client
+rustnative serve static target/web/client # serve them as a static host does
+rustnative build web --mode serverless --host lambda  # a function
+rustnative package web                    # the server as one archive
+cargo test                                # the page, rendered as the server renders it
+```
+
+`rustnative.toml` holds the application's identity and, under `[web]`, the
+address `run` and `dev` serve on.
+";

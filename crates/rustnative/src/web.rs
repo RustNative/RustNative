@@ -346,6 +346,20 @@ fn read_request_head(stream: &mut TcpStream) -> Option<(Vec<u8>, String, String)
     Some((head, method, path))
 }
 
+/// A request's head asking the server to close the connection after it.
+fn close_after(head: &[u8]) -> Vec<u8> {
+    let text = String::from_utf8_lossy(head);
+    let mut out = String::with_capacity(text.len() + 20);
+    for line in text.trim_end_matches("\r\n").split("\r\n") {
+        if !line.to_ascii_lowercase().starts_with("connection:") {
+            out.push_str(line);
+            out.push_str("\r\n");
+        }
+    }
+    out.push_str("Connection: close\r\n\r\n");
+    out.into_bytes()
+}
+
 fn write_response(stream: &mut TcpStream, status: u16, headers: &[(String, String)], body: &[u8]) {
     let reason = match status {
         200 => "OK",
@@ -449,7 +463,10 @@ fn proxy(mut client: TcpStream, state: &Arc<Mutex<DevState>>) {
         return;
     };
     let mut upstream = backend;
-    if upstream.write_all(&head).is_err() {
+    // One request per connection: the proxy reads only a connection's first
+    // request, so a kept-alive one would carry the next (`/_rn/dev`, say)
+    // past it to the server.
+    if upstream.write_all(&close_after(&head)).is_err() {
         return;
     }
     let (Ok(mut client_reader), Ok(mut upstream_writer)) =
@@ -478,7 +495,13 @@ fn start_server(project: &Project, backend: SocketAddr) -> Result<Child> {
         project.config.app.name,
         std::env::consts::EXE_SUFFIX
     ));
-    Command::new(&executable)
+    // A copy runs, so the next build can replace the executable (Windows
+    // will not overwrite a running one). The last copy has been stopped.
+    let running = target.join("web/dev").join(executable.file_name().unwrap_or_default());
+    std::fs::create_dir_all(target.join("web/dev"))
+        .and_then(|()| std::fs::copy(&executable, &running))
+        .map_err(io(format!("copy {} to run it", executable.display())))?;
+    Command::new(&running)
         .current_dir(&project.root)
         .env("RUSTNATIVE_WEB_ADDR", backend.to_string())
         .env("RUSTNATIVE_DEV", "1")
@@ -587,6 +610,15 @@ mod tests {
     use super::*;
 
     const RULES: &str = "/*\n  Content-Security-Policy: default-src 'self'\n  X-Frame-Options: DENY\n\n/_rn/*\n  Cache-Control: public, max-age=31536000, immutable\n\n/_rn/w/*\n  ! Cache-Control\n  Cache-Control: no-cache\n\n/game\n  ! Content-Security-Policy\n  Content-Security-Policy: default-src 'self'; script-src 'self' 'wasm-unsafe-eval'\n";
+
+    #[test]
+    fn a_forwarded_request_closes_its_connection() {
+        let head = b"GET / HTTP/1.1\r\nHost: x\r\nConnection: keep-alive\r\n\r\n";
+        assert_eq!(
+            String::from_utf8(close_after(head)).unwrap(),
+            "GET / HTTP/1.1\r\nHost: x\r\nConnection: close\r\n\r\n"
+        );
+    }
 
     #[test]
     fn paths_that_leave_the_folder_are_refused() {

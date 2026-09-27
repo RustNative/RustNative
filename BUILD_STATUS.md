@@ -12,6 +12,12 @@ milestone that will do it. The shipped backends are Windows and the headless
 reference backend (Milestone 45); a "done when" that names several backends is
 met on those two, and its other half is listed as owed.
 
+**The Web track (2026-09-27 to 2026-09-28).** Web milestones A–K are built,
+with every web half those milestones had recorded as owed. See the Web
+entry below and `docs/superpowers/plans/2026-09-27-web-milestones-a-k.md`.
+The shipped backends are now Windows, the Web, and the headless reference
+backend.
+
 **Crate rename (2026-09-27).** The crates are now named `rustnative-*`, to
 match the project name. Before this, they used the working name
 `framework-*` (for example `framework-core` and `framework-windows`), and
@@ -24,6 +30,225 @@ One markup expansion golden was re-blessed: the longer crate path moves one
 call past the pretty-printer's line width.
 
 <!-- milestone entries, newest first -->
+
+### Web milestones A–K — the Web backend — complete (Chromium engines; provider accounts owed)
+
+**Built.** Plan: `docs/superpowers/plans/2026-09-27-web-milestones-a-k.md`,
+Phases 0–9. Guide: `docs/web.md`. Also built: every web item another
+milestone had recorded as owed:
+
+- `C43-1` custom elements;
+- `C41` metadata and language alternates;
+- `C42` the loading path and web budgets;
+- `C69-1` the permissions policy;
+- `C07`/`C33` the browser live client and render modes;
+- `C44` serverless event handlers;
+- `C46` edge actors;
+- static, function, and edge deployment adapters with emulators.
+
+- **Phase 0 — core readiness.**
+  - `rustnative-core` builds for `wasm32-unknown-unknown` and
+    `wasm32-wasip1`: Tokio sits behind `threads` and `getrandom` behind
+    `os-random`.
+  - `HostExecutor` runs tasks on the host's own loop, driven by
+    `pump_tasks` and the host clock.
+  - Also added: `Services` extensions, `ComponentTree::unresolved_view`, and
+    a serializable `ServerFnError`.
+- **Phase 1 — DOM and CSS (Web B, C).** `rustnative-web` covers:
+  - every node kind as its semantic element;
+  - layout and styles as CSS, with classes named by a hash the runtime
+    shares;
+  - the canvas as SVG;
+  - the HTML renderer.
+
+  `rustnative-style::WEB` and `WEB_UNITS` are the style capability table.
+  `rustnative-web-testing` drives headless Edge or Chrome over the DevTools
+  protocol.
+- **Phase 2 — the client subset (Web A).** `#[rustnative_web::client]`
+  translates client logic to an ES module at build time and leaves the Rust
+  with checked arithmetic, so both languages fail at the same step with the
+  same message. Constructs outside the subset are refused with the three
+  ways forward. `rn.js` is the runtime: the realizer mirror, the patcher,
+  islands, and effects. Guide: `docs/web/client-subset.md`.
+- **Phase 3 — pages (Web H).** Pages render per request on a
+  `HostExecutor`, whole, streamed, or partially prerendered. Also in this
+  phase:
+  - islands with page data and element hooks;
+  - forms and links that work without JavaScript;
+  - a `pending` boundary;
+  - typed server functions checked for CSRF and build version (`409`);
+  - server-only components;
+  - `Live` server-interactive subtrees over a WebSocket, with the
+    automatic hand-over to the client module and its state;
+  - `?_rn_explain`.
+
+  Guide: `docs/web/wire-format.md`.
+- **Phase 4 — input and capabilities (Web D, E, F, G).**
+  - Input: pointer, wheel, composition, and clipboard events.
+  - Navigation: client navigation with prefetch, and history with scroll
+    and state restored.
+  - Capabilities: every one as an effect, each opened in the page's
+    `Permissions-Policy` only when declared.
+  - `Persisted<S>`.
+
+  Guide: `docs/web/capabilities.md`.
+- **Phase 5 — WebAssembly subtrees.** `wasm_subtree!` builds one module
+  with a small export/import surface. It runs on the page's thread or in a
+  worker, and its services go through the page's bridge. The example is
+  `examples/web-subtree` (a counter, and CRDT notes). Guide:
+  `docs/web/wasm-subtrees.md`.
+- **Phase 6 — offline (Web I).** `Pwa` provides a manifest and icons. The
+  service worker precaches, serves pages network-first, queues calls while
+  offline and replays them, and applies updates when the person accepts.
+  Guide: `docs/web/offline.md`.
+- **Phase 7 — packaging and the loading path (Web J).**
+  - Static export (`Site`): external CSS, `_headers`, a sitemap, and a
+    report.
+  - Source maps.
+  - Custom elements.
+  - Responsive WebP images.
+  - Font subsets rebuilt with their `cmap` and `OS/2` tables.
+  - Runtime metrics: LCP, CLS, INP, and ready.
+  - Dev mode over `/_rn/dev`.
+  - CLI: `build`, `run`, `dev`, and `package web`; `serve static`; `test
+    --browser`; `bench --target web` with `budgets/web.toml`.
+- **Phase 8 — serverless and edge (Web K).**
+  - **The feature split.** `rustnative-server` gains `serve` and `db`. The
+    request pipeline, security, sessions, server functions, and pages build
+    for `wasm32-wasip1` with `--no-default-features --features web`.
+  - **`serverless::run`.**
+    - The function shape speaks AWS Lambda's runtime API: API Gateway v2
+      events, deadlines, and other events through a hook.
+    - The edge shape is WAGI: one request per module run.
+    - Each invocation gets its own runtime, dropped at the response.
+    - `HostLimits` arrive in the request.
+    - Outbound HTTP (`rn_http` on the edge) and the edge key-value store
+      (`rn_kv`).
+  - **Emulators.** `serve lambda` is the runtime API, a front, and instance
+    replacement on timeout. `serve wagi` runs on wasmi 0.46 with a WASI
+    preview 1 subset, fuel per route, a memory ceiling, a response cap, an
+    allow-list for outbound hosts, and one instance at a time per actor.
+  - **`examples/web-notes`.** Milestone 49's done-when in every shape: the
+    long-lived server (SQLite, sessions, the indexing job, a data service),
+    a Lambda function, and an edge module.
+  - **`rustnative-durable`.** It splits into the actor contract (storage
+    over a `Backend`; builds for wasip1) and the `local` engines. Also:
+    `edge::serve` for actors (`C46`), `events::sqs_batch` for
+    `batchItemFailures` (`C44`), and `examples/edge-actors`.
+  - **Deployment.** `deploy local start --target
+    static|function|edge|server`, and `deploy export sam|spin`.
+  - **Budgets.** `bench --target serverless` measures against
+    `budgets/serverless.toml`.
+  - **`ServerApp::client::<T>()`.** It declares a client module up front,
+    which an instance that lives for one request needs.
+  - **Guide:** `docs/web/deploy.md`.
+- **Phase 9 — the rest of the project.**
+  - `rustnative new --web`.
+  - `docs/web.md`, `docs/security/threat-model-web.md`, and the Web table in
+    `docs/guarantees.md`, including mode equivalence (`W-MF-5`).
+  - The Web column in `docs/conformance/new-backend-checklist.md`.
+  - README, and the owed lines in the server, sync, durable, deploy, i18n,
+    and adoption-ladder guides.
+
+**Verified.** All browser suites run in headless Edge on this machine:
+`pages_in_a_browser`, `input_navigation_and_services_in_a_browser`,
+`webassembly_subtrees_in_a_browser`, `an_offline_application_in_a_browser`,
+`the_loading_path_in_a_browser`, `rustnative-web/tests/{browser_dom,
+export, element}.rs`, `the_ui_is_the_same_in_every_mode`, and
+`a_new_web_application_develops_in_the_browser`.
+
+- **Client subset:** three client modules agree between Rust and Node on
+  state, DOM, rules, effects, and panics.
+- **Serverless end to end** (`crates/rustnative/tests/serverless.rs`):
+  - the same sign-in, list, and add flow through the server, the Lambda
+    emulator, and the edge emulator;
+  - one session is good in every shape;
+  - the job indexes what the serverless shapes added;
+  - fuel and memory are stopped at their limits;
+  - the edge actor session serializes 20 concurrent appends and persists;
+  - a function deployment is previewed, promoted, and rolled back.
+- **Budgets**, measured on this machine:
+
+  | Budget | Key | Value |
+  |---|---|---|
+  | `web.toml` | route script | 122.7 KB |
+  | `web.toml` | unrelated-route growth | 0 |
+  | `web.toml` | startup | 1.9 s |
+  | `web.toml` | LCP | 916 ms |
+  | `web.toml` | CLS | 0 |
+  | `web.toml` | INP | 32 ms |
+  | `serverless.toml` | function artifact | 4.6 MB |
+  | `serverless.toml` | function cold start | 29–40 ms |
+  | `serverless.toml` | function warm | 4 ms |
+  | `serverless.toml` | function peak memory | 6.1 MB |
+  | `serverless.toml` | edge module | 2.0 MB |
+  | `serverless.toml` | edge cold (interpreted) | 71–109 ms |
+  | `serverless.toml` | edge warm | 28–32 ms |
+  | `serverless.toml` | edge memory | 1.6 MB |
+  | `serverless.toml` | sign-in route | 11.7 M fuel |
+
+- **Builds and checks:** `wasm32-wasip1` builds and clippy for
+  `rustnative-server` (`--features web`), `rustnative-durable`
+  (`--no-default-features`), `web-notes`' edge module, and `edge-actors`.
+  `cargo +1.85 check --workspace --all-targets` and `cargo deny check` pass.
+
+**Found and fixed while building.**
+
+- An empty label was a child in one realizer and not in the other
+  (`rn:mismatch`).
+- A service worker's offline emulation leaked across DevTools sessions.
+- Font subsets lost `cmap` and `OS/2`, so the browser refused them.
+- `ttf-parser` was unmaintained; it was replaced by `skrifa`, which is
+  shared with the subsetter.
+- Source maps skipped expanded statements.
+- Literals inside `format!` kept their placeholders.
+- WebAssembly views arrived out of order from a worker.
+- A failed module import was cached by the browser under its URL.
+- Rendering inline starved the runtime's timer; a render now leaves the
+  runtime's thread whenever there is another.
+- An edge instance could not serve the module of a page another instance
+  rendered; `ServerApp::client` fixes it.
+- `serve static` let `..\` and drive letters out of the export on Windows.
+- `rustnative new --framework-path` wrote verbatim Windows paths
+  (`\\?\E:\…`) that Cargo rejects.
+- A Lambda child outlived a killed emulator; a function now exits when its
+  runtime API is gone.
+- `dev web` never reloaded a page, for two reasons, both found by the
+  end-to-end test:
+  - The proxy read only a connection's first request, so a kept-alive
+    `/_rn/dev` request went to the server, which answered 404. It now
+    forwards each request with `Connection: close`.
+  - A rebuild could not replace the running server's executable on
+    Windows. A copy now runs, as in `dev windows`.
+
+**Deviations from the plan.**
+
+- The example subtree is `examples/web-subtree`.
+- The deploy adapters moved from Phase 7 to Phase 8.
+- Lifecycle events were tested by overriding `visibilityState`.
+- Serverless invocations run on a current-thread Tokio runtime of their own
+  rather than a bare `HostExecutor`. It is per invocation, dropped at the
+  response, and never process-wide. Pages still render on a `HostExecutor`.
+  The runtime is kept because handlers' timers and sockets need a reactor.
+- Streamed pages are answered whole in the serverless shapes. Response
+  streaming on a function runtime is owed.
+- `examples/web-notes` reads its configuration when an instance starts,
+  which on these hosts is fixed for the instance's life.
+
+**Owed.**
+
+- **Other browsers:** Firefox and Safari.
+- **Hardware-bound capabilities:** Bluetooth, sensors, camera, and media
+  are implemented and answered by capability, but not exercised.
+- **Real provider accounts:** AWS Lambda through SAM, and Spin. The
+  templates are generated and parsed, not deployed.
+- **The `rn_http`/`rn_kv` bridge** to a provider's own interfaces.
+- **An alarm scheduler** in the edge emulator.
+- **Linux builds of the function from Windows.** They need a Linux target
+  toolchain.
+- **Web checklist rows marked `—`:** safe-area insets, gesture arbitration
+  against the browser's, runtime token switches without a reload, and
+  others.
 
 ### Milestone 52 — The project around the framework — complete for Windows (device end owed)
 

@@ -1185,6 +1185,8 @@ Build a dedicated `rustnative-web` adapter that:
 
 The client and the server exchange serializable data and nothing else, and no JavaScript runs on the server. The subset is kept deliberately small, because every construct in it is a translation the framework maintains for as long as it exists, and because a WebAssembly subtree is always available for what the subset does not express. Within the subset, numeric and string semantics that differ between Rust and JavaScript — 64-bit integers, overflow, UTF-8 versus UTF-16 indexing, float formatting — are restricted or wrapped so both sides agree on the same data. On every other target the same client logic is ordinary Rust and runs natively, so the subset constrains only what the browser receives, and a route with no WebAssembly subtree pays nothing for the option.
 
+**Status (2026-09-28): implemented** on Chromium engines. `#[rustnative_web::client]` translates client logic to JavaScript at build time and refuses what is outside the subset with the three ways forward; the same logic runs natively with checked arithmetic, so both fail alike (`docs/web/client-subset.md`, `rustnative-web/tests/client_subset.rs`). See `BUILD_STATUS.md`.
+
 ### Web milestone B — Native DOM realization
 
 Map framework nodes to semantic DOM elements rather than a canvas renderer:
@@ -1199,6 +1201,8 @@ Dialog   → <dialog> or an appropriate semantic composition
 ```
 
 The adapter must retain stable node identity and native DOM ownership just like the desktop backends retain native HWND ownership. The server renderer, the generated client code, and any WebAssembly subtree address nodes through the same stable identities, so the markup one produces is exactly what the others attach to.
+
+**Status (2026-09-28): implemented** on Chromium engines. Every node kind is its semantic element, checked under a strict policy in Edge (`docs/web/dom-mapping.md`, `rustnative-web/tests/browser_dom.rs`). See `BUILD_STATUS.md`.
 
 ### Web milestone C — CSS/layout integration
 
@@ -1235,6 +1239,8 @@ so a runtime theme change stays one re-resolution here as well, and any property
 the browser expresses differently from the native backends is named in the
 mapping document rather than left to diverge with a version bump.
 
+**Status (2026-09-28): implemented** on Chromium engines. Layout and styles become CSS classes compiled at build time; `rustnative_style::WEB` is the capability table (`docs/web/layout-mapping.md`). See `BUILD_STATUS.md`.
+
 ### Web milestone D — Browser input/focus/accessibility
 
 Integrate:
@@ -1252,6 +1258,8 @@ Integrate:
 - ARIA roles/properties/states where a semantic HTML element is insufficient.
 
 The framework accessibility model must map to real browser semantics rather than emulate accessibility behavior itself. Browser input is handled in the browser, by the generated client code or by the WebAssembly subtree that owns the node; an event reaches the server only when the handler it triggers is a server call.
+
+**Status (2026-09-28): implemented** on Chromium engines. Pointer, wheel, composition, clipboard, keyboard, and focus reach components as the same events (`docs/web/capabilities.md`, `input_navigation_and_services_in_a_browser`). See `BUILD_STATUS.md`.
 
 ### Web milestone E — Browser services/capabilities
 
@@ -1278,11 +1286,15 @@ The capability system must include browser implementations for, where supported:
 
 Capability availability must be explicit because browser support varies by browser, security context, permissions, user gesture, and deployment mode. Client logic reaches these capabilities through bindings the code generator emits; server logic reaches its own services in Rust.
 
+**Status (2026-09-28): implemented** on Chromium engines. Every capability is an effect, answered where the browser has it and opened in `Permissions-Policy` only when declared (`docs/web/capabilities.md`). See `BUILD_STATUS.md`.
+
 ### Web milestone F — Async/runtime scheduling
 
 The scheduler must support browser constraints without blocking the browser main thread. Generated client code and WebAssembly subtrees run on the browser's event loop and task model, and DOM operations must remain on the browser thread where required.
 
 Long-running CPU work that must stay in the browser runs in a WebAssembly subtree, with a path to Web Workers running that module when the capability is available and a serializable message bridge back into the page; otherwise it belongs on the server, reached through a server call.
+
+**Status (2026-09-28): implemented** on Chromium engines. `HostExecutor` runs component tasks on the page's loop and the host clock; islands batch one patch per microtask (`pages_in_a_browser`). See `BUILD_STATUS.md`.
 
 ### Web milestone G — Routing, navigation, persistence, and browser lifecycle
 
@@ -1297,6 +1309,8 @@ Add browser-native lifecycle concepts:
 - before-unload/pagehide/unload boundaries where applicable;
 - persistence and restoration;
 - storage-backed application state.
+
+**Status (2026-09-28): implemented** on Chromium engines. Client navigation with prefetch, history with scroll and state restored, `Persisted<S>`, and lifecycle events (`docs/web/capabilities.md`). See `BUILD_STATUS.md`.
 
 ### Web milestone H — Server-rendered HTML, client attachment, and progressive enhancement
 
@@ -1370,6 +1384,8 @@ compile-time-checked queries, migrations, durable background jobs,
 secure-by-default request handling, and a generated administrative surface —
 is Milestone 49, and it builds on this render path rather than duplicating it.
 
+**Status (2026-09-28): implemented** on Chromium engines. Pages render per request — whole, streamed, or partially prerendered — with islands, forms and links that work without JavaScript, typed server functions, server-only components, and `Live` server-interactive subtrees with the automatic hand-over (`docs/web.md`, `docs/web/wire-format.md`). See `BUILD_STATUS.md`.
+
 ### Web milestone I — Service workers and offline applications
 
 Support service-worker-backed application architectures for offline caching, background synchronization where available, update/version management, and installable Progressive Web Apps.
@@ -1389,6 +1405,8 @@ leaves to applications:
   storage-access request path, and an embedded-context test that runs a
   component inside a third-party frame — which is our problem the moment a
   component is exported as a custom element (`C43-1`).
+
+**Status (2026-09-28): implemented** on Chromium engines. `Pwa`: a manifest, icons, and a service worker that precaches, serves pages network-first, queues calls offline and replays them, and updates on the person's say (`docs/web/offline.md`). See `BUILD_STATUS.md`.
 
 ### Web milestone J — Web packaging, testing, and deployment
 
@@ -1440,6 +1458,8 @@ Section 11 adds to this milestone:
 - **single-artifact deployment** as a supported shape: server binary with
   embedded assets and no separate asset pipeline to operate (Milestone 50).
 
+**Status (2026-09-28): implemented** on Chromium engines. Static export, source maps, custom elements, responsive images, font subsets, runtime metrics, the dev loop, and `build`/`run`/`dev`/`package web`, `serve static`, `test --browser`, `bench --target web` with `budgets/web.toml`. See `BUILD_STATUS.md`.
+
 ### Web milestone K — Serverless and edge deployment
 
 The serverless mode runs Web milestone H's renderer per request in a host that keeps nothing between requests, and it is a distinct milestone because those hosts impose constraints a long-lived server does not:
@@ -1461,6 +1481,8 @@ durable in the process, a scope bounded by the invocation, configuration read
 per invocation — applies unchanged to event-triggered invocations and to
 durable workflows, which are Milestone 56; revisions, traffic splitting, and
 resource bindings for these hosts are in Milestone 50.
+
+**Status (2026-09-28): implemented** on Chromium engines. `rustnative_server::serverless::run` answers AWS Lambda's runtime API and WAGI; the pipeline builds for `wasm32-wasip1`; `serve lambda` and `serve wagi` emulate the hosts with their limits (fuel per route, a memory ceiling); `examples/web-notes` runs in every shape, and one application in the same state has the same DOM in every mode (`the_ui_is_the_same_in_every_mode`). Owed: response streaming on a function runtime, and real provider accounts (`docs/web/deploy.md`). See `BUILD_STATUS.md`.
 
 ---
 
@@ -2314,6 +2336,8 @@ milestone B) and embedding on the deferred backends. See `BUILD_STATUS.md`.
 
 ---
 
+**Web (2026-09-28): delivered** with the Web track — the web rung of the adoption ladder: a client component as a custom element (`C43-1`, `rustnative-web/tests/element.rs`).
+
 ## Tier 1 — continuous, and gating each backend's completion
 
 ## Milestone 41 — Guarantees and conformance suites
@@ -2451,6 +2475,8 @@ performance claim in the project's documentation lacks a number behind it.
 
 Web, edge, embedded, and device keys are owed with their backends. See
 `BUILD_STATUS.md`.
+
+**Web (2026-09-28): delivered** with the Web track — the web budgets (`budgets/web.toml`, `C42-4`) and the serverless ones (`budgets/serverless.toml`).
 
 ## Milestone 43 — The developer loop
 
@@ -2909,6 +2935,8 @@ under pseudo-localization on every backend.
 runtime. The layout suite passes under the pseudo-locale on both backends.
 See `docs/i18n.md` and `BUILD_STATUS.md`.
 
+**Web (2026-09-28): delivered** with the Web track — HTML language alternates, `lang`, and `dir` on web routes (`C41`).
+
 ## Milestone 47 — State, resilience, and data
 
 Four absences that together account for most of what an application actually
@@ -3361,6 +3389,8 @@ codebase (`examples/notes-shared`). The same view is also served as a page.
 The Web track's shapes (browser client, serverless) are owed with Web H and
 K. See `docs/server.md` and `BUILD_STATUS.md`.
 
+**Web (2026-09-28): delivered** with the Web track — the browser client and the serverless shapes: `examples/web-notes` serves authenticated, database-backed, job-processing traffic whose UI runs client-side, server-rendered, and serverless without modification.
+
 ## Milestone 50 — Deployment, updates, and fleet operations
 
 Shipping once is packaging; shipping repeatedly is a different problem, and
@@ -3453,6 +3483,8 @@ Static-host, per-request-function, and edge adapters are owed with Web
 milestones J and K. Mobile and firmware updates are owed with Milestones
 35–37. See `docs/deploy.md` and `BUILD_STATUS.md`.
 
+**Web (2026-09-28): delivered** with the Web track — static, function, and edge deployment targets with their emulators, preview, promotion, and rollback, and `deploy export sam|spin`.
+
 ## Milestone 51 — Observability, security, and compliance
 
 What makes a framework acceptable to the people who never read a benchmark:
@@ -3543,6 +3575,8 @@ covers:
 
 The embedded obligations are owed with the embedded backends. See
 `docs/observability.md` and `BUILD_STATUS.md`.
+
+**Web (2026-09-28): delivered** with the Web track — the permissions policy from declared capabilities (`C69-1`) and the Web threat model (`docs/security/threat-model-web.md`).
 
 ## Milestone 52 — The project around the framework
 
@@ -3688,6 +3722,8 @@ milestone H.
 The browser client is owed with Web milestone H. See `docs/sync.md` and
 `BUILD_STATUS.md`.
 
+**Web (2026-09-28): delivered** with the Web track — the browser live client and the render modes, with the automatic hand-over (`C07`, `C33`).
+
 ## Milestone 56 — Durable and event-driven execution
 
 Web milestone K is request-shaped, yet most per-invocation workloads are events,
@@ -3730,6 +3766,8 @@ implementation and on one edge adapter.
 
 The edge adapter is owed with Web milestone K. See `docs/durable.md` and
 `BUILD_STATUS.md`.
+
+**Web (2026-09-28): delivered** with the Web track — event handlers as a function's entry point (`events::sqs_batch`, `C44`) and actors on an edge host (`edge::serve`, `C46`).
 
 ## Milestone 57 — Surfaces beyond the main window, and product services
 

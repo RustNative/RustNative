@@ -147,7 +147,9 @@ on its own listener, as `it_mounts_inside_an_existing_service` shows.
 
 ## Owed
 
-- **Web track.** Browser interactivity for server-rendered pages, the
-  serverless deployment shape, and the web client half of server functions
-  come with Web milestones H and K.
+- **Web track: delivered.** Browser interactivity for server-rendered pages
+  (islands), the web client half of server functions, and the serverless
+  shapes (a function and an edge module, `serverless::run`) are built:
+  `docs/web.md`, `docs/web/deploy.md`. `examples/web-notes` is this
+  milestone's done-when in every shape.
 - **Live push.** Live sending to WNS, APNs, and FCM needs credentials.

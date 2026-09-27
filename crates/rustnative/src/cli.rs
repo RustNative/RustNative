@@ -51,8 +51,13 @@ enum Command {
         /// Which syntax the project is written in. There is no default:
         /// neither is the one a developer should prefer (`PLAN.md` 2.9),
         /// and both templates are the same application.
-        #[arg(long, value_enum)]
-        syntax: crate::project::Syntax,
+        #[arg(long, value_enum, required_unless_present = "web")]
+        syntax: Option<crate::project::Syntax>,
+        /// A web application: a page with an interactive island, served by
+        /// the application and exportable as static files (the builder
+        /// syntax).
+        #[arg(long)]
+        web: bool,
     },
     /// Generate a binding from an interface description (`.ril`): the C
     /// header, the C# bindings, or the Rust implementation shims.
@@ -357,7 +362,7 @@ impl Cli {
         let here = std::env::current_dir()
             .map_err(|cause| Error::Io { what: "find the current folder".to_owned(), cause })?;
         match self.command {
-            Command::New { name, path, framework_path, syntax } => {
+            Command::New { name, path, framework_path, syntax, web } => {
                 let parent = path.unwrap_or_else(|| here.clone());
                 // A relative checkout path names a folder from here, not from
                 // the new project, where Cargo will read it.
@@ -371,6 +376,20 @@ impl Cli {
                         })
                     },
                 );
+                if web {
+                    if syntax == Some(crate::project::Syntax::Markup) {
+                        return Err(Error::Usage(
+                            "the web template is written in the builder syntax; leave out --syntax"
+                                .into(),
+                        ));
+                    }
+                    let root = crate::project::create_web(&parent, &name, &framework)?;
+                    println!("Created {}", root.display());
+                    println!("  cd {name}");
+                    println!("  rustnative dev web");
+                    return Ok(());
+                }
+                let syntax = syntax.unwrap_or(crate::project::Syntax::Builder);
                 let root = create(&parent, &name, &framework, syntax)?;
                 println!("Created {}", root.display());
                 println!("  cd {name}");

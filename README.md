@@ -19,7 +19,10 @@ tree, reach the same API, and cost the same at runtime. See
 
 ## Current status
 
-The current working backend is Windows/Win32. The framework core is designed to remain platform-independent so macOS, Linux, Android, iOS, Web, terminal, and embedded targets are added as separate adapters, each planned to the same depth: native host objects, native measurement, native input, native accessibility, its own toolchain and packaging.
+The working backends are Windows/Win32 and the Web (semantic HTML and CSS,
+in the browser, on a server, as a function, or on an edge host; see
+[`docs/web.md`](docs/web.md)), with the headless reference backend for
+tests. The framework core is designed to remain platform-independent so macOS, Linux, Android, iOS, Web, terminal, and embedded targets are added as separate adapters, each planned to the same depth: native host objects, native measurement, native input, native accessibility, its own toolchain and packaging.
 
 Two notes on what "planned" means here. macOS and iOS are fully planned platforms that this project has no hardware to build or verify on yet, so their milestones are specified and designed for but not started — order follows hardware, not priority. And a backend advertises a capability only once it genuinely realizes it, so "planned" never reaches an application as a claim of support.
 
@@ -706,9 +709,9 @@ and restoration contracts, `AccessibilityNodeInfo`, and Gradle/AAB packaging.
 **iOS** (Milestone 36) — `UIView`/UIKit, the scene lifecycle, `UIAccessibility`,
 universal links into the existing deep-link model, and Xcode packaging.
 
-**Web** — a `rustnative-web` adapter using semantic DOM elements rather than a
-canvas, in all three deployment modes, chosen at build time from one
-application:
+**Web** (Web milestones A–K, **built**: [`docs/web.md`](docs/web.md)) — a
+`rustnative-web` adapter using semantic DOM elements rather than a canvas, in
+all three deployment modes, chosen at build time from one application:
 
 ```text
 rustnative-core → rustnative-web → Rust on the server
@@ -1222,6 +1225,17 @@ rustnative test -- --nocapture             # arguments pass through to cargo tes
 rustnative doctor                          # what this machine can build, and what it lacks
 ```
 
+A web application:
+
+```sh
+rustnative new my-site --web --framework-path .   # a page with an island
+cd my-site
+rustnative dev web                                # serve, rebuild and reload on save
+rustnative build web --mode client                # static files; or --mode server,
+                                                  # or --mode serverless --host lambda|wagi
+rustnative serve static target/web/client         # or serve lambda / serve wagi: as the host runs it
+```
+
 `--syntax` has no default: the generator does not pick a side on a developer's
 behalf, and the two templates are the same application written twice
 (Milestone 53) — the markup one in `.rsx` files with `compile_rsx()` already in
@@ -1399,8 +1413,9 @@ cargo test --workspace -- --ignored
 
 The complete master roadmap—including completed milestones, architectural invariants, and all planned future stages—is maintained in [`PLAN.md`](PLAN.md).
 
-Milestones 25–32 are complete. What remains is the rest of the platform
-matrix — macOS, Linux, Android, iOS, embedded, terminal, and Web — plus the
+Milestones 25–32 are complete, and so is the Web track (Web milestones A–K).
+What remains is the rest of the platform matrix — macOS, Linux, Android, iOS,
+embedded, and terminal — plus the
 core work those targets share: a `no_std`-capable core subset, an executor
 seam for single-threaded hosts, and time from the host clock rather than
 `std::time::Instant`. The markup syntax and the style spellings are core work of

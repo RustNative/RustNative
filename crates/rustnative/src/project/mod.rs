@@ -75,6 +75,20 @@ impl FrameworkSource {
         }
     }
 
+    /// A web application's: the core, the server, and the Web backend.
+    fn web_dependencies(&self) -> String {
+        let crates = ["rustnative-core", "rustnative-server", "rustnative-web"];
+        crates
+            .iter()
+            .map(|name| match self {
+                Self::Published(version) => format!("{name} = \"{version}\"\n"),
+                Self::Path(path) => {
+                    format!("{name} = {{ path = \"{}/crates/{name}\" }}\n", normalized(path))
+                }
+            })
+            .collect()
+    }
+
     /// The test half: the headless backend, which runs the previews as
     /// golden tests.
     fn dev_dependencies(&self) -> String {
@@ -104,7 +118,11 @@ impl FrameworkSource {
 
 /// A path Cargo reads the same way however it was written.
 fn normalized(path: &Path) -> String {
-    path.display().to_string().replace('\\', "/")
+    let text = path.display().to_string();
+    // A canonical Windows path is verbatim (`\\?\E:\…`), which Cargo does
+    // not take as a path.
+    let text = text.strip_prefix(r"\\?\").unwrap_or(&text);
+    text.replace('\\', "/")
 }
 
 /// Creates a new project called `name` in `parent`, returning its folder.
@@ -167,6 +185,49 @@ pub fn create(
     Ok(root)
 }
 
+/// Creates a new web application called `name` in `parent` (`rustnative
+/// new --web`): a page with an island, served by the application, with
+/// `[web]` in `rustnative.toml`. Written in the builder syntax.
+///
+/// # Errors
+///
+/// As [`create`].
+pub fn create_web(parent: &Path, name: &str, framework: &FrameworkSource) -> Result<PathBuf> {
+    let mut config = Config::template(name);
+    config.validate().map_err(|error| match error {
+        config::ConfigError::Invalid { field: "app.name", problem } => {
+            Error::Usage(format!("`{name}` cannot be a project name: {problem}"))
+        }
+        other => Error::Config(other),
+    })?;
+    config.app.description = Some(format!("{name}, a Rust Native web application"));
+    config.web = Some(crate::web::WebConfig {
+        address: Some("127.0.0.1:3000".to_owned()),
+        ..crate::web::WebConfig::default()
+    });
+    let root = parent.join(name);
+    if root.exists() {
+        return Err(Error::Usage(format!("{} already exists", root.display())));
+    }
+    write(&root.join("src"), "lib.rs", &fill(templates::WEB_LIB_RS, &config))?;
+    write(&root.join("src"), "main.rs", &fill(templates::WEB_MAIN_RS, &config))?;
+    write(&root.join("tests"), "page.rs", &fill(templates::WEB_TEST_RS, &config))?;
+    write(
+        &root,
+        "Cargo.toml",
+        &fill(templates::WEB_CARGO_TOML, &config)
+            .replace("{{dependencies}}", &framework.web_dependencies()),
+    )?;
+    let rf_toml = toml::to_string_pretty(&config).map_err(|cause| Error::Io {
+        what: "write rustnative.toml".to_owned(),
+        cause: std::io::Error::other(cause.to_string()),
+    })?;
+    write(&root, config::FILE_NAME, &rf_toml)?;
+    write(&root, ".gitignore", templates::GITIGNORE)?;
+    write(&root, "README.md", &fill(templates::WEB_README, &config))?;
+    Ok(root)
+}
+
 /// Substitutes a template's placeholders with what the config says.
 fn fill(template: &str, config: &Config) -> String {
     template
@@ -195,6 +256,12 @@ mod tests {
         let _ = std::fs::remove_dir_all(&directory);
         std::fs::create_dir_all(&directory).expect("a scratch folder");
         directory
+    }
+
+    #[test]
+    fn a_verbatim_windows_path_is_one_cargo_reads() {
+        assert_eq!(normalized(Path::new(r"\\?\E:\work\RustNative")), "E:/work/RustNative");
+        assert_eq!(normalized(Path::new(r"C:\work")), "C:/work");
     }
 
     #[test]

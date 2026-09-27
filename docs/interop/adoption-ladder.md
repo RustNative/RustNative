@@ -64,6 +64,7 @@ framework neither subclasses it nor changes its tab stop.
 ## Owed
 
 - **The web rung** — a component exported as a web custom element (`C43`) —
-  is owed by Web milestone B, with the web backend.
+  is delivered: `rustnative_web::element::CustomElement`
+  (`rustnative-web/tests/element.rs::a_custom_element_on_a_plain_page`).
 - The other backends' embedding (a view, a widget, a document node) is owed by
   Milestones 33–38.

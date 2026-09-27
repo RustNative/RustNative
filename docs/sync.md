@@ -89,7 +89,9 @@ Application::new(RemoteView::new(client), window)
 - **Protocol.** WebSocket frames of JSON:
   - client to server: `hello` and `event`;
   - server to client: `welcome`, `tree`, and `drain`.
-  - The browser client is owed with Web milestone H.
+  - The browser client is built (Web milestone H): `LiveIsland` in the
+    runtime, with reconnect and the automatic hand-over to the client
+    module (`docs/web/wire-format.md`, `pages_in_a_browser`).
 
 ## Channels and presence
 

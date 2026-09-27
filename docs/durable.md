@@ -105,8 +105,12 @@ runner.run_until_idle().await?;
 - **Deduplication.** An id published twice is processed once.
 - **Task scope.** Each invocation runs in a task scope that is cancelled
   when the invocation ends.
-- **Serverless platforms.** Adapters are owed with Web milestone K. The
-  handler contract does not change.
+- **Serverless platforms.** `events::sqs_batch(handler)` runs a handler as
+  a function's entry point: an SQS batch in, `batchItemFailures` out, so
+  only the failed records are redelivered (Web milestone K,
+  `a_function_batch_reports_its_partial_failures`). The handler contract
+  does not change. Deduplication there is the queue's, or a key the
+  handler checks against its data service.
 
 ## Actors
 
@@ -123,9 +127,13 @@ documents.ask("doc-1", Edit::Append(who, words)).await?;
   instance, which finds its storage as the last instance left it.
 - **Alarms.** An alarm (`set_alarm`) is recorded, so it fires through
   `fire_alarms` even after a restart.
-- **Scope.** This is the single-process implementation, for development
-  and single-node deployments. The edge adapter is owed with the Web
-  track's edge target.
+- **Two places.** `LocalActorSystem` is the single-process implementation,
+  for development and single-node deployments. `edge::serve::<A>` runs the
+  same actor on an edge host, an instance per request with its storage in
+  the host's key-value store (Web milestone K, `C46`;
+  `docs/web/deploy.md`). `examples/edge-actors` runs one collaborative
+  document under both. Storage is a `Backend` (SQLite, or the edge store),
+  and the crate builds for `wasm32-wasip1` without its `local` feature.
 
 ## Supervision
 

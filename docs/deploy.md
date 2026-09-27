@@ -138,7 +138,11 @@ would not count as a verification.
 
 ## Owed
 
-- **Other targets.** Static-host, per-request-function, and edge adapters
-  and their local emulators are owed with Web milestones J and K. Mobile
+- **Other targets: delivered for the Web.** Static-host, function, and edge
+  targets (`deploy local start --target static|function|edge`), their
+  emulators (`serve static`, `serve lambda`, `serve wagi`), and provider
+  descriptions (`deploy export sam`, `deploy export spin`):
+  `docs/web/deploy.md`. A real provider account is not exercised. Mobile
   store packs and firmware images are owed with Milestones 35–37.
-- **Web loading path** (`C42`), with Web milestone J.
+- **Web loading path** (`C42`): delivered with Web milestone J
+  (`docs/web.md`, `budgets/web.toml`).
