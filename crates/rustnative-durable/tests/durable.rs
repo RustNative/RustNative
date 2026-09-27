@@ -149,6 +149,22 @@ impl EventHandler for Orders {
     }
 }
 
+#[test]
+fn a_function_batch_reports_its_partial_failures() {
+    let handler = Arc::new(Orders { seen: Mutex::new(Vec::new()) });
+    let hook = rustnative_durable::events::sqs_batch(handler.clone());
+    let envelope = EventEnvelope::new("e9", "shop", "order.placed", json!({ "poison": true }));
+    let reply = hook(
+        json!({ "Records": [
+            { "messageId": "m1", "body": "{\"poison\":false}", "eventSourceARN": "arn:queue", "attributes": { "ApproximateReceiveCount": "1" } },
+            { "messageId": "m2", "body": serde_json::to_string(&envelope).unwrap(), "attributes": { "ApproximateReceiveCount": "3" } },
+        ] }),
+        Duration::from_secs(30),
+    );
+    assert_eq!(reply, json!({ "batchItemFailures": [{ "itemIdentifier": "m2" }] }));
+    assert_eq!(*handler.seen.lock().unwrap(), ["m1#1", "e9#3"]);
+}
+
 #[tokio::test]
 async fn a_batch_with_partial_failures_is_settled_per_event() {
     let handler = Arc::new(Orders { seen: Mutex::new(Vec::new()) });

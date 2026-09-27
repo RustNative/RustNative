@@ -15,15 +15,22 @@ categories.workspace = true
 workspace = true
 
 # Milestone 56: durable workflows, event handlers, actors, and supervision.
-# They are journaled in SQLite through rustnative-server's data layer.
+# They are journaled in SQLite through rustnative-server's data layer
+# (`local`, the default). Without it the crate is the actor contract and its
+# edge adapter, which build for `wasm32-wasip1` (Web milestone K, `C46`).
+[features]
+default = ["local"]
+local = ["rustnative-server/default", "rustnative-core/default", "dep:rusqlite", "tokio/rt-multi-thread"]
+
 [dependencies]
-rustnative-core.workspace = true
-rustnative-server.workspace = true
+rustnative-core = { path = "../rustnative-core", version = "0.1.0", default-features = false, features = ["markup"] }
+rustnative-server = { path = "../rustnative-server", version = "0.1.0", default-features = false, features = ["web"] }
 async-trait.workspace = true
-rusqlite = { version = "0.40", default-features = false, features = ["bundled"] }
+rusqlite = { version = "0.40", default-features = false, features = ["bundled"], optional = true }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
-tokio = { workspace = true, features = ["sync", "rt", "time", "macros"] }
+http = "1"
+tokio = { version = "1.53", default-features = false, features = ["sync", "rt", "time", "macros"] }
 futures-util = { version = "0.3", default-features = false, features = ["std"] }
 
 [dev-dependencies]

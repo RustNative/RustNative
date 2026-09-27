@@ -1,0 +1,33 @@
+[package]
+name = "edge-actors"
+version = "0.1.0"
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+description.workspace = true
+repository.workspace = true
+homepage.workspace = true
+readme.workspace = true
+keywords.workspace = true
+categories.workspace = true
+publish = false
+
+[lints]
+workspace = true
+
+# `C46` (Web milestone K): one collaborative-document actor, run by the
+# local actor system (SQLite) and by an edge host (a WAGI module whose
+# storage is the host's key-value store) without modification.
+[features]
+default = ["local"]
+local = ["rustnative-durable/local"]
+
+[dependencies]
+rustnative-durable = { path = "../../crates/rustnative-durable", version = "0.1.0", default-features = false }
+async-trait.workspace = true
+serde = { version = "1", features = ["derive"] }
+tokio = { version = "1.53", default-features = false, features = ["rt"] }
+
+[dev-dependencies]
+rustnative-server.workspace = true
+tokio = { workspace = true, features = ["rt-multi-thread", "macros", "time"] }

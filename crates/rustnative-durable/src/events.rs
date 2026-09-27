@@ -245,3 +245,54 @@ impl EventRunner {
         Ok(())
     }
 }
+
+/// Event handlers as a function's entry point (`C44-1`, Web milestone K):
+/// an SQS-shaped batch (`{"Records": [...]}`) handed to `handler` as
+/// envelopes, answered with the batch's partial failures
+/// (`{"batchItemFailures": [{"itemIdentifier": ...}]}`), so the queue
+/// redelivers only those — and, after its own retry limit, dead-letters
+/// them. A record whose body is an [`EventEnvelope`] is taken as it is;
+/// any other body is the data of a `sqs.message` event whose id is the
+/// message id. The invocation's scope ends with the batch.
+///
+/// Pass it to [`rustnative_server::serverless::lambda::run`].
+#[must_use]
+pub fn sqs_batch(
+    handler: Arc<dyn EventHandler>,
+) -> rustnative_server::serverless::lambda::EventHook {
+    Box::new(move |event: Value, _remaining: Duration| {
+        let records = event["Records"].as_array().cloned().unwrap_or_default();
+        let mut message_ids = Vec::new();
+        let batch: Vec<EventEnvelope> = records
+            .iter()
+            .map(|record| {
+                let message_id = record["messageId"].as_str().unwrap_or_default().to_owned();
+                let body = record["body"].as_str().unwrap_or_default();
+                let attempt = record["attributes"]["ApproximateReceiveCount"]
+                    .as_str()
+                    .and_then(|count| count.parse().ok())
+                    .unwrap_or(1);
+                let mut envelope =
+                    serde_json::from_str::<EventEnvelope>(body).unwrap_or_else(|_| {
+                        let data = serde_json::from_str(body)
+                            .unwrap_or_else(|_| Value::String(body.to_owned()));
+                        let source = record["eventSourceARN"].as_str().unwrap_or("sqs");
+                        EventEnvelope::new(message_id.clone(), source, "sqs.message", data)
+                    });
+                envelope.attempt = attempt;
+                message_ids.push((envelope.id.clone(), message_id));
+                envelope
+            })
+            .collect();
+        let scope = RequestScope::default();
+        let result = rustnative_server::serverless::block_on(handler.handle(&batch, &scope));
+        drop(scope);
+        let failures: Vec<Value> = result
+            .failed
+            .iter()
+            .filter_map(|(id, _)| message_ids.iter().find(|(event, _)| event == id))
+            .map(|(_, message)| serde_json::json!({ "itemIdentifier": message }))
+            .collect();
+        serde_json::json!({ "batchItemFailures": failures })
+    })
+}

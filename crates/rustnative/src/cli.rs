@@ -392,6 +392,60 @@ impl Cli {
             Command::Serve { command: ServeCommand::Static { folder, address, requests } } => {
                 crate::web::serve_static(&folder, address, requests)
             }
+            Command::Serve {
+                command: ServeCommand::Lambda { binary, address, memory_mb, timeout, requests },
+            } => crate::emulate::lambda::serve(
+                &binary,
+                address,
+                crate::emulate::lambda::LambdaOptions {
+                    memory_mb,
+                    timeout: std::time::Duration::from_secs(timeout),
+                    requests,
+                },
+            ),
+            Command::Serve {
+                command:
+                    ServeCommand::Wagi {
+                        module,
+                        address,
+                        fuel,
+                        route_fuel,
+                        memory_mb,
+                        response_kb,
+                        deadline_ms,
+                        actors,
+                        env,
+                        allow_http,
+                        requests,
+                    },
+            } => {
+                let pairs = |list: Vec<String>| -> Vec<(String, String)> {
+                    list.into_iter()
+                        .filter_map(|pair| {
+                            pair.split_once('=').map(|(a, b)| (a.to_owned(), b.to_owned()))
+                        })
+                        .collect()
+                };
+                let route_fuel = pairs(route_fuel)
+                    .into_iter()
+                    .filter_map(|(prefix, fuel)| Some((prefix, fuel.parse().ok()?)))
+                    .collect();
+                crate::emulate::wagi::serve(
+                    &module,
+                    address,
+                    crate::emulate::wagi::WagiOptions {
+                        fuel,
+                        route_fuel,
+                        memory_bytes: memory_mb * 1024 * 1024,
+                        response_bytes: response_kb * 1024,
+                        deadline: std::time::Duration::from_millis(deadline_ms),
+                        actor_prefix: actors,
+                        env: pairs(env),
+                        allow_http,
+                        requests,
+                    },
+                )
+            }
             Command::Build { platform, release, pgo, cache, .. } => {
                 if pgo {
                     if platform.backend().is_none() {
@@ -683,6 +737,65 @@ pub enum ServeCommand {
         /// Where to listen.
         #[arg(long, default_value = "127.0.0.1:8080")]
         address: std::net::SocketAddr,
+        /// Stop after this many requests (for tests).
+        #[arg(long, hide = true)]
+        requests: Option<usize>,
+    },
+    /// A function binary behind an emulated function runtime (AWS Lambda's
+    /// runtime API), each request an API Gateway v2 event.
+    Lambda {
+        /// The function binary (built with `rustnative build web --mode
+        /// serverless --host lambda`).
+        binary: PathBuf,
+        /// Where to listen.
+        #[arg(long, default_value = "127.0.0.1:9000")]
+        address: std::net::SocketAddr,
+        /// The memory size reported to the function, in megabytes.
+        #[arg(long, default_value_t = 128)]
+        memory_mb: u64,
+        /// How long an invocation may take, in seconds.
+        #[arg(long, default_value_t = 10)]
+        timeout: u64,
+        /// Stop after this many requests (for tests).
+        #[arg(long, hide = true)]
+        requests: Option<usize>,
+    },
+    /// A `wasm32-wasip1` module run per request by an emulated edge host
+    /// (WAGI), metered in fuel under a memory ceiling.
+    Wagi {
+        /// The module (built with `rustnative build web --mode serverless
+        /// --host edge`).
+        module: PathBuf,
+        /// Where to listen.
+        #[arg(long, default_value = "127.0.0.1:9100")]
+        address: std::net::SocketAddr,
+        /// The CPU budget per request, in fuel.
+        #[arg(long, default_value_t = 2_000_000_000)]
+        fuel: u64,
+        /// A route's own budget, `PREFIX=FUEL` (repeatable; the longest
+        /// matching prefix wins).
+        #[arg(long = "route-fuel", value_name = "PREFIX=FUEL")]
+        route_fuel: Vec<String>,
+        /// The memory ceiling, in megabytes.
+        #[arg(long, default_value_t = 128)]
+        memory_mb: u64,
+        /// The largest response, in kilobytes.
+        #[arg(long, default_value_t = 6144)]
+        response_kb: u64,
+        /// How long a request may take, in milliseconds.
+        #[arg(long, default_value_t = 30_000)]
+        deadline_ms: u64,
+        /// Requests under this prefix are for the actor its next segment
+        /// names, one at a time per actor.
+        #[arg(long)]
+        actors: Option<String>,
+        /// Configuration and secrets for the module, `NAME=VALUE`
+        /// (repeatable).
+        #[arg(long, value_name = "NAME=VALUE")]
+        env: Vec<String>,
+        /// A `host:port` the module may send HTTP requests to (repeatable).
+        #[arg(long = "allow-http", value_name = "HOST:PORT")]
+        allow_http: Vec<String>,
         /// Stop after this many requests (for tests).
         #[arg(long, hide = true)]
         requests: Option<usize>,

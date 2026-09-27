@@ -70,6 +70,7 @@ pub fn run(app: ServerApp) -> std::process::ExitCode {
     let service = app.into_service();
     if std::env::var_os("AWS_LAMBDA_RUNTIME_API").is_some() {
         lambda::run(&service, None);
+        return std::process::ExitCode::SUCCESS;
     }
     if std::env::var_os("REQUEST_METHOD").is_some() {
         return wagi::run(&service);
@@ -226,12 +227,16 @@ pub mod lambda {
     }
 
     /// Handles invocations from the runtime API in `AWS_LAMBDA_RUNTIME_API`
-    /// for as long as the process lives: HTTP events answered by `service`,
-    /// anything else by `events`.
-    pub fn run(service: &AppService, events: Option<&EventHook>) -> ! {
+    /// until it goes away (ten seconds unreachable): HTTP events answered by
+    /// `service`, anything else by `events`.
+    pub fn run(service: &AppService, events: Option<&EventHook>) {
         let api = std::env::var("AWS_LAMBDA_RUNTIME_API").unwrap_or_default();
-        loop {
-            if next(&api, service, events).is_err() {
+        let mut failures = 0;
+        while failures < 100 {
+            if next(&api, service, events).is_ok() {
+                failures = 0;
+            } else {
+                failures += 1;
                 std::thread::sleep(Duration::from_millis(100));
             }
         }
@@ -388,5 +393,227 @@ pub mod wagi {
         let _ = out.write_all(response.body());
         let _ = out.flush();
         std::process::ExitCode::SUCCESS
+    }
+}
+
+/// Outbound HTTP from either shape: over a socket natively, through the
+/// edge host's `rn_http` import on `wasm32-wasip1` (an edge sandbox has no
+/// sockets; the host sends for the module, to the hosts it allows). Plain
+/// `http://` only natively — a data service beside the function; TLS is
+/// the host's in the edge shape.
+pub mod outbound {
+    use serde_json::{Value, json};
+
+    /// A response: status, headers (names lowercased), and body as text.
+    #[derive(Debug, Clone, PartialEq, Eq)]
+    pub struct Reply {
+        /// The status.
+        pub status: u16,
+        /// The headers.
+        pub headers: Vec<(String, String)>,
+        /// The body.
+        pub body: String,
+    }
+
+    /// Sends `method url` with `headers` and `body`.
+    ///
+    /// # Errors
+    ///
+    /// It could not be sent, or no answer came.
+    pub fn send(
+        method: &str,
+        url: &str,
+        headers: &[(&str, &str)],
+        body: &str,
+    ) -> Result<Reply, String> {
+        let request = json!({
+            "method": method,
+            "url": url,
+            "headers": headers.iter().map(|(name, value)| [name, value]).collect::<Vec<_>>(),
+            "body": body,
+        });
+        let reply = transport(&request)?;
+        let status =
+            reply["status"].as_u64().and_then(|code| u16::try_from(code).ok()).unwrap_or(0);
+        let body = reply["body"].as_str().unwrap_or_default().to_owned();
+        if status == 0 {
+            return Err(body);
+        }
+        let headers = reply["headers"]
+            .as_array()
+            .into_iter()
+            .flatten()
+            .filter_map(|pair| Some((pair[0].as_str()?.to_owned(), pair[1].as_str()?.to_owned())))
+            .collect();
+        Ok(Reply { status, headers, body })
+    }
+
+    #[cfg(target_os = "wasi")]
+    #[link(wasm_import_module = "rn_http")]
+    unsafe extern "C" {
+        #[link_name = "send"]
+        fn rn_http_send(request: *const u8, len: usize) -> i64;
+        #[link_name = "read"]
+        fn rn_http_read(buffer: *mut u8, capacity: usize) -> i64;
+    }
+
+    #[cfg(target_os = "wasi")]
+    fn transport(request: &Value) -> Result<Value, String> {
+        let bytes = request.to_string().into_bytes();
+        // SAFETY: the host reads `len` bytes at `request`, which this slice
+        // owns for the call.
+        let length = unsafe { rn_http_send(bytes.as_ptr(), bytes.len()) };
+        let length =
+            usize::try_from(length).map_err(|_| "the host refused the request".to_owned())?;
+        let mut buffer = vec![0u8; length];
+        // SAFETY: the host writes at most `capacity` bytes into `buffer`,
+        // which is that long.
+        let read = unsafe { rn_http_read(buffer.as_mut_ptr(), buffer.len()) };
+        if read < 0 {
+            return Err("the host lost the response".into());
+        }
+        serde_json::from_slice(&buffer).map_err(|error| error.to_string())
+    }
+
+    #[cfg(not(target_os = "wasi"))]
+    fn transport(request: &Value) -> Result<Value, String> {
+        use std::io::{Read, Write};
+        let url = request["url"].as_str().unwrap_or_default();
+        let rest =
+            url.strip_prefix("http://").ok_or_else(|| format!("only http:// here: {url}"))?;
+        let (authority, path) =
+            rest.split_once('/').map_or((rest, "/".to_owned()), |(a, p)| (a, format!("/{p}")));
+        let mut stream =
+            std::net::TcpStream::connect(authority).map_err(|error| error.to_string())?;
+        let body = request["body"].as_str().unwrap_or_default();
+        let mut head = format!(
+            "{} {path} HTTP/1.1\r\nhost: {authority}\r\nconnection: close\r\ncontent-length: {}\r\n",
+            request["method"].as_str().unwrap_or("GET"),
+            body.len()
+        );
+        for pair in request["headers"].as_array().into_iter().flatten() {
+            if let (Some(name), Some(value)) = (pair[0].as_str(), pair[1].as_str()) {
+                head.push_str(name);
+                head.push_str(": ");
+                head.push_str(value);
+                head.push_str("\r\n");
+            }
+        }
+        head.push_str("\r\n");
+        stream.write_all(head.as_bytes()).map_err(|error| error.to_string())?;
+        stream.write_all(body.as_bytes()).map_err(|error| error.to_string())?;
+        let mut response = Vec::new();
+        stream.read_to_end(&mut response).map_err(|error| error.to_string())?;
+        let split =
+            response.windows(4).position(|window| window == b"\r\n\r\n").ok_or("no response")?;
+        let head = String::from_utf8_lossy(&response[..split]).into_owned();
+        let status =
+            head.split_whitespace().nth(1).and_then(|code| code.parse::<u16>().ok()).unwrap_or(0);
+        let headers: Vec<[String; 2]> = head
+            .lines()
+            .skip(1)
+            .filter_map(|line| line.split_once(':'))
+            .map(|(name, value)| [name.trim().to_ascii_lowercase(), value.trim().to_owned()])
+            .collect();
+        let mut body = response[split + 4..].to_vec();
+        if headers
+            .iter()
+            .any(|[name, value]| name == "transfer-encoding" && value.contains("chunked"))
+        {
+            body = unchunk(&body);
+        }
+        Ok(json!({ "status": status, "headers": headers, "body": String::from_utf8_lossy(&body) }))
+    }
+
+    #[cfg(not(target_os = "wasi"))]
+    fn unchunk(mut body: &[u8]) -> Vec<u8> {
+        let mut out = Vec::new();
+        while let Some(line_end) = body.windows(2).position(|window| window == b"\r\n") {
+            let size = std::str::from_utf8(&body[..line_end])
+                .ok()
+                .and_then(|line| {
+                    usize::from_str_radix(line.split(';').next().unwrap_or("").trim(), 16).ok()
+                })
+                .unwrap_or(0);
+            let start = line_end + 2;
+            if size == 0 || start + size > body.len() {
+                break;
+            }
+            out.extend_from_slice(&body[start..start + size]);
+            body = &body[(start + size + 2).min(body.len())..];
+        }
+        out
+    }
+}
+
+/// The edge host's key-value store (`rn_kv`), as a `wasm32-wasip1` module
+/// reaches it: the storage an edge actor keeps its state in.
+#[cfg(target_os = "wasi")]
+pub mod kv {
+    #[link(wasm_import_module = "rn_kv")]
+    unsafe extern "C" {
+        #[link_name = "get"]
+        fn rn_kv_get(key: *const u8, key_len: usize, buffer: *mut u8, capacity: usize) -> i64;
+        #[link_name = "set"]
+        fn rn_kv_set(key: *const u8, key_len: usize, value: *const u8, value_len: usize) -> i32;
+        #[link_name = "delete"]
+        fn rn_kv_delete(key: *const u8, key_len: usize) -> i32;
+        #[link_name = "list"]
+        fn rn_kv_list(
+            prefix: *const u8,
+            prefix_len: usize,
+            buffer: *mut u8,
+            capacity: usize,
+        ) -> i64;
+    }
+
+    /// The value at `key`.
+    #[must_use]
+    pub fn get(key: &str) -> Option<Vec<u8>> {
+        let mut buffer = vec![0u8; 256];
+        loop {
+            // SAFETY: the host reads `key` and writes at most `capacity`
+            // bytes into `buffer`, both owned for the call.
+            let length =
+                unsafe { rn_kv_get(key.as_ptr(), key.len(), buffer.as_mut_ptr(), buffer.len()) };
+            let length = usize::try_from(length).ok()?;
+            if length <= buffer.len() {
+                buffer.truncate(length);
+                return Some(buffer);
+            }
+            buffer.resize(length, 0);
+        }
+    }
+
+    /// Stores `value` at `key`; `false` if the host refused.
+    #[must_use]
+    pub fn set(key: &str, value: &[u8]) -> bool {
+        // SAFETY: the host reads both slices, owned for the call.
+        unsafe { rn_kv_set(key.as_ptr(), key.len(), value.as_ptr(), value.len()) == 0 }
+    }
+
+    /// Removes `key`.
+    pub fn delete(key: &str) {
+        // SAFETY: the host reads `key`, owned for the call.
+        unsafe {
+            rn_kv_delete(key.as_ptr(), key.len());
+        }
+    }
+
+    /// The keys that start with `prefix`, in order.
+    #[must_use]
+    pub fn list(prefix: &str) -> Vec<String> {
+        let mut buffer = vec![0u8; 1024];
+        loop {
+            // SAFETY: as for `get`.
+            let length = unsafe {
+                rn_kv_list(prefix.as_ptr(), prefix.len(), buffer.as_mut_ptr(), buffer.len())
+            };
+            let Ok(length) = usize::try_from(length) else { return Vec::new() };
+            if length <= buffer.len() {
+                return serde_json::from_slice(&buffer[..length]).unwrap_or_default();
+            }
+            buffer.resize(length, 0);
+        }
     }
 }

@@ -1,0 +1,51 @@
+[package]
+name = "web-notes"
+version = "0.1.0"
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+description.workspace = true
+repository.workspace = true
+homepage.workspace = true
+readme.workspace = true
+keywords.workspace = true
+categories.workspace = true
+publish = false
+
+[lints]
+workspace = true
+
+# Milestone 49's done-when, on the Web track (Web milestone K): one notes
+# application — signed in, database-backed, indexing notes in a job — whose
+# UI runs client-side (a static export), server-rendered (the long-lived
+# server), and serverless (a Lambda function and a WAGI edge module),
+# unchanged. The serverless shapes reach the database through the server's
+# data service over HTTP: SQLite is not available in an edge sandbox.
+[features]
+default = ["server"]
+# The long-lived server: SQLite, jobs, a socket. The Lambda function builds
+# with it too (it runs natively); the edge module builds without it.
+server = ["rustnative-server/default", "dep:tokio"]
+
+[dependencies]
+rustnative-core = { path = "../../crates/rustnative-core", version = "0.1.0", default-features = false, features = ["markup"] }
+rustnative-server = { path = "../../crates/rustnative-server", version = "0.1.0", default-features = false, features = ["web"] }
+rustnative-web.workspace = true
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+http = "1"
+async-trait.workspace = true
+tokio = { version = "1.53", default-features = false, features = ["net", "rt-multi-thread", "macros", "time"], optional = true }
+
+[[bin]]
+name = "web-notes"
+path = "src/main.rs"
+required-features = ["server"]
+
+[[bin]]
+name = "web-notes-lambda"
+path = "src/bin/lambda.rs"
+
+[[bin]]
+name = "web-notes-edge"
+path = "src/bin/edge.rs"

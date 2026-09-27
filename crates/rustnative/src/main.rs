@@ -37,6 +37,7 @@ mod describe;
 mod dev;
 mod diagnostics;
 mod doctor;
+mod emulate;
 mod error;
 mod generate;
 mod i18n;
