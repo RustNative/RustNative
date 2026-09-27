@@ -35,6 +35,9 @@ pub enum BenchTarget {
     Headless,
     /// The web backend, in headless Edge (`examples/web-bench`).
     Web,
+    /// The serverless shapes (`examples/web-notes` as a function and as an
+    /// edge module), under the emulators.
+    Serverless,
 }
 
 impl BenchTarget {
@@ -43,6 +46,7 @@ impl BenchTarget {
             Self::Windows => "windows",
             Self::Headless => "headless",
             Self::Web => "web",
+            Self::Serverless => "serverless",
         }
     }
 
@@ -51,6 +55,7 @@ impl BenchTarget {
         match self {
             Self::Windows | Self::Headless => "bench-app",
             Self::Web => "web-bench",
+            Self::Serverless => "web-notes",
         }
     }
 
@@ -67,6 +72,8 @@ impl BenchTarget {
             ],
             Self::Headless => &[("headless", 3), ("core", 1), ("compile", 1)],
             Self::Web => &[("web", 3)],
+            // Measured in this process, under the emulators.
+            Self::Serverless => &[],
         }
     }
 }
@@ -304,6 +311,11 @@ pub fn run(
     let budgets: BudgetFile = toml::from_str(&text)
         .map_err(|error| Error::Usage(format!("{}: {error}", budget_path.display())))?;
 
+    if target == BenchTarget::Serverless {
+        let measured = serverless(&root)?;
+        return finish(&root, &budgets, &budget_path, &measured, low_end, check);
+    }
+
     println!("bench: building the scenarios (release)");
     let mut command = cargo();
     command.current_dir(&root).args(["build", "--release", "-p", target.package()]);
@@ -344,7 +356,19 @@ pub fn run(
         measured.extend(build_times(&root)?);
     }
 
-    let report = judge(&budgets, &measured, low_end);
+    finish(&root, &budgets, &budget_path, &measured, low_end, check)
+}
+
+/// Judges `measured`, writes the report, and prints the verdicts.
+fn finish(
+    root: &Path,
+    budgets: &BudgetFile,
+    budget_path: &Path,
+    measured: &BTreeMap<String, f64>,
+    low_end: bool,
+    check: bool,
+) -> Result<()> {
+    let report = judge(budgets, measured, low_end);
     let report_path = root.join("target/budget-report.json");
     std::fs::write(&report_path, serde_json::to_vec_pretty(&report).unwrap_or_default())
         .map_err(io(format!("write {}", report_path.display())))?;
@@ -373,6 +397,168 @@ pub fn run(
     Ok(())
 }
 
+/// One `GET path` against `port`: the time to the whole response, and its
+/// headers.
+fn timed_get(port: u16, path: &str) -> Result<(f64, Vec<(String, String)>)> {
+    use std::io::{Read, Write};
+    let started = Instant::now();
+    let mut stream = std::net::TcpStream::connect(("127.0.0.1", port))
+        .map_err(io(format!("connect to 127.0.0.1:{port}")))?;
+    write!(stream, "GET {path} HTTP/1.1\r\nhost: localhost\r\nconnection: close\r\n\r\n")
+        .map_err(io("send a request"))?;
+    let mut response = Vec::new();
+    stream.read_to_end(&mut response).map_err(io("read a response"))?;
+    let elapsed = started.elapsed().as_secs_f64() * 1000.0;
+    let head = String::from_utf8_lossy(&response).into_owned();
+    if !head.starts_with("HTTP/1.1 200") {
+        return Err(Error::Usage(format!(
+            "bench: GET {path} was not answered: {}",
+            head.lines().next().unwrap_or_default()
+        )));
+    }
+    let headers = head
+        .split("\r\n\r\n")
+        .next()
+        .unwrap_or_default()
+        .lines()
+        .filter_map(|line| line.split_once(':'))
+        .map(|(name, value)| (name.trim().to_ascii_lowercase(), value.trim().to_owned()))
+        .collect();
+    Ok((elapsed, headers))
+}
+
+fn kilobytes(path: &Path) -> Result<f64> {
+    let size = std::fs::metadata(path).map_err(io(format!("read {}", path.display())))?.len();
+    #[allow(clippy::cast_precision_loss, reason = "kilobytes")]
+    Ok(size as f64 / 1024.0)
+}
+
+/// The largest the process named `name` has been, in megabytes (the peak
+/// working set; Windows, the reference machine).
+fn peak_memory_mb(name: &str) -> Option<f64> {
+    let output = Command::new("powershell")
+        .args(["-NoProfile", "-Command"])
+        .arg(format!(
+            "(Get-Process -Name '{name}' | Measure-Object PeakWorkingSet64 -Maximum).Maximum"
+        ))
+        .output()
+        .ok()?;
+    let bytes: f64 = String::from_utf8_lossy(&output.stdout).trim().parse().ok()?;
+    Some(bytes / (1024.0 * 1024.0))
+}
+
+/// The serverless budgets' measurements (`W-SL-1`, `W-ED-2`): the notes
+/// application's sign-in page, as a function under the Lambda emulator and
+/// as an edge module under the WAGI emulator, from a cold start and warm.
+fn serverless(root: &Path) -> Result<BTreeMap<String, f64>> {
+    if cfg!(debug_assertions) {
+        eprintln!(
+            "bench: this `rustnative` is a debug build; the edge interpreter's timings will be slow"
+        );
+    }
+    println!("bench: building the function and the edge module (release)");
+    let mut function = cargo();
+    function.current_dir(root).args([
+        "build",
+        "--release",
+        "-p",
+        "web-notes",
+        "--bin",
+        "web-notes-lambda",
+    ]);
+    checked("cargo", function)?;
+    let mut module = cargo();
+    module.current_dir(root).args([
+        "build",
+        "--release",
+        "-p",
+        "web-notes",
+        "--bin",
+        "web-notes-edge",
+        "--target",
+        "wasm32-wasip1",
+        "--no-default-features",
+    ]);
+    checked("cargo", module)?;
+    let binary = root
+        .join("target/release")
+        .join(format!("web-notes-lambda{}", std::env::consts::EXE_SUFFIX));
+    let module_path = root.join("target/wasm32-wasip1/release/web-notes-edge.wasm");
+    let mut measured = BTreeMap::from([
+        ("lambda_artifact_kb".to_owned(), kilobytes(&binary)?),
+        ("edge_artifact_kb".to_owned(), kilobytes(&module_path)?),
+    ]);
+    let median = |mut values: Vec<f64>| {
+        values.sort_by(f64::total_cmp);
+        values[values.len() / 2]
+    };
+
+    // The function: the first request starts the process (a cold start).
+    println!("bench: the function, cold and warm");
+    let listener = std::net::TcpListener::bind("127.0.0.1:0").map_err(io("bind a port"))?;
+    let port = listener.local_addr().map_err(io("read the port"))?.port();
+    let repeats = 5;
+    let emulator = std::thread::spawn(move || {
+        let options = crate::emulate::lambda::LambdaOptions {
+            // The cold request, the warm ones, and one that closes it after
+            // the memory is read.
+            requests: Some(2 + repeats),
+            ..crate::emulate::lambda::LambdaOptions::default()
+        };
+        crate::emulate::lambda::serve_on(&listener, &binary, options)
+    });
+    measured.insert("lambda_cold_start_ms".to_owned(), timed_get(port, "/")?.0);
+    let mut warm = Vec::new();
+    for _ in 0..repeats {
+        warm.push(timed_get(port, "/")?.0);
+    }
+    if let Some(memory) = peak_memory_mb("web-notes-lambda") {
+        measured.insert("lambda_memory_mb".to_owned(), memory);
+    }
+    timed_get(port, "/")?;
+    measured.insert("lambda_warm_ms".to_owned(), median(warm));
+    let _ = emulator.join();
+
+    // The edge module: compiled once per host, instantiated per request.
+    println!("bench: the edge module, cold and warm");
+    let started = Instant::now();
+    let host = crate::emulate::wagi::Host::new(
+        &module_path,
+        crate::emulate::wagi::WagiOptions::default(),
+    )?;
+    let request = crate::emulate::HttpRequest {
+        method: "GET".into(),
+        target: "/".into(),
+        ..crate::emulate::HttpRequest::default()
+    };
+    let first = host.answer(&request, None);
+    measured.insert("edge_cold_start_ms".to_owned(), started.elapsed().as_secs_f64() * 1000.0);
+    let header = |outcome: &crate::emulate::wagi::Outcome, name: &str| {
+        outcome
+            .headers
+            .iter()
+            .find(|(key, _)| key == name)
+            .and_then(|(_, value)| value.parse::<f64>().ok())
+            .unwrap_or(f64::MAX)
+    };
+    if first.status != 200 {
+        return Err(Error::Usage(format!("bench: the edge module answered {}", first.status)));
+    }
+    measured.insert("edge_memory_mb".to_owned(), header(&first, "x-rn-memory") / (1024.0 * 1024.0));
+    let mut warm = Vec::new();
+    let mut last = first;
+    for _ in 0..5 {
+        let started = Instant::now();
+        last = host.answer(&request, None);
+        warm.push(started.elapsed().as_secs_f64() * 1000.0);
+    }
+    measured.insert("edge_warm_ms".to_owned(), median(warm));
+    // A route's CPU budget, in millions of fuel units: the sign-in page,
+    // warm (the first request also pays to compile what it calls).
+    measured.insert("edge_fuel_sign_in_mfuel".to_owned(), header(&last, "x-rn-fuel") / 1_000_000.0);
+    Ok(measured)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -396,6 +582,20 @@ mod tests {
         assert!(!judge(&budgets, &measured(200.0, 0.0), false).passes());
         // So does a route that grows because others were added.
         assert!(!judge(&budgets, &measured(122.7, 0.5), false).passes());
+    }
+
+    #[test]
+    fn the_serverless_budget_fails_a_route_over_its_fuel() {
+        let text = include_str!("../../../budgets/serverless.toml");
+        let budgets: BudgetFile = toml::from_str(text).unwrap();
+        let measured = |fuel: f64| {
+            let mut measured: BTreeMap<String, f64> =
+                budgets.budget.iter().map(|(key, budget)| (key.clone(), budget.max)).collect();
+            measured.insert("edge_fuel_sign_in_mfuel".to_owned(), fuel);
+            measured
+        };
+        assert!(judge(&budgets, &measured(11.7), false).passes());
+        assert!(!judge(&budgets, &measured(20.0), false).passes());
     }
 
     fn budgets() -> BudgetFile {

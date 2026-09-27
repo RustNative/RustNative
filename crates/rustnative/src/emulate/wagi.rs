@@ -9,7 +9,7 @@
 //! - **CPU**, in fuel (one unit per instruction, roughly): a default budget
 //!   and a budget per route prefix. A request out of fuel is `503` with
 //!   `x-rn-limit: fuel`. Every response reports what it used in
-//!   `x-rn-fuel`.
+//!   `x-rn-fuel`, and its linear memory's size in `x-rn-memory`.
 //! - **Memory**: a ceiling on the module's linear memory. A request that
 //!   grows past it is `503` with `x-rn-limit: memory`.
 //! - **Response size**: a body over the cap is `502` with
@@ -757,6 +757,9 @@ impl Host {
         let bytes = std::fs::read(path).map_err(io(format!("read {}", path.display())))?;
         let mut config = Config::default();
         config.consume_fuel(true);
+        // Functions compile when first called, as a host that compiles
+        // ahead of time pays nothing for the ones a request never reaches.
+        config.compilation_mode(wasmi::CompilationMode::Lazy);
         let engine = Engine::new(&config);
         let module = Module::new(&engine, &bytes).map_err(|error| Error::Io {
             what: format!("compile {}", path.display()),
@@ -807,12 +810,18 @@ impl Host {
         let mut store = Store::new(&self.engine, state);
         store.limiter(|state| &mut state.ceiling);
         let _ = store.set_fuel(fuel);
+        let mut memory_bytes = 0;
         let run = self
             .linker
             .instantiate(&mut store, &self.module)
             .and_then(|pre| pre.start(&mut store))
             .and_then(|instance| {
-                instance.get_typed_func::<(), ()>(&store, "_start")?.call(&mut store, ())
+                let result =
+                    instance.get_typed_func::<(), ()>(&store, "_start")?.call(&mut store, ());
+                if let Some(memory) = instance.get_memory(&store, "memory") {
+                    memory_bytes = memory.data_size(&store);
+                }
+                result
             });
         let used = fuel.saturating_sub(store.get_fuel().unwrap_or(0));
         let state = store.data();
@@ -835,6 +844,7 @@ impl Host {
         }
         let mut outcome = parse_cgi(&state.stdout);
         outcome.headers.push(("x-rn-fuel".into(), used.to_string()));
+        outcome.headers.push(("x-rn-memory".into(), memory_bytes.to_string()));
         outcome
     }
 }

@@ -1,0 +1,28 @@
+# The serverless shapes' budgets (`PLAN.md` Web milestone K, `W-SL-1`,
+# `W-ED-2`). See SCHEMA.md. Measured by `rustnative bench --target
+# serverless` (a release build of `rustnative`) on the reference machine:
+# `examples/web-notes`' sign-in page, as a function under `serve lambda` and
+# as an edge module under `serve wagi`.
+target = "serverless"
+
+[budget]
+# The function binary (release): what a deployment uploads, before zipping.
+lambda_artifact_kb = { max = 5500, tolerance = 0.05 }     # 4656
+# Process start, runtime-API handshake, and the first response.
+lambda_cold_start_ms = { max = 150, tolerance = 1.0 }     # 29
+# A warm invocation, through the emulator's front.
+lambda_warm_ms = { max = 25, tolerance = 1.0 }            # 4.1
+# The function's peak working set after a cold and five warm invocations.
+lambda_memory_mb = { max = 16, tolerance = 0.25 }         # 6.1
+# The edge module (release, wasm32-wasip1).
+edge_artifact_kb = { max = 2500, tolerance = 0.05 }       # 2094
+# Compiling the module and the first request, in the emulator's
+# interpreter: an upper bound on a host that compiles ahead of time.
+edge_cold_start_ms = { max = 250, tolerance = 1.0 }       # 71
+# A warm request: a fresh instance of the compiled module.
+edge_warm_ms = { max = 100, tolerance = 1.0 }             # 28
+# The module's linear memory after a request.
+edge_memory_mb = { max = 4, tolerance = 0.25 }            # 1.6
+# The sign-in route's CPU, in millions of fuel units (instructions), warm:
+# the per-route budget `serve wagi --route-fuel` enforces.
+edge_fuel_sign_in_mfuel = { max = 15, tolerance = 0.1 }   # 11.7

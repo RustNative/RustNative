@@ -1,8 +1,10 @@
 # Budget files
 
 `PLAN.md` Milestone 42. There is one file per shipped target:
-`windows.toml`, `headless.toml`, and `web.toml` (measured by
-`examples/web-bench` in headless Edge on a throttled profile). `rustnative bench --target <target>`
+`windows.toml`, `headless.toml`, `web.toml` (measured by
+`examples/web-bench` in headless Edge on a throttled profile), and
+`serverless.toml` (measured by `rustnative bench` itself, running
+`examples/web-notes` under its emulators). `rustnative bench --target <target>`
 measures the target and compares the results with its file. With `--check`,
 the command fails when a measurement is over budget, just as a failing test
 fails the build. CI runs it on every push (`.github/workflows/ci.yml`, job
@@ -117,3 +119,21 @@ comments.
 | `cls` | Cumulative layout shift (framework-controlled content reserves its size). |
 | `inp_ms` | A click's interaction to next paint on that profile. |
 
+
+## Serverless keys (`serverless.toml`)
+
+Measured by a release build of `rustnative` (the emulators run in its
+process): `examples/web-notes`' sign-in page, as a function behind `serve
+lambda` and as a `wasm32-wasip1` module behind `serve wagi`.
+
+| Key | Meaning |
+|---|---|
+| `lambda_artifact_kb` | The release function binary. |
+| `lambda_cold_start_ms` | Process start, the runtime-API handshake, and the first response. |
+| `lambda_warm_ms` | A warm invocation, median of five. |
+| `lambda_memory_mb` | The function's peak working set (Windows). |
+| `edge_artifact_kb` | The release edge module. |
+| `edge_cold_start_ms` | Compiling the module in the emulator's interpreter, and the first request. |
+| `edge_warm_ms` | A request on a fresh instance of the compiled module, median of five. |
+| `edge_memory_mb` | The module's linear memory after a request. |
+| `edge_fuel_sign_in_mfuel` | The sign-in route's CPU in millions of fuel units, warm: a per-route budget, which `serve wagi --route-fuel` enforces at run time. |
