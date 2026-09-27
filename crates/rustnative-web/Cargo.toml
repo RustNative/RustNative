@@ -28,6 +28,10 @@ serde = { version = "1", features = ["derive"] }
 # back as the value that was written.
 serde_json = { version = "1", features = ["float_roundtrip"] }
 
+# A WebAssembly subtree's services, bridged to the browser.
+[target.'cfg(target_arch = "wasm32")'.dependencies]
+async-trait.workspace = true
+
 [dev-dependencies]
 rustnative-core.workspace = true
 rustnative-web-testing.workspace = true

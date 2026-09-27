@@ -617,11 +617,13 @@ pub struct Island {
 pub enum IslandKind {
     /// Generated JavaScript.
     Client(&'static ClientModule),
-    /// A WebAssembly module (Web milestone A's opt-in subtrees).
+    /// A component in a WebAssembly module (`crate::wasm`).
     Wasm {
-        /// Its name.
-        name: &'static str,
-        /// Whether it runs in a worker.
+        /// The module's name.
+        module: &'static str,
+        /// The component's name in it.
+        component: &'static str,
+        /// Whether it runs in a Web Worker.
         worker: bool,
     },
     /// Held on the server, over a persistent connection (`C33`).
@@ -841,6 +843,255 @@ pub fn event_json(event: &Event) -> Option<serde_json::Value> {
     })
 }
 
+/// The event `json` describes, as the runtime delivers it ([`event_json`]'s
+/// inverse): how a WebAssembly subtree receives its events. Targets are
+/// local keys.
+#[must_use]
+pub fn event_from_json(json: &serde_json::Value) -> Option<Event> {
+    use rustnative_core::{
+        CalendarDate, ClipboardAction, Composition, KeyCode, KeyModifiers, Lifecycle, NodeId,
+        WheelDelta,
+    };
+    use serde_json::Value;
+    let text = |field: &str| json.get(field).and_then(Value::as_str).map(str::to_owned);
+    let node = |value: Option<&Value>| value.and_then(Value::as_str).map(NodeId::from_key);
+    let target = || node(json.get("target"));
+    let key_code = |value: &Value| -> KeyCode {
+        match value {
+            Value::String(name) => match name.as_str() {
+                "Enter" => KeyCode::Enter,
+                "Space" => KeyCode::Space,
+                "Tab" => KeyCode::Tab,
+                "Escape" => KeyCode::Escape,
+                "Backspace" => KeyCode::Backspace,
+                "ArrowLeft" => KeyCode::ArrowLeft,
+                "ArrowRight" => KeyCode::ArrowRight,
+                "ArrowUp" => KeyCode::ArrowUp,
+                "ArrowDown" => KeyCode::ArrowDown,
+                "Delete" => KeyCode::Delete,
+                "Insert" => KeyCode::Insert,
+                "Home" => KeyCode::Home,
+                "End" => KeyCode::End,
+                "PageUp" => KeyCode::PageUp,
+                "PageDown" => KeyCode::PageDown,
+                _ => KeyCode::Unknown(0),
+            },
+            other => {
+                if let Some(character) = other
+                    .get("Character")
+                    .and_then(Value::as_str)
+                    .and_then(|text| text.chars().next())
+                {
+                    KeyCode::Character(character)
+                } else if let Some(number) = other.get("Function").and_then(Value::as_u64) {
+                    KeyCode::Function(u8::try_from(number).unwrap_or(0))
+                } else {
+                    KeyCode::Unknown(
+                        other
+                            .get("Unknown")
+                            .and_then(Value::as_u64)
+                            .and_then(|code| u32::try_from(code).ok())
+                            .unwrap_or(0),
+                    )
+                }
+            }
+        }
+    };
+    let modifiers = |value: Option<&Value>| {
+        let flag = |name: &str| {
+            value
+                .and_then(|modifiers| modifiers.get(name))
+                .and_then(Value::as_bool)
+                .unwrap_or(false)
+        };
+        KeyModifiers {
+            shift: flag("shift"),
+            ctrl: flag("ctrl"),
+            alt: flag("alt"),
+            meta: flag("meta"),
+        }
+    };
+    let kind = json.get("type").and_then(Value::as_str)?;
+    Some(match kind {
+        "Click" => Event::Click { target: target()? },
+        "FocusGained" => Event::FocusGained { target: target()? },
+        "FocusLost" => Event::FocusLost { target: target()? },
+        "PointerEnter" => Event::PointerEnter { target: target()? },
+        "PointerLeave" => Event::PointerLeave { target: target()? },
+        "TextChanged" => Event::TextChanged { target: target()?, value: text("value")? },
+        "TextInput" => Event::TextInput { target: target(), text: text("text")? },
+        "Toggled" => Event::Toggled { target: target()?, on: json.get("on")?.as_bool()? },
+        "ValueChanged" => {
+            Event::ValueChanged { target: target()?, value: json.get("value")?.as_i64()? }
+        }
+        "SelectionChanged" => Event::SelectionChanged {
+            target: target()?,
+            index: json
+                .get("index")
+                .and_then(Value::as_u64)
+                .and_then(|index| usize::try_from(index).ok()),
+        },
+        "TabSelected" => Event::TabSelected {
+            target: target()?,
+            index: usize::try_from(json.get("index")?.as_u64()?).ok()?,
+        },
+        "DateChanged" => {
+            let date = json.get("date")?;
+            let part = |name: &str| date.get(name).and_then(Value::as_i64);
+            Event::DateChanged {
+                target: target()?,
+                date: CalendarDate::new(
+                    i32::try_from(part("year")?).ok()?,
+                    u8::try_from(part("month")?).ok()?,
+                    u8::try_from(part("day")?).ok()?,
+                )?,
+            }
+        }
+        "KeyDown" | "KeyUp" => {
+            let (key, modifiers) = (key_code(json.get("key")?), modifiers(json.get("modifiers")));
+            if kind == "KeyDown" {
+                Event::KeyDown { target: target(), key, modifiers }
+            } else {
+                Event::KeyUp { target: target(), key, modifiers }
+            }
+        }
+        "PointerDown" | "PointerMove" | "PointerUp" | "PointerCancel" => {
+            let pointer = pointer_from_json(
+                json.get("pointer")?,
+                modifiers(json.pointer("/pointer/modifiers")),
+            )?;
+            let target = target()?;
+            match kind {
+                "PointerDown" => Event::PointerDown { target, pointer },
+                "PointerMove" => Event::PointerMove { target, pointer },
+                "PointerUp" => Event::PointerUp { target, pointer },
+                _ => Event::PointerCancel { target, pointer },
+            }
+        }
+        "Wheel" => {
+            let delta = json.get("delta")?;
+            let amount = |variant: &Value| -> Option<(i32, i32)> {
+                Some((
+                    i32::try_from(variant.get("x")?.as_i64()?).ok()?,
+                    i32::try_from(variant.get("y")?.as_i64()?).ok()?,
+                ))
+            };
+            let delta = if let Some((x, y)) = delta.get("Lines").and_then(amount) {
+                WheelDelta::Lines { x, y }
+            } else {
+                let (x, y) = delta.get("Pixels").and_then(amount)?;
+                WheelDelta::Pixels { x, y }
+            };
+            Event::Wheel { target: target()?, delta }
+        }
+        "Composition" => {
+            let value = json.get("composition")?;
+            let composition = match value.as_str() {
+                Some("Started") => Composition::Started,
+                Some("Cancelled") => Composition::Cancelled,
+                _ => {
+                    if let Some(updated) = value.get("Updated") {
+                        Composition::Updated {
+                            text: updated.get("text")?.as_str()?.to_owned(),
+                            cursor: usize::try_from(updated.get("cursor")?.as_u64()?).ok()?,
+                        }
+                    } else {
+                        Composition::Committed {
+                            text: value.get("Committed")?.get("text")?.as_str()?.to_owned(),
+                        }
+                    }
+                }
+            };
+            Event::Composition { target: target(), composition }
+        }
+        "Clipboard" => {
+            let value = json.get("action")?;
+            let action = match value.as_str() {
+                Some("Copy") => ClipboardAction::Copy,
+                Some("Cut") => ClipboardAction::Cut,
+                _ => ClipboardAction::Paste {
+                    text: value
+                        .get("Paste")?
+                        .get("text")
+                        .and_then(Value::as_str)
+                        .map(str::to_owned),
+                },
+            };
+            Event::Clipboard { target: target(), action }
+        }
+        "Lifecycle" => Event::Lifecycle(match json.get("value")?.as_str()? {
+            "Suspending" => Lifecycle::Suspending,
+            "Resuming" => Lifecycle::Resuming,
+            "Terminating" => Lifecycle::Terminating,
+            _ => Lifecycle::LowMemory,
+        }),
+        "DeepLink" => Event::DeepLink { url: text("url")? },
+        _ => return None,
+    })
+}
+
+fn pointer_from_json(
+    json: &serde_json::Value,
+    modifiers: rustnative_core::KeyModifiers,
+) -> Option<rustnative_core::PointerEvent> {
+    use rustnative_core::{Point, PointerButton, PointerButtons, PointerEvent, PointerKind};
+    use serde_json::Value;
+    let button = |name: &str| match name {
+        "Primary" => Some(PointerButton::Primary),
+        "Secondary" => Some(PointerButton::Secondary),
+        "Middle" => Some(PointerButton::Middle),
+        "Back" => Some(PointerButton::Back),
+        "Forward" => Some(PointerButton::Forward),
+        _ => None,
+    };
+    let kind = match json.get("kind").and_then(Value::as_str) {
+        Some("Touch") => PointerKind::Touch,
+        Some("Pen") => PointerKind::Pen,
+        _ => PointerKind::Mouse,
+    };
+    let coordinate = |name: &str| {
+        json.pointer(&format!("/position/{name}"))
+            .and_then(Value::as_i64)
+            .and_then(|value| i32::try_from(value).ok())
+    };
+    let bits = json.get("buttons").and_then(Value::as_u64).unwrap_or(0);
+    let all = [
+        PointerButton::Primary,
+        PointerButton::Secondary,
+        PointerButton::Middle,
+        PointerButton::Back,
+        PointerButton::Forward,
+    ];
+    let buttons = all
+        .into_iter()
+        .enumerate()
+        .filter(|(index, _)| bits & (1 << index) != 0)
+        .fold(PointerButtons::none(), |buttons, (_, button)| buttons.with(button));
+    let id = u32::try_from(json.get("pointer_id")?.as_u64()?).ok()?;
+    let mut pointer = PointerEvent::new(
+        id,
+        kind,
+        Point::new(coordinate("x")?, coordinate("y")?),
+        std::time::Duration::ZERO,
+    )
+    .with_buttons(buttons)
+    .with_modifiers(modifiers)
+    .with_region(
+        json.get("region").and_then(Value::as_u64).and_then(|region| u32::try_from(region).ok()),
+    );
+    if let Some(pressed) = json.get("button").and_then(Value::as_str).and_then(button) {
+        pointer = pointer.with_button(pressed);
+    }
+    if let Some(pressure) = json.get("pressure").and_then(Value::as_f64) {
+        #[allow(
+            clippy::cast_possible_truncation,
+            reason = "a pressure in [0, 1], which an f32 holds"
+        )]
+        let pressure = pressure as f32;
+        pointer = pointer.with_pressure(pressure);
+    }
+    Some(pointer)
+}
 /// A pointer sample as the runtime delivers it (`rn.pointerOf`).
 fn pointer_json(pointer: &rustnative_core::PointerEvent) -> serde_json::Value {
     use rustnative_core::{PointerButton, PointerKind};
@@ -1407,5 +1658,66 @@ mod tests {
             state_json(&State { id: MAX_SAFE_INTEGER + 1 }),
             Err(StateError::Unsafe(_))
         ));
+    }
+}
+
+#[cfg(test)]
+mod event_tests {
+    use rustnative_core::{
+        CalendarDate, ClipboardAction, Composition, Event, KeyCode, KeyModifiers, Lifecycle,
+        NodeId, Point, PointerButton, PointerButtons, PointerEvent, PointerKind, WheelDelta,
+    };
+
+    #[test]
+    fn every_browser_event_reads_back_as_itself() {
+        let id = || NodeId::from_key("k");
+        let pointer =
+            PointerEvent::new(3, PointerKind::Pen, Point::new(4, -5), std::time::Duration::ZERO)
+                .with_buttons(
+                    PointerButtons::none().with(PointerButton::Primary).with(PointerButton::Back),
+                )
+                .with_button(PointerButton::Primary)
+                .with_modifiers(KeyModifiers { shift: true, ..KeyModifiers::default() })
+                .with_pressure(0.25);
+        let events = [
+            Event::Click { target: id() },
+            Event::TextChanged { target: id(), value: "héllo".into() },
+            Event::Toggled { target: id(), on: true },
+            Event::ValueChanged { target: id(), value: -7 },
+            Event::SelectionChanged { target: id(), index: Some(2) },
+            Event::TabSelected { target: id(), index: 1 },
+            Event::DateChanged { target: id(), date: CalendarDate::new(2026, 9, 27).unwrap() },
+            Event::KeyDown {
+                target: Some(id()),
+                key: KeyCode::Character('é'),
+                modifiers: KeyModifiers { ctrl: true, ..KeyModifiers::default() },
+            },
+            Event::KeyUp {
+                target: None,
+                key: KeyCode::Function(5),
+                modifiers: KeyModifiers::default(),
+            },
+            Event::KeyDown {
+                target: None,
+                key: KeyCode::ArrowLeft,
+                modifiers: KeyModifiers::default(),
+            },
+            Event::FocusGained { target: id() },
+            Event::PointerDown { target: id(), pointer: pointer.clone() },
+            Event::PointerMove { target: id(), pointer },
+            Event::PointerEnter { target: id() },
+            Event::Wheel { target: id(), delta: WheelDelta::Lines { x: 0, y: -120 } },
+            Event::Composition {
+                target: None,
+                composition: Composition::Updated { text: "にほ".into(), cursor: 2 },
+            },
+            Event::Composition { target: Some(id()), composition: Composition::Cancelled },
+            Event::Clipboard { target: None, action: ClipboardAction::Paste { text: None } },
+            Event::Lifecycle(Lifecycle::Resuming),
+        ];
+        for event in events {
+            let json = super::event_json(&event).expect("a browser event");
+            assert_eq!(super::event_from_json(&json), Some(event), "{json}");
+        }
     }
 }

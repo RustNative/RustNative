@@ -15,19 +15,28 @@
 //! - [`device`]: device desired and reported state, and messaging with
 //!   stated delivery guarantees (an in-process broker and MQTT 3.1.1).
 
+#[cfg(feature = "net")]
 pub mod bus;
+#[cfg(feature = "net")]
 pub mod channel;
 pub mod clock;
 pub mod crdt;
+#[cfg(feature = "net")]
 pub mod device;
+#[cfg(feature = "net")]
 pub mod http;
+#[cfg(feature = "net")]
 pub mod live;
+#[cfg(feature = "net")]
 pub mod mqtt;
+#[cfg(feature = "net")]
 pub mod replica;
 
+#[cfg(feature = "net")]
 pub use channel::{Channel, LocalHub, Presence};
 pub use clock::{Clock, Hlc, ReplicaId};
 pub use crdt::{Crdt, GCounter, LwwMap, LwwRegister, OrSet, PnCounter, Rga};
+#[cfg(feature = "net")]
 pub use replica::{
     Change, ConflictPolicy, Filter, InMemory, Pull, PullReply, Push, PushReply, Record, SyncError,
     SyncReport, SyncServer, SyncTransport, SyncedCollection,

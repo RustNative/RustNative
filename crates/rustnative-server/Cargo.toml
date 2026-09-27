@@ -49,6 +49,8 @@ hyper = { version = "1", features = ["client", "server", "http1"] }
 # Pages in a real browser, and live subtrees served on the application's port.
 rustnative-web-testing.workspace = true
 rustnative-sync = { workspace = true, features = ["server"] }
+# WebAssembly subtrees, built for the browser by the test.
+web-subtree = { path = "../../examples/web-subtree", version = "0.1.0" }
 aes-gcm = "0.10"
 hkdf = "0.12"
 

@@ -2198,6 +2198,184 @@ export class LiveIsland {
   }
 }
 
+// ------------------------------------------- WebAssembly subtrees (A, F) ----
+
+const utf8 = { encoder: new TextEncoder(), decoder: new TextDecoder() };
+
+/// Carries out a WebAssembly subtree's service request (its HTTP, storage,
+/// and clipboard services); the answer goes back as JSON.
+async function serviceRequest(request) {
+  const failed = (error) => ({ error: errorOf(error) });
+  try {
+    switch (request.kind) {
+      case "fetch": {
+        const target = new URL(request.url, typeof location !== "undefined" ? location.href : self.location.href);
+        const headers = Object.fromEntries(request.headers || []);
+        const origin = typeof location !== "undefined" ? location.origin : self.location.origin;
+        if (target.origin === origin && request.method !== "GET" && request.method !== "HEAD") {
+          const token = typeof document !== "undefined" ? csrfToken() : null;
+          if (token) headers["x-csrf-token"] = token;
+        }
+        const body = request.method === "GET" || request.method === "HEAD" ? undefined : request.body;
+        const response = await fetch(target, { method: request.method, headers, body, credentials: "same-origin" });
+        return { status: response.status, headers: [...response.headers], body: await response.text() };
+      }
+      case "storage_get": return { value: localStorage.getItem(`rn:w:${request.key}`) };
+      case "storage_set": localStorage.setItem(`rn:w:${request.key}`, request.value); return {};
+      case "storage_remove": localStorage.removeItem(`rn:w:${request.key}`); return {};
+      case "clipboard_read": return { text: await navigator.clipboard.readText() };
+      case "clipboard_write": await navigator.clipboard.writeText(request.text); return {};
+      default: return { error: `no such service: ${request.kind}` };
+    }
+  } catch (error) {
+    return failed(error);
+  }
+}
+
+/// Loads a subtree's module and wraps its exports; `wake(delay)` is called
+/// when the module asks to be pumped.
+export async function loadSubtree(url, wake) {
+  let exports = null;
+  const read = (pointer, length) => utf8.decoder.decode(new Uint8Array(exports.memory.buffer, pointer, length));
+  const write = (value) => {
+    const bytes = utf8.encoder.encode(JSON.stringify(value));
+    const pointer = exports.rn_alloc(bytes.length);
+    new Uint8Array(exports.memory.buffer, pointer, bytes.length).set(bytes);
+    return bytes.length;
+  };
+  const imports = {
+    rn: {
+      rn_now: () => performance.now(),
+      rn_wake: (delay) => wake(delay),
+      // Answered later, never from inside the call: the module is not
+      // re-entered while it waits.
+      rn_request: (id, pointer, length) => {
+        const request = JSON.parse(read(pointer, length));
+        serviceRequest(request).then((answer) => { exports.rn_complete(id, write(answer)); wake(0); });
+      },
+    },
+  };
+  const response = await fetch(url);
+  if (!response.ok) throw new Error(`the module ${url} did not load (${response.status})`);
+  const { instance } = WebAssembly.instantiateStreaming && (response.headers.get("content-type") || "").includes("application/wasm")
+    ? await WebAssembly.instantiateStreaming(response, imports)
+    : await WebAssembly.instantiate(await response.arrayBuffer(), imports);
+  exports = instance.exports;
+  return {
+    init: (component, props, scope, flow) => exports.rn_init(write({ component, props, scope, flow })) === 1,
+    dispatch: (event) => exports.rn_dispatch(write(event)),
+    pump: () => exports.rn_pump() === 1,
+    deadline: () => exports.rn_deadline(),
+    // The view is written first; only then is the buffer's address known.
+    view: () => { const length = exports.rn_view(); return JSON.parse(read(exports.rn_out(), length)); },
+  };
+}
+
+/// A WebAssembly subtree on the page's main thread. Its logic is the
+/// module's: events go in, and each render asks for its view.
+export class WasmIsland extends Island {
+  constructor(spec, root) {
+    super(spec.i, { name: spec.component }, spec.s, root, spec.flow ?? { t: "root" });
+    this.spec = spec;
+    this.subtree = null;
+    this.timer = null;
+    this.latest = null;
+  }
+
+  async load() {
+    this.subtree = await loadSubtree(this.spec.m, (delay) => this.wake(delay));
+    if (!this.subtree.init(this.spec.component, this.spec.s, this.scope, this.flow)) {
+      throw new Error(`the module has no component ${this.spec.component}`);
+    }
+    this.subtree.pump();
+    this.attach();
+  }
+
+  wake(delay) {
+    if (delay > 0) setTimeout(() => this.schedule(), delay); else this.schedule();
+  }
+
+  realize() {
+    const { element, rules } = this.latest ?? this.subtree.view();
+    this.latest = null;
+    applySheet({ entries: () => rules || [] });
+    return element;
+  }
+
+  dispatch(event) {
+    if (this.failed) return;
+    try { this.subtree.dispatch(event); } catch (error) { this.failed = error; console.error("rn: WebAssembly subtree failed", error); return; }
+    this.schedule();
+  }
+
+  render() {
+    this.subtree.pump();
+    super.render();
+    const delay = this.subtree.deadline();
+    clearTimeout(this.timer);
+    if (delay >= 0) this.timer = setTimeout(() => this.schedule(), Math.max(0, delay));
+  }
+}
+
+/// A WebAssembly subtree in a Web Worker: the page keeps its DOM and
+/// events, the worker its logic.
+export class WorkerIsland extends WasmIsland {
+  load() {
+    return new Promise((resolve, reject) => {
+      this.worker = new Worker(this.spec.worker, { type: "module" });
+      this.worker.onerror = (error) => reject(error);
+      this.sent = 0;
+      this.worker.onmessage = (message) => {
+        const data = message.data;
+        if (data.type === "error") { reject(new Error(data.message)); return; }
+        // A view from before the latest event would undo what the person
+        // just did (a character typed): only the answer to the latest
+        // counts.
+        if (data.seen < this.sent) return;
+        this.latest = data.view;
+        if (!this.tree) { this.attach(); resolve(); } else this.schedule();
+      };
+      this.worker.postMessage({ type: "init", url: new URL(this.spec.m, location.href).href, component: this.spec.component, props: this.spec.s, scope: this.scope, flow: this.flow });
+    });
+  }
+
+  dispatch(event) { this.worker.postMessage({ type: "event", event, sequence: ++this.sent }); }
+
+  render() {
+    if (!this.latest) return;
+    Island.prototype.render.call(this);
+  }
+}
+
+/// A Web Worker's side of a `WorkerIsland` (the worker script calls it).
+export function wasmWorker() {
+  let subtree = null;
+  let timer = null;
+  let seen = 0;
+  const tick = () => {
+    subtree.pump();
+    self.postMessage({ type: "view", view: subtree.view(), seen });
+    const delay = subtree.deadline();
+    clearTimeout(timer);
+    if (delay >= 0) timer = setTimeout(tick, Math.max(0, delay));
+  };
+  self.onmessage = async (message) => {
+    const data = message.data;
+    try {
+      if (data.type === "init") {
+        subtree = await loadSubtree(data.url, (delay) => setTimeout(tick, Math.max(0, delay)));
+        if (!subtree.init(data.component, data.props, data.scope, data.flow)) throw new Error(`the module has no component ${data.component}`);
+        tick();
+      } else if (data.type === "event" && subtree) {
+        seen = data.sequence;
+        subtree.dispatch(data.event);
+        tick();
+      }
+    } catch (error) {
+      self.postMessage({ type: "error", message: errorOf(error) });
+    }
+  };
+}
 /// Attaches every island the page declares; `restored` holds island states
 /// to start from instead of the page's (a page returned to).
 export async function start(restored = null) {
@@ -2239,6 +2417,12 @@ export async function start(restored = null) {
         });
         handoff(2000);
       }
+    } else if (spec.kind === "wasm") {
+      // Loaded only here: a page with no WebAssembly subtree never fetches
+      // a module.
+      const island = spec.worker ? new WorkerIsland(spec, root) : new WasmIsland(spec, root);
+      islands[spec.i] = island;
+      await island.load().catch((error) => console.error("rn: the WebAssembly subtree did not start", error));
     } else if (extraIslands[spec.kind]) {
       islands[spec.i] = await extraIslands[spec.kind](spec, root, runtime);
     }
@@ -2276,7 +2460,8 @@ function saveEntry() {
   const id = current;
   if (!id) return;
   const states = {};
-  islands.forEach((island, index) => { if (island instanceof Island) states[index] = island.state; });
+  // A WebAssembly subtree's state is the module's own; it starts again.
+  islands.forEach((island, index) => { if (island instanceof Island && !(island instanceof WasmIsland)) states[index] = island.state; });
   try { sessionStorage.setItem(`rn:entry:${id}`, JSON.stringify({ states, scroll: [scrollX, scrollY] })); } catch (_) { /* storage refused */ }
 }
 

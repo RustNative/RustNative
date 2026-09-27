@@ -1,0 +1,30 @@
+[package]
+name = "web-subtree"
+version = "0.1.0"
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+description.workspace = true
+repository.workspace = true
+homepage.workspace = true
+readme.workspace = true
+keywords.workspace = true
+categories.workspace = true
+publish = false
+
+[lints]
+workspace = true
+
+# Web milestone A's WebAssembly subtrees: components built for
+# `wasm32-unknown-unknown` and run in the browser, and the same client
+# component as generated JavaScript, for the equivalence test.
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+rustnative-core = { path = "../../crates/rustnative-core", version = "0.1.0", default-features = false, features = ["markup"] }
+rustnative-web.workspace = true
+# The replicated types only (no networking): they build for the browser.
+rustnative-sync = { path = "../../crates/rustnative-sync", version = "0.1.0", default-features = false }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"

@@ -16,13 +16,15 @@ workspace = true
 
 # Milestone 55: sync, server-interactive mode, and device desired state.
 [dependencies]
-rustnative-core.workspace = true
-async-trait.workspace = true
+# Without `net`, only the replicated types and clocks: what a browser
+# subtree (`wasm32-unknown-unknown`) can use.
+rustnative-core = { path = "../rustnative-core", version = "0.1.0", default-features = false, features = ["markup"] }
+async-trait = { workspace = true, optional = true }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
-tokio = { workspace = true, features = ["sync", "rt", "time", "net", "io-util", "macros"] }
-tokio-tungstenite = "0.24"
-futures-util = { version = "0.3", default-features = false, features = ["sink", "std"] }
+tokio = { workspace = true, optional = true, features = ["sync", "rt", "time", "net", "io-util", "macros"] }
+tokio-tungstenite = { version = "0.24", optional = true }
+futures-util = { version = "0.3", default-features = false, features = ["sink", "std"], optional = true }
 rustnative-server = { workspace = true, optional = true }
 # Mounting live sessions on a server application's own listener.
 hyper = { version = "1", features = ["server", "http1"], optional = true }
@@ -31,8 +33,12 @@ http = { version = "1", optional = true }
 bytes = { version = "1", optional = true }
 
 [features]
+default = ["net"]
+# Replication, channels, live sessions, and device messaging: everything
+# that talks over a network.
+net = ["rustnative-core/default", "dep:async-trait", "dep:tokio", "dep:tokio-tungstenite", "dep:futures-util"]
 # The sync endpoints on a `rustnative-server` application.
-server = ["dep:rustnative-server", "dep:hyper", "dep:hyper-util", "dep:http", "dep:bytes"]
+server = ["net", "dep:rustnative-server", "dep:hyper", "dep:hyper-util", "dep:http", "dep:bytes"]
 
 [dev-dependencies]
 serde_json = "1"

@@ -74,6 +74,7 @@ pub mod png;
 pub mod request;
 pub mod runtime;
 pub mod svg;
+pub mod wasm;
 
 pub use client::{Client, ClientLogic, ClientModule, Effects};
 pub use head::Head;

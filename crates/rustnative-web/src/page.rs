@@ -417,11 +417,14 @@ impl Session {
                         modules.push(module);
                     }
                 }
-                IslandKind::Wasm { name, worker } => {
+                IslandKind::Wasm { module, component, worker } => {
                     wasm = true;
                     spec.insert("kind".into(), json!("wasm"));
-                    spec.insert("m".into(), json!(format!("{}w/{name}.wasm", cx.assets)));
-                    spec.insert("worker".into(), json!(worker));
+                    spec.insert("m".into(), json!(format!("{}w/{module}.wasm", cx.assets)));
+                    spec.insert("component".into(), json!(component));
+                    if *worker {
+                        spec.insert("worker".into(), json!(crate::runtime::worker_url(&cx.assets)));
+                    }
                 }
                 IslandKind::Live { url, then } => {
                     spec.insert("kind".into(), json!("live"));

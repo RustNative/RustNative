@@ -64,6 +64,7 @@ impl IntoResponse for Page {
 #[derive(Default)]
 pub(crate) struct WebAssets {
     modules: Mutex<HashMap<String, &'static ClientModule>>,
+    wasm: Mutex<HashMap<String, Bytes>>,
     shells: Mutex<HashMap<String, Arc<Shell>>>,
     pub(crate) services: Mutex<Services>,
     pub(crate) version: Mutex<Option<String>>,
@@ -81,13 +82,32 @@ impl WebAssets {
     /// A framework asset at `path` (below `/_rn/`), if there is one.
     pub(crate) fn asset(&self, path: &str) -> Option<Response> {
         let rest = path.strip_prefix("/_rn/")?;
+        if let Some(name) = rest.strip_prefix("w/").and_then(|name| name.strip_suffix(".wasm")) {
+            let bytes = self.wasm.lock().unwrap_or_else(PoisonError::into_inner).get(name)?.clone();
+            let mut response = Response::new(bytes);
+            let headers = response.headers_mut();
+            headers.insert(header::CONTENT_TYPE, HeaderValue::from_static("application/wasm"));
+            // The module's address does not change with its contents:
+            // revalidate it.
+            headers.insert(header::CACHE_CONTROL, HeaderValue::from_static("no-cache"));
+            return Some(response);
+        }
         let body = if rest == rustnative_web::runtime::runtime_url("").as_str() {
-            rustnative_web::runtime::RUNTIME_JS
+            Bytes::from_static(rustnative_web::runtime::RUNTIME_JS.as_bytes())
+        } else if rest == rustnative_web::runtime::worker_url("").as_str() {
+            Bytes::from(rustnative_web::runtime::worker_js())
         } else {
             let name = rest.strip_prefix("m/")?;
-            self.modules.lock().unwrap_or_else(PoisonError::into_inner).get(name)?.js
+            Bytes::from_static(
+                self.modules
+                    .lock()
+                    .unwrap_or_else(PoisonError::into_inner)
+                    .get(name)?
+                    .js
+                    .as_bytes(),
+            )
         };
-        let mut response = Response::new(Bytes::from_static(body.as_bytes()));
+        let mut response = Response::new(body);
         let headers = response.headers_mut();
         headers.insert(
             header::CONTENT_TYPE,
@@ -107,6 +127,19 @@ impl crate::ServerApp {
     #[must_use]
     pub fn page_services(self, services: Services) -> Self {
         *self.web.services.lock().unwrap_or_else(PoisonError::into_inner) = services;
+        self
+    }
+
+    /// Serves the WebAssembly module `name` (built for
+    /// `wasm32-unknown-unknown` with `rustnative_web::wasm_subtree!`) at
+    /// `/_rn/w/{name}.wasm`, for the pages whose subtrees run it.
+    #[must_use]
+    pub fn wasm_module(self, name: &str, bytes: impl Into<Bytes>) -> Self {
+        self.web
+            .wasm
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner)
+            .insert(name.to_owned(), bytes.into());
         self
     }
 

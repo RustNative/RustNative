@@ -16,3 +16,19 @@ pub const RUNTIME_JS: &str = include_str!("runtime/rn.js");
 pub fn runtime_url(base: &str) -> String {
     format!("{base}rn.{}.js", crate::hash::class_name("", RUNTIME_JS))
 }
+
+/// The Web Worker script a worker-run WebAssembly subtree starts: it imports
+/// the runtime, beside it, and hands itself over.
+#[must_use]
+pub fn worker_js() -> String {
+    format!(
+        "import {{ wasmWorker }} from \"./rn.{}.js\";\nwasmWorker();\n",
+        crate::hash::class_name("", RUNTIME_JS)
+    )
+}
+
+/// The worker script's URL below `base`.
+#[must_use]
+pub fn worker_url(base: &str) -> String {
+    format!("{base}worker.{}.js", crate::hash::class_name("", &worker_js()))
+}
