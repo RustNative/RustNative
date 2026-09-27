@@ -875,13 +875,13 @@ impl Cx<'_> {
                 // Any other source (`bool`, `char`) stays an `as` cast.
                 match from {
                     Ty::Int(_) => {
-                        *expr = syn::parse_quote_spanned!(span=> #path::<_, #ty>(#operand))
+                        *expr = syn::parse_quote_spanned!(span=> #path::<_, #ty>(#operand));
                     }
                     Ty::Float(true) => {
-                        *expr = syn::parse_quote_spanned!(span=> #path_float::<#ty>(f64::from(#operand)))
+                        *expr = syn::parse_quote_spanned!(span=> #path_float::<#ty>(f64::from(#operand)));
                     }
                     Ty::Float(false) => {
-                        *expr = syn::parse_quote_spanned!(span=> #path_float::<#ty>(#operand))
+                        *expr = syn::parse_quote_spanned!(span=> #path_float::<#ty>(#operand));
                     }
                     _ => {}
                 }

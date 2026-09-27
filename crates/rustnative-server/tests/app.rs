@@ -287,7 +287,7 @@ async fn it_mounts_inside_an_existing_service() {
                             if request.uri().path().starts_with("/app/") {
                                 mounted.call(request).await
                             } else {
-                                Ok(http::Response::new(Full::new(Bytes::from("host"))))
+                                Ok(http::Response::new(rustnative_server::Body::from("host")))
                             }
                         }
                     });

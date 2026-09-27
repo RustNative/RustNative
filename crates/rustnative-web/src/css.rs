@@ -62,6 +62,36 @@ pub enum Flow {
     Root,
 }
 
+impl Flow {
+    /// The runtime's form (`{t: "column", a}`, `{t: "grid"}`, …), which an
+    /// island's page data carries so the browser lays its root out the same
+    /// way.
+    #[must_use]
+    pub fn to_json(self) -> serde_json::Value {
+        let align = |a: Alignment| serde_json::to_value(a).unwrap_or_default();
+        match self {
+            Self::Column(a) => serde_json::json!({ "t": "column", "a": align(a) }),
+            Self::Row(a) => serde_json::json!({ "t": "row", "a": align(a) }),
+            Self::Grid => serde_json::json!({ "t": "grid" }),
+            Self::Root => serde_json::json!({ "t": "root" }),
+        }
+    }
+
+    /// [`Self::to_json`]'s inverse; anything else is the root.
+    #[must_use]
+    pub fn from_json(value: &serde_json::Value) -> Self {
+        let align = || {
+            value.get("a").and_then(|a| serde_json::from_value(a.clone()).ok()).unwrap_or_default()
+        };
+        match value.get("t").and_then(serde_json::Value::as_str) {
+            Some("column") => Self::Column(align()),
+            Some("row") => Self::Row(align()),
+            Some("grid") => Self::Grid,
+            _ => Self::Root,
+        }
+    }
+}
+
 /// A container's own layout.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Container<'a> {

@@ -86,3 +86,22 @@ browser's accessibility tree: heading level, button, named text box, checked
 check box, switch, radio, slider, spinner, progress bar, combo box, link,
 separator, and a list with its items; and no content-security-policy
 violation.
+
+## Islands, boundaries, and forms in a page
+
+A page render (`rustnative_web::page`) marks three things the mapping
+alone does not know:
+
+- **An island** (a client component, a live subtree): its root element has
+  `data-rn-i="{index}"`, and every element its component owns has the id
+  `i{index}-{key}` — its key within the component, exactly as the browser's
+  realizer names it, so the runtime attaches to the server's markup without
+  a difference. A radio group inside an island is named by the island's
+  scope, as in the browser.
+- **A streamed boundary** (`pending`): a column keyed by the boundary,
+  `aria-busy="true"` while it shows its fallback.
+- **A form** (`form`): a `<form method="post" action>` in place of the
+  column, with a hidden `_csrf` input first. Inside it a button is
+  `<button type="submit" name="{key}" value="{key}">`, and a check box's
+  input is named by its key, so the browser submits them without
+  JavaScript.

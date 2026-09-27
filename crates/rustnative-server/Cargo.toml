@@ -46,6 +46,9 @@ sha2 = "0.10"
 
 [dev-dependencies]
 hyper = { version = "1", features = ["client", "server", "http1"] }
+# Pages in a real browser, and live subtrees served on the application's port.
+rustnative-web-testing.workspace = true
+rustnative-sync = { workspace = true, features = ["server"] }
 aes-gcm = "0.10"
 hkdf = "0.12"
 

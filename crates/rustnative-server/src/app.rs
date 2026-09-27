@@ -13,9 +13,10 @@ use std::time::Instant;
 
 use bytes::Bytes;
 use http::{HeaderValue, Method, StatusCode, header};
-use http_body_util::{BodyExt, Full, Limited};
+use http_body_util::{BodyExt, Limited};
 use rustnative_core::Route;
 
+use crate::body::{Body, into_body};
 use crate::handler::{Guarded, MethodRouter};
 use crate::request::{RequestContext, TypeMap};
 use crate::response::{IntoResponse, Response, ServerError};
@@ -31,6 +32,16 @@ pub type Before = Arc<dyn Fn(&mut RequestContext) -> Result<(), ServerError> + S
 
 /// Runs after the handler: may change the response (set a cookie).
 pub type After = Arc<dyn Fn(&RequestContext, &mut Response) + Send + Sync>;
+
+/// Answers a request that asks to switch protocols (a WebSocket): the
+/// request as the connection received it, and the peer's address. The
+/// handler returns the `101` response and takes the upgraded connection
+/// with `hyper::upgrade::on`.
+pub type Upgrade = Arc<
+    dyn Fn(http::Request<hyper::body::Incoming>, Option<SocketAddr>) -> http::Response<Body>
+        + Send
+        + Sync,
+>;
 
 /// A route as the application lists it.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -57,6 +68,8 @@ pub struct ServerApp {
     openapi: Option<(String, String)>,
     extra: Vec<(String, Arc<dyn Fn() -> Response + Send + Sync>)>,
     cache: crate::cache::ResponseCache,
+    upgrades: Vec<(String, Upgrade)>,
+    pub(crate) web: Arc<crate::web::WebAssets>,
 }
 
 impl Default for ServerApp {
@@ -82,7 +95,19 @@ impl ServerApp {
             openapi: None,
             extra: Vec::new(),
             cache: crate::cache::ResponseCache::new(),
+            upgrades: Vec::new(),
+            web: Arc::default(),
         }
+    }
+
+    /// Answers protocol upgrades (a WebSocket) at `path` with `handler`,
+    /// on the application's own listener. The handler must check what it
+    /// needs (the `Origin`, a session); the application's middleware does
+    /// not run for an upgrade.
+    #[must_use]
+    pub fn upgrade(mut self, path: &str, handler: Upgrade) -> Self {
+        self.upgrades.push((format!("{}{path}", self.prefix), handler));
+        self
     }
 
     /// The response cache (to invalidate tags when data changes).
@@ -337,6 +362,29 @@ impl AppService {
         if let Some(response) = self.operational(&path) {
             return response;
         }
+        if let Some(response) = app.web.asset(&path) {
+            return response;
+        }
+        // A server call from a page of another build: the page reloads
+        // rather than speak an old wire format.
+        if path.starts_with("/_fn/") {
+            let ours =
+                app.web.version.lock().unwrap_or_else(std::sync::PoisonError::into_inner).clone();
+            let theirs = parts.headers.get("x-rn-fn-version").and_then(|value| value.to_str().ok());
+            if let (Some(ours), Some(theirs)) = (ours, theirs) {
+                if ours != theirs {
+                    let mut response = (
+                        StatusCode::CONFLICT,
+                        crate::response::Json(
+                            serde_json::json!({ "error": "version", "version": ours }),
+                        ),
+                    )
+                        .into_response();
+                    secure_headers(response.headers_mut(), &app.security, "", false);
+                    return response;
+                }
+            }
+        }
 
         let Some((params, order, router)) = app.routes.iter().find_map(|(route, _, router)| {
             Some((
@@ -417,12 +465,22 @@ impl AppService {
         let guard = ScopeGuard(scope);
         let cached = cache_key.as_ref().and_then(|(key, _, _)| app.cache.get(key));
         let hit = cached.is_some();
-        let mut response = match cached {
-            Some(response) => response,
-            None => handler(context).await,
+        let request = crate::web::request_info(&after_context, &nonce, &csrf);
+        let explain = app.web.explain.load(Ordering::Relaxed)
+            && after_context.query.split('&').any(|pair| pair == "_rn_explain");
+        let mut response = if let Some(response) = cached {
+            response
+        } else {
+            let response = handler(context).await;
+            if explain {
+                crate::web::explain(&app.web, &app.prefix, response, request)
+            } else {
+                crate::web::render_pending(&app.web, &app.prefix, response, request).await
+            }
         };
         drop(guard);
-        if let Some((key, tags, ttl)) = cache_key {
+        let streaming = response.extensions().get::<crate::body::Streaming>().is_some();
+        if let Some((key, tags, ttl)) = cache_key.filter(|_| !streaming) {
             if !hit {
                 app.cache.put(key, &response, tags, ttl);
             }
@@ -437,7 +495,8 @@ impl AppService {
         for middleware in &app.after {
             middleware(&after_context, &mut response);
         }
-        secure_headers(response.headers_mut(), &app.security, &nonce);
+        let wasm = response.extensions().get::<crate::security::WasmPage>().is_some();
+        secure_headers(response.headers_mut(), &app.security, &nonce, wasm);
         if issued {
             let cookie = Cookie::new(CSRF_COOKIE, csrf).readable_by_script().strict();
             if let Ok(value) = HeaderValue::from_str(&cookie.to_string()) {
@@ -446,6 +505,7 @@ impl AppService {
         }
         if head {
             *response.body_mut() = Bytes::new();
+            response.extensions_mut().remove::<crate::body::Streaming>();
         }
         response
     }
@@ -525,14 +585,26 @@ impl AppService {
                     move |request: http::Request<hyper::body::Incoming>| {
                         let service = service.clone();
                         async move {
+                            let upgrade = service
+                                .0
+                                .app
+                                .upgrades
+                                .iter()
+                                .find(|(path, _)| request.uri().path() == path)
+                                .map(|(_, handler)| Arc::clone(handler));
+                            if let Some(handler) = upgrade {
+                                return Ok::<_, Infallible>(handler(request, Some(peer)));
+                            }
                             Ok::<_, Infallible>(
                                 service.collect_and_handle(request, Some(peer)).await,
                             )
                         }
                     },
                 );
-                let _ =
-                    hyper::server::conn::http1::Builder::new().serve_connection(io, answer).await;
+                let _ = hyper::server::conn::http1::Builder::new()
+                    .serve_connection(io, answer)
+                    .with_upgrades()
+                    .await;
             });
         }
     }
@@ -541,7 +613,7 @@ impl AppService {
         &self,
         request: http::Request<B>,
         client: Option<SocketAddr>,
-    ) -> http::Response<Full<Bytes>>
+    ) -> http::Response<Body>
     where
         B: http_body::Body + Send,
         B::Error: Into<Box<dyn std::error::Error + Send + Sync>>,
@@ -555,7 +627,7 @@ impl AppService {
             Err(_) => ServerError::new(StatusCode::PAYLOAD_TOO_LARGE, "The request is too large")
                 .render(false),
         };
-        response.map(Full::new)
+        into_body(response)
     }
 }
 
@@ -565,7 +637,7 @@ where
     B::Data: Send,
     B::Error: Into<Box<dyn std::error::Error + Send + Sync>>,
 {
-    type Response = http::Response<Full<Bytes>>;
+    type Response = http::Response<Body>;
     type Error = Infallible;
     type Future = Pin<Box<dyn Future<Output = Result<Self::Response, Infallible>> + Send>>;
 

@@ -202,12 +202,35 @@ fn is_focusable_tag(tag: &str) -> bool {
     matches!(tag, "button" | "input" | "select" | "textarea" | "a")
 }
 
+/// What a page render marks in the tree it realizes: which components are
+/// interactive islands (by their index in the page data), which nodes are
+/// forms that post without JavaScript, and the request-forgery token those
+/// forms carry.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct Marks {
+    /// Island owners, with each island's index.
+    pub islands: HashMap<ComponentId, usize>,
+    /// Form nodes, with the path each posts to.
+    pub forms: HashMap<NodeId, String>,
+    /// The request-forgery token.
+    pub csrf: String,
+    /// Islands are rendered by the browser (a client-only page): their
+    /// markup is left empty for it.
+    pub client_only: bool,
+}
+
 /// Converts core nodes to [`Element`]s, collecting the stylesheet rules
 /// they need.
 pub struct Realizer<'a> {
     sheet: &'a mut StyleSheet,
     scope: String,
     keys: HashMap<(Option<ComponentId>, String), String>,
+    marks: Marks,
+    /// The island being realized: its owner's nodes go by their local keys
+    /// under the island's scope, exactly as the browser realizes them.
+    island: Option<ComponentId>,
+    flows: Vec<(usize, Flow)>,
+    forms: usize,
 }
 
 impl std::fmt::Debug for Realizer<'_> {
@@ -222,20 +245,54 @@ impl<'a> Realizer<'a> {
     /// tree `root`.
     #[must_use]
     pub fn new(sheet: &'a mut StyleSheet, scope: &str, root: &Node) -> Self {
+        Self::with_marks(sheet, scope, root, &Marks::default())
+    }
+
+    /// A realizer for a page render's tree, with its [`Marks`].
+    #[must_use]
+    pub fn with_marks(sheet: &'a mut StyleSheet, scope: &str, root: &Node, marks: &Marks) -> Self {
         let mut keys = HashMap::new();
         root.visit(&mut |node, _, _| {
             let id = node.id();
             if let Some(local) = id.local_key() {
-                keys.entry((id.owner(), local)).or_insert_with(|| format!("{scope}{}", key_of(id)));
+                let island = id.owner().and_then(|owner| marks.islands.get(&owner));
+                keys.entry((id.owner(), local.clone())).or_insert_with(|| match island {
+                    Some(index) => format!("i{index}-{local}"),
+                    None => format!("{scope}{}", key_of(id)),
+                });
             }
         });
-        Self { sheet, scope: scope.to_owned(), keys }
+        Self {
+            sheet,
+            scope: scope.to_owned(),
+            keys,
+            marks: marks.clone(),
+            island: None,
+            flows: Vec::new(),
+            forms: 0,
+        }
+    }
+
+    /// Each island realized, with how its parent lays it out (what the
+    /// browser needs to realize it the same way), as JSON.
+    #[must_use]
+    pub fn island_flows(&self) -> Vec<(usize, serde_json::Value)> {
+        self.flows.iter().map(|(index, flow)| (*index, flow.to_json())).collect()
+    }
+
+    /// `id`'s key in the element tree: inside an island, its owner's
+    /// nodes go by their local keys, as the browser has them.
+    fn wire(&self, id: NodeId) -> String {
+        match (self.island, id.owner(), id.local_key()) {
+            (Some(island), Some(owner), Some(local)) if island == owner => local,
+            _ => key_of(id),
+        }
     }
 
     /// The element id of `id`.
     #[must_use]
     pub fn element_id(&self, id: NodeId) -> String {
-        format!("{}{}", self.scope, key_of(id))
+        format!("{}{}", self.scope, self.wire(id))
     }
 
     /// The element id a relationship names: the node with that local key
@@ -258,8 +315,50 @@ impl<'a> Realizer<'a> {
 
     /// The element for `node`, laid out in `flow`.
     #[must_use]
-    #[allow(clippy::too_many_lines, reason = "one arm per node kind, the mapping table itself")]
     pub fn element(&mut self, node: &Node, flow: Flow) -> Element {
+        let island = node
+            .id()
+            .owner()
+            .filter(|_| self.island.is_none())
+            .and_then(|owner| self.marks.islands.get(&owner).map(|index| (owner, *index)));
+        if let Some((owner, index)) = island {
+            let scope = std::mem::replace(&mut self.scope, format!("i{index}-"));
+            self.island = Some(owner);
+            let mut element = self.kind(node, flow);
+            self.island = None;
+            self.scope = scope;
+            element.set("data-rn-i", index.to_string());
+            if self.marks.client_only {
+                // The browser renders it; the element holds its place.
+                element.children.clear();
+                element.set("data-rn-fresh", "");
+            }
+            self.flows.push((index, flow));
+            return element;
+        }
+        let form = self.marks.forms.get(&node.id()).cloned();
+        if form.is_some() {
+            self.forms += 1;
+        }
+        let mut element = self.kind(node, flow);
+        if let Some(action) = form {
+            self.forms -= 1;
+            // A form that posts without JavaScript: the request-forgery
+            // token rides along as a field.
+            element.tag = "form".into();
+            element.set("method", "post");
+            element.set("action", action);
+            let token = Element::new("input")
+                .attr("type", "hidden")
+                .attr("name", "_csrf")
+                .attr("value", self.marks.csrf.clone());
+            element.children.insert(0, Child::Element(token));
+        }
+        element
+    }
+
+    #[allow(clippy::too_many_lines, reason = "one arm per node kind, the mapping table itself")]
+    fn kind(&mut self, node: &Node, flow: Flow) -> Element {
         let text = |value: &str| value.to_owned();
         match node {
             Node::Label(label) => {
@@ -281,8 +380,17 @@ impl<'a> Realizer<'a> {
                 )
             }
             Node::Button(button) => {
-                let element =
-                    Element::new("button").attr("type", "button").text(text(button.text()));
+                let element = if self.forms > 0 {
+                    // Inside a form, a button submits it, naming itself.
+                    let name = self.wire(node.id());
+                    Element::new("button")
+                        .attr("type", "submit")
+                        .attr("name", name.clone())
+                        .attr("value", name)
+                        .text(text(button.text()))
+                } else {
+                    Element::new("button").attr("type", "button").text(text(button.text()))
+                };
                 self.decorate(
                     element,
                     node,
@@ -675,8 +783,12 @@ impl<'a> Realizer<'a> {
             let group = node
                 .id()
                 .owner()
+                .filter(|owner| Some(*owner) != self.island)
                 .map_or_else(|| "r".to_owned(), |owner| format!("r{}", owner.get()));
             input.set("name", format!("{}{group}", self.scope));
+        }
+        if self.forms > 0 && native == AccessibilityRole::CheckBox {
+            input.set("name", self.wire(node.id()));
         }
         if node.is_disabled() {
             input.set("disabled", "");
@@ -691,7 +803,7 @@ impl<'a> Realizer<'a> {
             &Container::None,
             Display::InlineFlex,
         );
-        wrapper.key = Some(key_of(node.id()));
+        wrapper.key = Some(self.wire(node.id()));
         wrapper
     }
 
@@ -711,7 +823,7 @@ impl<'a> Realizer<'a> {
         if local.is_some() {
             element.set("id", self.element_id(node.id()));
         }
-        element.key = Some(key_of(node.id()));
+        element.key = Some(self.wire(node.id()));
         let display = match container {
             Container::Grid(_) => Display::Grid,
             Container::Linear { .. } => Display::Flex,
@@ -778,7 +890,7 @@ impl<'a> Realizer<'a> {
             element.set("data-command", command.name());
         }
         if let Some(shared) = node.shared_id() {
-            element.set("data-shared", key_of(shared));
+            element.set("data-shared", self.wire(shared));
         }
         if let Some(index) = node.item_index() {
             element.set("data-index", index.to_string());

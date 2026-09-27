@@ -1765,7 +1765,9 @@ dependencies = [
  "rusqlite",
  "rustnative-core",
  "rustnative-server-macros",
+ "rustnative-sync",
  "rustnative-web",
+ "rustnative-web-testing",
  "serde",
  "serde_json",
  "sha2",
@@ -1799,7 +1801,11 @@ name = "rustnative-sync"
 version = "0.1.0"
 dependencies = [
  "async-trait",
+ "bytes",
  "futures-util",
+ "http",
+ "hyper",
+ "hyper-util",
  "proptest",
  "rustnative-core",
  "rustnative-server",

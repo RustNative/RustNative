@@ -108,6 +108,12 @@ pub enum ClientFrame {
         session: Option<String>,
         /// The last state snapshot the client received.
         snapshot: Option<Value>,
+        /// A browser's options (its element-id scope and layout flow): the
+        /// client wants rendered elements ([`ServerFrame::Dom`]) rather
+        /// than trees, encoded by the server's browser encoding
+        /// ([`LiveServer::set_browser_encoding`]).
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        dom: Option<Value>,
     },
     /// An event, numbered so the server can acknowledge it.
     Event {
@@ -136,6 +142,18 @@ pub enum ServerFrame {
         /// The root component's state.
         snapshot: Option<Value>,
     },
+    /// The tree as a browser patches it: its elements and the rules they
+    /// need, from the server's browser encoding.
+    Dom {
+        /// The root element.
+        element: Value,
+        /// The `(class, rule)` pairs its classes need.
+        rules: Value,
+        /// The last event applied.
+        acknowledged: u64,
+        /// The root component's state.
+        snapshot: Option<Value>,
+    },
     /// This instance is going away: reconnect to `to` after a pause.
     Drain {
         /// Where to reconnect (empty: the same address).
@@ -159,9 +177,88 @@ pub trait LiveApp: Send + Sync + 'static {
     fn root(&self, snapshot: Option<Value>) -> Self::Root;
 }
 
+#[cfg(feature = "server")]
+impl<A: LiveApp> LiveServer<A> {
+    /// Serves this server's sessions on `app`'s own listener at `path` (a
+    /// WebSocket upgrade), for pages whose live subtrees connect back to the
+    /// origin that served them. A connection from a page of another origin
+    /// is refused: a WebSocket carries the person's cookies, and only the
+    /// application's own pages may use them.
+    #[must_use]
+    pub fn mount(
+        self: &Arc<Self>,
+        app: rustnative_server::ServerApp,
+        path: &str,
+    ) -> rustnative_server::ServerApp {
+        use tokio_tungstenite::tungstenite::handshake::derive_accept_key;
+        use tokio_tungstenite::tungstenite::protocol::Role;
+
+        let server = Arc::clone(self);
+        app.upgrade(
+            path,
+            Arc::new(move |mut request: http::Request<hyper::body::Incoming>, _peer| {
+                let refuse = |status: u16| {
+                    let mut response =
+                        http::Response::new(rustnative_server::Body::from(bytes::Bytes::new()));
+                    *response.status_mut() =
+                        http::StatusCode::from_u16(status).unwrap_or(http::StatusCode::BAD_REQUEST);
+                    response
+                };
+                let header = |name: &str| {
+                    request
+                        .headers()
+                        .get(name)
+                        .and_then(|value| value.to_str().ok())
+                        .map(str::to_owned)
+                };
+                let host = header("host").unwrap_or_default();
+                if let Some(origin) = header("origin") {
+                    let origin_host =
+                        origin.split_once("://").map_or(origin.as_str(), |(_, rest)| rest);
+                    if origin_host != host {
+                        return refuse(403);
+                    }
+                }
+                let Some(key) = header("sec-websocket-key") else { return refuse(400) };
+                if !header("upgrade")
+                    .is_some_and(|upgrade| upgrade.eq_ignore_ascii_case("websocket"))
+                {
+                    return refuse(400);
+                }
+                let accept = derive_accept_key(key.as_bytes());
+                let upgrading = hyper::upgrade::on(&mut request);
+                let server = Arc::clone(&server);
+                tokio::spawn(async move {
+                    if let Ok(upgraded) = upgrading.await {
+                        let io = hyper_util::rt::TokioIo::new(upgraded);
+                        let socket = tokio_tungstenite::WebSocketStream::from_raw_socket(
+                            io,
+                            Role::Server,
+                            None,
+                        )
+                        .await;
+                        server.accept(socket).await;
+                    }
+                });
+                let mut response = refuse(101);
+                let headers = response.headers_mut();
+                headers.insert(http::header::CONNECTION, http::HeaderValue::from_static("upgrade"));
+                headers.insert(http::header::UPGRADE, http::HeaderValue::from_static("websocket"));
+                if let Ok(value) = http::HeaderValue::from_str(&accept) {
+                    headers.insert(http::header::SEC_WEBSOCKET_ACCEPT, value);
+                }
+                response
+            }),
+        )
+    }
+}
+/// How a browser client's trees are encoded: the view and the options the
+/// browser sent in its hello, to an object with `element` and `rules`.
+pub type BrowserEncoding = Arc<dyn Fn(&Node, &Value) -> Value + Send + Sync>;
+
 enum Command {
     Event(WireEvent, u64),
-    Attach(async_mpsc::UnboundedSender<ServerFrame>),
+    Attach(async_mpsc::UnboundedSender<ServerFrame>, Option<(BrowserEncoding, Value)>),
     Detach,
     Snapshot(oneshot::Sender<Option<Value>>),
     Drain(String, u64),
@@ -182,6 +279,7 @@ pub struct LiveServer<A: LiveApp> {
     drain_to: Mutex<String>,
     next: AtomicU64,
     instance: u64,
+    encoding: Mutex<Option<BrowserEncoding>>,
 }
 
 fn root_snapshot(tree: &ComponentTree) -> Option<Value> {
@@ -197,6 +295,7 @@ fn run_session<A: LiveApp>(app: &A, snapshot: Option<Value>, commands: &mpsc::Re
     let mut tree = ComponentTree::new(app.root(snapshot));
     let _ = tree.render();
     let mut outbound: Option<async_mpsc::UnboundedSender<ServerFrame>> = None;
+    let mut browser: Option<(BrowserEncoding, Value)> = None;
     let mut acknowledged = 0;
     let mut last: Option<Node> = None;
     loop {
@@ -209,8 +308,9 @@ fn run_session<A: LiveApp>(app: &A, snapshot: Option<Value>, commands: &mpsc::Re
                     acknowledged = sequence;
                 }
             }
-            Ok(Command::Attach(sender)) => {
+            Ok(Command::Attach(sender, encoding)) => {
                 outbound = Some(sender);
+                browser = encoding;
                 last = None;
             }
             Ok(Command::Detach) => outbound = None,
@@ -233,13 +333,29 @@ fn run_session<A: LiveApp>(app: &A, snapshot: Option<Value>, commands: &mpsc::Re
         }
         tree.pump_tasks();
         let _ = tree.render();
-        let view = tree.view();
+        // A browser resolves declarations itself: it gets the unresolved
+        // view.
+        let view = if browser.is_some() { tree.unresolved_view() } else { tree.view() };
         if last.as_ref() != Some(&view) {
             if let Some(sender) = &outbound {
-                let frame = ServerFrame::Tree {
-                    tree: Box::new(WireNode::from_node(&view)),
-                    acknowledged,
-                    snapshot: root_snapshot(&tree),
+                let frame = match &browser {
+                    Some((encode, options)) => {
+                        let mut encoded = encode(&view, options);
+                        ServerFrame::Dom {
+                            element: encoded
+                                .get_mut("element")
+                                .map(Value::take)
+                                .unwrap_or_default(),
+                            rules: encoded.get_mut("rules").map(Value::take).unwrap_or_default(),
+                            acknowledged,
+                            snapshot: root_snapshot(&tree),
+                        }
+                    }
+                    None => ServerFrame::Tree {
+                        tree: Box::new(WireNode::from_node(&view)),
+                        acknowledged,
+                        snapshot: root_snapshot(&tree),
+                    },
                 };
                 if sender.send(frame).is_err() {
                     outbound = None;
@@ -264,6 +380,7 @@ impl<A: LiveApp> LiveServer<A> {
             draining: AtomicBool::new(false),
             drain_to: Mutex::new(String::new()),
             next: AtomicU64::new(1),
+            encoding: Mutex::new(None),
             // A per-instance random part, so two instances (even in one
             // process) never mint the same session id.
             instance: {
@@ -304,24 +421,38 @@ impl<A: LiveApp> LiveServer<A> {
         self.sessions.lock().unwrap_or_else(PoisonError::into_inner).len()
     }
 
+    /// How browsers get the tree ([`ServerFrame::Dom`]): the web
+    /// backend's element encoding (`rustnative_web::live::encode`).
+    pub fn set_browser_encoding(&self, encoding: BrowserEncoding) {
+        *self.encoding.lock().unwrap_or_else(PoisonError::into_inner) = Some(encoding);
+    }
+
     /// Serves connections on `listener` until the task is dropped.
     pub async fn serve(self: Arc<Self>, listener: tokio::net::TcpListener) {
         while let Ok((stream, _)) = listener.accept().await {
             let server = Arc::clone(&self);
             tokio::spawn(async move {
                 if let Ok(socket) = tokio_tungstenite::accept_async(stream).await {
-                    server.connection(socket).await;
+                    server.accept(socket).await;
                 }
             });
         }
     }
 
-    async fn connection(&self, socket: tokio_tungstenite::WebSocketStream<tokio::net::TcpStream>) {
+    /// Runs one connection that has already been upgraded to a WebSocket
+    /// (by this server's listener, or by an application's own, as
+    /// `rustnative-server` does), until it closes.
+    pub async fn accept<S>(&self, socket: tokio_tungstenite::WebSocketStream<S>)
+    where
+        S: tokio::io::AsyncRead + tokio::io::AsyncWrite + Unpin,
+    {
         let (mut sink, mut stream) = socket.split();
         let hello = loop {
             match stream.next().await {
                 Some(Ok(Message::Text(text))) => match serde_json::from_str::<ClientFrame>(&text) {
-                    Ok(ClientFrame::Hello { session, snapshot }) => break (session, snapshot),
+                    Ok(ClientFrame::Hello { session, snapshot, dom }) => {
+                        break (session, snapshot, dom);
+                    }
                     _ => return,
                 },
                 Some(Ok(_)) => {}
@@ -354,7 +485,11 @@ impl<A: LiveApp> LiveServer<A> {
         {
             handle.detached_at = None;
         }
-        let _ = commands.send(Command::Attach(outbound));
+        let encoding = hello.2.and_then(|options| {
+            let encoding = self.encoding.lock().unwrap_or_else(PoisonError::into_inner).clone()?;
+            Some((encoding, options))
+        });
+        let _ = commands.send(Command::Attach(outbound, encoding));
         if sink.send(send(&ServerFrame::Welcome { session: id.clone() })).await.is_err() {
             return;
         }
@@ -485,7 +620,7 @@ impl LiveClient {
                 let state = inner.state.lock().unwrap_or_else(PoisonError::into_inner);
                 (state.session.clone(), state.snapshot.clone())
             };
-            let hello = ClientFrame::Hello { session, snapshot };
+            let hello = ClientFrame::Hello { session, snapshot, dom: None };
             if sink
                 .send(Message::Text(serde_json::to_string(&hello).unwrap_or_default()))
                 .await
@@ -549,7 +684,8 @@ impl LiveClient {
                                 redirect = (!to.is_empty()).then_some(to);
                                 break;
                             }
-                            Err(_) => {}
+                            // This client never asks for elements.
+                            Ok(ServerFrame::Dom { .. }) | Err(_) => {}
                         }
                     }
                 }

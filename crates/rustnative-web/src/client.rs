@@ -47,7 +47,7 @@
 //! browser's runtime carries them out there, and [`Client::render`] carries
 //! them out through the tree's services everywhere else.
 
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, HashMap, HashSet};
 use std::future::Future;
 use std::pin::Pin;
 use std::sync::{Arc, Mutex, PoisonError};
@@ -56,7 +56,7 @@ use std::time::Duration;
 use rustnative_core::server_fn::{ServerFn, ServerFnError};
 use rustnative_core::{
     Component, ComponentContext, ComponentId, Event, HttpRequest, HttpResponse, Method, Node,
-    Services,
+    NodeId, Services,
 };
 use serde::Serialize;
 use serde::de::DeserializeOwned;
@@ -569,6 +569,31 @@ fn method_name(method: &Method) -> &'static str {
 #[derive(Debug, Default)]
 pub struct ServerRender {
     islands: Mutex<Vec<Island>>,
+    marks: Mutex<RenderMarks>,
+}
+
+/// What a render's components noted besides islands.
+#[derive(Debug, Default)]
+struct RenderMarks {
+    /// Streamed boundaries, and whether each has its content.
+    boundaries: Vec<(NodeId, bool)>,
+    /// Forms, and where each posts.
+    forms: HashMap<NodeId, String>,
+    /// Components that read the request.
+    dynamic: HashSet<ComponentId>,
+    /// Bumped whenever a boundary's content arrives.
+    revision: u64,
+}
+
+/// The identity the tree gives node `key` of component `owner` — the
+/// same scoping `ComponentTree` applies to every node a component renders.
+#[must_use]
+pub fn global_id(owner: ComponentId, key: &str) -> NodeId {
+    if owner == ComponentId::ROOT {
+        NodeId::from_key(key)
+    } else {
+        rustnative_core::wire::node_id(&format!("{}~{key}", owner.get()))
+    }
 }
 
 /// What a page's interactive subtree needs in the browser.
@@ -627,6 +652,78 @@ impl ServerRender {
     #[must_use]
     pub fn islands(&self) -> Vec<Island> {
         self.islands.lock().unwrap_or_else(PoisonError::into_inner).clone()
+    }
+
+    fn marks(&self) -> std::sync::MutexGuard<'_, RenderMarks> {
+        self.marks.lock().unwrap_or_else(PoisonError::into_inner)
+    }
+
+    /// Records a streamed boundary and whether it has its content yet.
+    pub fn note_pending(&self, id: NodeId, resolved: bool) {
+        let mut marks = self.marks();
+        match marks.boundaries.iter_mut().find(|(known, _)| *known == id) {
+            Some((_, state)) if *state == resolved => {}
+            Some((_, state)) => {
+                *state = resolved;
+                marks.revision += 1;
+            }
+            None => {
+                marks.boundaries.push((id, resolved));
+                marks.revision += 1;
+            }
+        }
+    }
+
+    /// Records a form that posts to `action`.
+    pub fn note_form(&self, id: NodeId, action: &str) {
+        self.marks().forms.insert(id, action.to_owned());
+    }
+
+    /// Records that `component` read the request.
+    pub fn note_dynamic(&self, component: ComponentId) {
+        self.marks().dynamic.insert(component);
+    }
+
+    /// The streamed boundaries, in the order first rendered, with whether
+    /// each has its content.
+    #[must_use]
+    pub fn boundaries(&self) -> Vec<(NodeId, bool)> {
+        self.marks().boundaries.clone()
+    }
+
+    /// The boundaries still showing their fallback.
+    #[must_use]
+    pub fn unresolved(&self) -> HashSet<NodeId> {
+        self.marks()
+            .boundaries
+            .iter()
+            .filter(|(_, resolved)| !resolved)
+            .map(|(id, _)| *id)
+            .collect()
+    }
+
+    /// The forms, with where each posts.
+    #[must_use]
+    pub fn forms(&self) -> HashMap<NodeId, String> {
+        self.marks().forms.clone()
+    }
+
+    /// Whether any component read the request.
+    #[must_use]
+    pub fn is_dynamic(&self) -> bool {
+        !self.marks().dynamic.is_empty()
+    }
+
+    /// How many components read the request.
+    #[must_use]
+    pub fn dynamic_count(&self) -> usize {
+        self.marks().dynamic.len()
+    }
+
+    /// Changes whenever a boundary's content arrives.
+    #[must_use]
+    pub fn revision(&self) -> u64 {
+        self.marks().revision
     }
 }
 

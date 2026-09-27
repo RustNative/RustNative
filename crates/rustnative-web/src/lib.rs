@@ -7,7 +7,10 @@
 //!
 //! - [`dom`] realizes the tree as semantic elements (milestone B);
 //! - [`css`] states the layout and style model in CSS (milestone C);
-//! - [`html`] writes the elements as a document (milestone H);
+//! - [`html`] writes the elements as HTML, and [`page`] renders a page for a
+//!   request — whole, streamed ([`pending`](mod@pending)), or partially prerendered —
+//!   with its islands, forms ([`form`]), and live subtrees ([`live`])
+//!   (milestone H);
 //! - [`svg`] and [`png`] carry drawn and pixel content into the document.
 //!
 //! ```
@@ -28,19 +31,54 @@
 //! };
 //! assert_eq!(rustnative_web::render(&markup, &Theme::default()), rendered);
 //! ```
+//!
+//! Server-only code stays on the server at compile time (`C05-2`): a
+//! `#[server]` function's definition is there for every caller, but its body
+//! exists only with the crate's `server` feature, so a build of the client
+//! side cannot reach it.
+//!
+//! ```
+//! #[rustnative_web::server]
+//! pub async fn add_one(value: i32) -> Result<i32, String> {
+//!     Ok(value + 1)
+//! }
+//!
+//! use rustnative_core::server_fn::ServerFn;
+//! assert_eq!(AddOne::PATH, "add_one");
+//! ```
+//!
+//! ```compile_fail
+//! #[rustnative_web::server]
+//! pub async fn add_one(value: i32) -> Result<i32, String> {
+//!     Ok(value + 1)
+//! }
+//!
+//! // error[E0425]: cannot find function `add_one` in this scope
+//! let _ = add_one(1);
+//! ```
 #![deny(missing_docs)]
 
 pub mod client;
 pub mod css;
 pub mod dom;
+pub mod form;
 pub mod hash;
+pub mod head;
 pub mod html;
 pub mod jsnode;
+pub mod live;
+pub mod page;
+pub mod pending;
 pub mod png;
+pub mod request;
 pub mod runtime;
 pub mod svg;
 
 pub use client::{Client, ClientLogic, ClientModule, Effects};
+pub use head::Head;
+pub use page::{Page, PageContext, Strategy};
+pub use pending::pending;
+pub use request::{HostLimits, RequestInfo, request};
 /// Client logic compiled to JavaScript: see [client](mod@client).
 pub use rustnative_web_macros::client;
 /// A typed server function from one `async fn`; see `rustnative_webgen::server`.

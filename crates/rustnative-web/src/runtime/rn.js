@@ -1448,6 +1448,28 @@ export function keyCode(event) {
   return { Unknown: event.keyCode || 0 };
 }
 
+const POINTER_KINDS = { mouse: "Mouse", touch: "Touch", pen: "Pen" };
+// `PointerEvent.button`'s numbering; `buttons` is already the framework's
+// bit set (primary 1, secondary 2, middle 4, back 8, forward 16).
+const POINTER_BUTTONS = ["Primary", "Middle", "Secondary", "Back", "Forward"];
+
+/// A DOM pointer event as the framework's `PointerEvent`, in the target's
+/// own coordinates.
+export function pointerOf(event, element) {
+  const box = element.getBoundingClientRect();
+  const changed = event.type === "pointerdown" || event.type === "pointerup";
+  return {
+    pointer_id: event.pointerId,
+    kind: POINTER_KINDS[event.pointerType] ?? "Mouse",
+    position: { x: Math.round(event.clientX - box.left), y: Math.round(event.clientY - box.top) },
+    button: changed ? POINTER_BUTTONS[event.button] ?? null : null,
+    buttons: event.buttons & 31,
+    modifiers: { shift: event.shiftKey, ctrl: event.ctrlKey, alt: event.altKey, meta: event.metaKey },
+    pressure: event.pointerType === "pen" ? Math.fround(Math.min(1, Math.max(0, event.pressure))) : null,
+    region: null,
+  };
+}
+
 export const config = { fns: {}, base: "", csrf: null, assets: "/_rn/", version: null };
 export const islands = [];
 const topics = new Map();
@@ -1466,6 +1488,9 @@ export class Island {
     this.failed = null;
     this.renders = 0;
     this.subscriptions = [];
+    this.listening = new AbortController();
+    // Where a persistent island keeps its state (`localStorage`), if it is one.
+    this.persist = null;
   }
 
   realize() {
@@ -1475,13 +1500,19 @@ export class Island {
     return element;
   }
 
-  attach() {
+  /// Takes over the server's markup. `fresh`: the server left the island
+  /// for the browser to render (a client-only page), so there is nothing
+  /// to compare.
+  attach(fresh = false) {
     const element = this.realize();
-    const difference = mismatch(this.root, element);
+    const difference = fresh ? "fresh" : mismatch(this.root, element);
     if (difference) {
-      console.error(`rn:mismatch island ${this.index} (${this.module.name}) ${difference}`);
-      document.dispatchEvent(new CustomEvent("rn:mismatch", { detail: { island: this.index, at: difference } }));
+      if (!fresh) {
+        console.error(`rn:mismatch island ${this.index} (${this.module.name}) ${difference}`);
+        document.dispatchEvent(new CustomEvent("rn:mismatch", { detail: { island: this.index, at: difference } }));
+      }
       const replacement = create(element);
+      replacement.setAttribute("data-rn-i", String(this.index));
       this.root.replaceWith(replacement);
       this.root = replacement;
     }
@@ -1534,6 +1565,9 @@ export class Island {
     this.tree = element;
     this.renders++;
     this.syncControlled(this.root, element);
+    if (this.persist) {
+      try { localStorage.setItem(this.persist, JSON.stringify(this.state)); } catch (_) { /* storage refused */ }
+    }
   }
 
   // A control shows what the state says, even when the state refused the
@@ -1572,7 +1606,7 @@ export class Island {
 
   listen() {
     const root = this.root;
-    const on = (type, handler) => root.addEventListener(type, handler);
+    const on = (type, handler, options = {}) => root.addEventListener(type, handler, { ...options, signal: this.listening.signal });
     on("click", (event) => {
       const found = this.keyOf(event.target);
       if (!found) return;
@@ -1613,6 +1647,45 @@ export class Island {
     on("keyup", key("KeyUp"));
     on("focusin", (event) => { const found = this.keyOf(event.target); if (found) this.dispatch({ type: "FocusGained", target: found.key }); });
     on("focusout", (event) => { const found = this.keyOf(event.target); if (found) this.dispatch({ type: "FocusLost", target: found.key }); });
+    // Pointers: a captured pointer's events keep coming to the node that
+    // captured it, wherever the pointer goes.
+    for (const [type, name] of [["pointerdown", "PointerDown"], ["pointermove", "PointerMove"], ["pointerup", "PointerUp"], ["pointercancel", "PointerCancel"]]) {
+      on(type, (event) => {
+        const found = this.keyOf(event.target);
+        if (found && found.element) this.dispatch({ type: name, target: found.key, pointer: pointerOf(event, found.element) });
+      });
+    }
+    const crossing = (name) => (event) => {
+      const found = this.keyOf(event.target);
+      if (!found || !found.element || (event.relatedTarget && found.element.contains(event.relatedTarget))) return;
+      this.dispatch({ type: name, target: found.key });
+    };
+    on("pointerover", crossing("PointerEnter"));
+    on("pointerout", crossing("PointerLeave"));
+    on("wheel", (event) => {
+      const found = this.keyOf(event.target);
+      if (!found || !found.element) return;
+      // Lines are in 1/120ths of a notch; a page is three lines.
+      const scale = event.deltaMode === 0 ? 1 : event.deltaMode === 1 ? 120 : 360;
+      const amount = { x: Math.round(event.deltaX * scale), y: Math.round(event.deltaY * scale) };
+      this.dispatch({ type: "Wheel", target: found.key, delta: event.deltaMode === 0 ? { Pixels: amount } : { Lines: amount } });
+    }, { passive: true });
+    // An input method's composition, for logic that draws it itself; the
+    // text control's own value still arrives as `TextChanged`.
+    const composition = (make) => (event) => {
+      const found = this.keyOf(event.target);
+      this.dispatch({ type: "Composition", target: found ? found.key : null, composition: make(event.data ?? "") });
+    };
+    on("compositionstart", composition(() => "Started"));
+    on("compositionupdate", composition((text) => ({ Updated: { text, cursor: [...text].length } })));
+    on("compositionend", composition((text) => (text === "" ? "Cancelled" : { Committed: { text } })));
+    const clipboard = (make) => (event) => {
+      const found = this.keyOf(event.target);
+      this.dispatch({ type: "Clipboard", target: found ? found.key : null, action: make(event) });
+    };
+    on("copy", clipboard(() => "Copy"));
+    on("cut", clipboard(() => "Cut"));
+    on("paste", clipboard((event) => ({ Paste: { text: event.clipboardData ? event.clipboardData.getData("text/plain") : null } })));
   }
 }
 
@@ -1627,6 +1700,7 @@ export async function callServer(path, input) {
   const headers = { "content-type": "application/json", accept: "application/json" };
   const token = csrfToken();
   if (token) headers["x-csrf-token"] = token;
+  if (config.version) headers["x-rn-fn-version"] = config.version;
   let response;
   try {
     response = await fetch(`${config.base}/_fn/${path}`, { method: "POST", headers, body: JSON.stringify(input), credentials: "same-origin" });
@@ -1634,6 +1708,12 @@ export async function callServer(path, input) {
     return { Err: { Transport: String(error && error.message || error) } };
   }
   const text = await response.text();
+  if (response.status === 409) {
+    // A new build is deployed: reload rather than speak an old wire format.
+    let body = null;
+    try { body = JSON.parse(text); } catch (_) { /* not JSON */ }
+    if (body && body.error === "version" && typeof location !== "undefined") location.reload();
+  }
   if (!response.ok) {
     let message = "";
     try { message = JSON.parse(text).error ?? ""; } catch (_) { /* not JSON */ }
@@ -1693,11 +1773,246 @@ export function perform(island, kind, args) {
       import(module).then((loaded) => loaded[fn](input)).then((value) => reply(answer({ Ok: value })), (error) => reply(answer({ Err: String(error && error.message || error) })));
       break;
     }
+    case "capturePointer": case "releasePointer": {
+      const target = document.getElementById(island.scope + args[0]);
+      try {
+        if (kind === "capturePointer") target?.setPointerCapture(args[1]);
+        else target?.releasePointerCapture(args[1]);
+      } catch (_) { /* the pointer is no longer active */ }
+      break;
+    }
     default:
-      if (extraEffects[kind]) extraEffects[kind](island, args, reply);
+      if (capabilityEffects[kind]) capabilityEffects[kind](island, args, reply);
+      else if (extraEffects[kind]) extraEffects[kind](island, args, reply);
       else console.error("rn: unknown effect", kind);
   }
 }
+
+// ------------------------------------------------- capabilities (E) ----
+
+const errorOf = (error) => String((error && error.message) || error);
+const unsupported = "this browser does not have this capability";
+const ok = (value) => ({ Ok: value === undefined ? null : value });
+const err = (error) => ({ Err: errorOf(error) });
+
+function openDatabase() {
+  return new Promise((resolve, reject) => {
+    const request = indexedDB.open("rn", 1);
+    request.onupgradeneeded = () => request.result.createObjectStore("kv");
+    request.onsuccess = () => resolve(request.result);
+    request.onerror = () => reject(request.error);
+  });
+}
+
+async function database(mode, act) {
+  const db = await openDatabase();
+  try {
+    return await new Promise((resolve, reject) => {
+      const transaction = db.transaction("kv", mode);
+      const request = act(transaction.objectStore("kv"));
+      transaction.oncomplete = () => resolve(request.result);
+      transaction.onerror = () => reject(transaction.error);
+    });
+  } finally {
+    db.close();
+  }
+}
+
+function permissionName(state) {
+  return { granted: "Granted", denied: "Denied", prompt: "Prompt", default: "Prompt" }[state] ?? "Unsupported";
+}
+
+async function queryPermission(name) {
+  if (name === "notifications" && typeof Notification !== "undefined") return permissionName(Notification.permission);
+  try { return permissionName((await navigator.permissions.query({ name })).state); } catch (_) { return "Unsupported"; }
+}
+
+const SENSORS = { accelerometer: "Accelerometer", gyroscope: "Gyroscope", magnetometer: "Magnetometer", "ambient-light": "AmbientLightSensor", "linear-acceleration": "LinearAccelerationSensor", gravity: "GravitySensor" };
+
+function sensorValues(sensor) {
+  if ("illuminance" in sensor) return [sensor.illuminance];
+  return [sensor.x, sensor.y, sensor.z];
+}
+
+/// Whether a sensor actually delivers here: a desktop browser may have the
+/// API and no sensor behind it.
+function probeSensor(name) {
+  const Sensor = globalThis[SENSORS[name]];
+  if (typeof Sensor !== "function") return Promise.resolve(false);
+  return new Promise((resolve) => {
+    let sensor;
+    const done = (value) => { try { sensor?.stop(); } catch (_) { /* already stopped */ } resolve(value); };
+    try {
+      sensor = new Sensor();
+      sensor.onreading = () => done(true);
+      sensor.onerror = () => done(false);
+      sensor.start();
+      setTimeout(() => done(false), 500);
+    } catch (_) {
+      done(false);
+    }
+  });
+}
+
+/// What this browser can do, in this security context, under this page's
+/// permissions policy: the effect names the application can use.
+export async function caps() {
+  const secure = typeof isSecureContext !== "undefined" && isSecureContext;
+  const nav = typeof navigator !== "undefined" ? navigator : {};
+  const storage = (() => { try { localStorage.setItem("rn:probe", "1"); localStorage.removeItem("rn:probe"); return true; } catch (_) { return false; } })();
+  const policy = typeof document !== "undefined" ? document.permissionsPolicy ?? document.featurePolicy : null;
+  const allowed = (feature) => !policy || policy.allowsFeature(feature);
+  let bluetooth = false;
+  if (secure && nav.bluetooth && allowed("bluetooth")) {
+    try { bluetooth = await nav.bluetooth.getAvailability(); } catch (_) { bluetooth = false; }
+  }
+  const sensor = secure && allowed("accelerometer") && (await probeSensor("accelerometer") || await probeSensor("ambient-light"));
+  const have = {
+    fetch: typeof fetch === "function",
+    store: storage,
+    load: storage,
+    db_put: typeof indexedDB !== "undefined",
+    db_get: typeof indexedDB !== "undefined",
+    cache_put: secure && typeof caches !== "undefined",
+    cache_get: secure && typeof caches !== "undefined",
+    copy: secure && Boolean(nav.clipboard && nav.clipboard.writeText),
+    read_clipboard: secure && Boolean(nav.clipboard && nav.clipboard.readText) && allowed("clipboard-read"),
+    notify: typeof Notification !== "undefined",
+    permission: Boolean(nav.permissions),
+    request_permission: Boolean(nav.permissions),
+    share: secure && typeof nav.share === "function" && allowed("web-share"),
+    locate: secure && Boolean(nav.geolocation) && allowed("geolocation"),
+    open_file: typeof document !== "undefined",
+    save_file: typeof document !== "undefined",
+    download: typeof document !== "undefined",
+    socket_open: typeof WebSocket !== "undefined",
+    worker: typeof Worker !== "undefined",
+    vibrate: typeof nav.vibrate === "function",
+    online: true,
+    media: secure && Boolean(nav.mediaDevices && nav.mediaDevices.getUserMedia) && (allowed("camera") || allowed("microphone")),
+    bluetooth,
+    sensor,
+    history: typeof history !== "undefined",
+    service_worker: secure && Boolean(nav.serviceWorker),
+  };
+  return Object.keys(have).filter((name) => have[name]).sort();
+}
+
+const capabilityEffects = {
+  share(island, [title, text, url, answer], reply) {
+    if (typeof navigator.share !== "function") { reply(answer(err(unsupported))); return; }
+    navigator.share({ title, text, url: url || undefined }).then(() => reply(answer(ok())), (error) => reply(answer(err(error))));
+  },
+  locate(island, [answer], reply) {
+    if (!navigator.geolocation) { reply(answer(err(unsupported))); return; }
+    navigator.geolocation.getCurrentPosition(
+      (position) => reply(answer(ok({ latitude: position.coords.latitude, longitude: position.coords.longitude, accuracy: position.coords.accuracy }))),
+      (error) => reply(answer(err(error))),
+    );
+  },
+  permission(island, [name, answer], reply) { queryPermission(name).then((state) => reply(answer(state))); },
+  async requestPermission(island, [name, answer], reply) {
+    try {
+      if (name === "notifications" && typeof Notification !== "undefined") await Notification.requestPermission();
+      else if (name === "geolocation") await new Promise((resolve) => navigator.geolocation.getCurrentPosition(resolve, resolve));
+      else if (name === "camera" || name === "microphone") {
+        const stream = await navigator.mediaDevices.getUserMedia(name === "camera" ? { video: true } : { audio: true });
+        stream.getTracks().forEach((track) => track.stop());
+      } else if (name === "clipboard-read") await navigator.clipboard.readText();
+    } catch (_) { /* the answer is the state */ }
+    reply(answer(await queryPermission(name)));
+  },
+  openFile(island, [accept, answer], reply) {
+    const input = document.createElement("input");
+    input.type = "file";
+    if (accept) input.accept = accept;
+    input.addEventListener("change", async () => {
+      const file = input.files && input.files[0];
+      reply(answer(file ? { name: file.name, text: await file.text() } : null));
+    }, { once: true });
+    input.addEventListener("cancel", () => reply(answer(null)), { once: true });
+    input.click();
+  },
+  async saveFile(island, [name, text, answer], reply) {
+    try {
+      if (typeof showSaveFilePicker === "function") {
+        const handle = await showSaveFilePicker({ suggestedName: name });
+        const writable = await handle.createWritable();
+        await writable.write(text);
+        await writable.close();
+      } else {
+        perform(island, "download", [name, text]);
+      }
+      reply(answer(ok()));
+    } catch (error) {
+      reply(answer(err(error)));
+    }
+  },
+  dbPut(island, [store, key, value]) { database("readwrite", (kv) => kv.put(clone(value), `${store}/${key}`)).catch((error) => console.error("rn: db_put", error)); },
+  dbGet(island, [store, key, answer], reply) {
+    database("readonly", (kv) => kv.get(`${store}/${key}`)).then((value) => reply(answer(value === undefined ? null : value)), () => reply(answer(null)));
+  },
+  cachePut(island, [url]) { caches.open("rn-data").then((cache) => cache.add(url)).catch((error) => console.error("rn: cache_put", error)); },
+  cacheGet(island, [url, answer], reply) {
+    caches.match(url).then((response) => (response ? response.text() : null)).then((text) => reply(answer(text)), () => reply(answer(null)));
+  },
+  readClipboard(island, [answer], reply) {
+    if (!navigator.clipboard || !navigator.clipboard.readText) { reply(answer(err(unsupported))); return; }
+    navigator.clipboard.readText().then((text) => reply(answer(ok(text))), (error) => reply(answer(err(error))));
+  },
+  socketOpen(island, [name, url, answer], reply) {
+    island.sockets = island.sockets || {};
+    let socket;
+    try { socket = new WebSocket(new URL(url, location.href)); } catch (error) { reply(answer({ Failed: errorOf(error) })); return; }
+    island.sockets[name] = socket;
+    socket.onopen = () => reply(answer("Opened"));
+    socket.onmessage = (message) => reply(answer({ Message: String(message.data) }));
+    socket.onerror = () => reply(answer({ Failed: "the connection failed" }));
+    socket.onclose = () => { if (island.sockets[name] === socket) delete island.sockets[name]; reply(answer("Closed")); };
+  },
+  socketSend(island, [name, text]) { island.sockets?.[name]?.send(text); },
+  socketClose(island, [name]) { island.sockets?.[name]?.close(); },
+  worker(island, [url, input, answer], reply) {
+    let worker;
+    try { worker = new Worker(new URL(url, location.href), { type: "module" }); } catch (error) { reply(answer(err(error))); return; }
+    worker.onmessage = (message) => { worker.terminate(); reply(answer(ok(message.data))); };
+    worker.onerror = (error) => { worker.terminate(); reply(answer(err(error.message || "the worker failed"))); };
+    worker.postMessage(input);
+  },
+  vibrate(island, [milliseconds]) { if (typeof navigator.vibrate === "function") navigator.vibrate(milliseconds); },
+  online(island, [answer], reply) {
+    const tell = () => reply(answer(navigator.onLine));
+    tell();
+    window.addEventListener("online", tell, { signal: island.listening.signal });
+    window.addEventListener("offline", tell, { signal: island.listening.signal });
+  },
+  media(island, [audio, video, answer], reply) {
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) { reply(answer(err(unsupported))); return; }
+    navigator.mediaDevices.getUserMedia({ audio, video }).then((stream) => {
+      const kinds = stream.getTracks().map((track) => track.kind);
+      stream.getTracks().forEach((track) => track.stop());
+      reply(answer(ok(kinds)));
+    }, (error) => reply(answer(err(error))));
+  },
+  bluetooth(island, [service, answer], reply) {
+    if (!navigator.bluetooth) { reply(answer(err(unsupported))); return; }
+    navigator.bluetooth.requestDevice({ filters: [{ services: [service] }] }).then((device) => reply(answer(ok(device.name || ""))), (error) => reply(answer(err(error))));
+  },
+  sensor(island, [name, answer], reply) {
+    const Sensor = globalThis[SENSORS[name]];
+    if (typeof Sensor !== "function") { reply(answer(err(unsupported))); return; }
+    try {
+      const sensor = new Sensor();
+      sensor.onreading = () => reply(answer(ok(sensorValues(sensor))));
+      sensor.onerror = (event) => reply(answer(err(event.error || "the sensor failed")));
+      island.listening.signal.addEventListener("abort", () => sensor.stop());
+      sensor.start();
+    } catch (error) {
+      reply(answer(err(error)));
+    }
+  },
+  capabilities(island, [answer], reply) { caps().then((names) => reply(answer(names))); },
+};
 
 /// Effects other runtime modules add (capabilities, Web milestone E).
 export const extraEffects = {};
@@ -1706,23 +2021,323 @@ export const extraEffects = {};
 export let navigate = (url) => { location.assign(url); };
 export function setNavigate(handler) { navigate = handler; }
 
-/// Attaches every island the page declares.
-export async function start() {
+// ------------------------------------------------------ live islands ----
+
+/// A subtree held on the server (`C33`): its events go there over a
+/// WebSocket (`rustnative-sync`'s frames), and the trees it renders come
+/// back and are patched in. A dropped connection reconnects with the
+/// session id, resending what was not acknowledged; in `Auto` mode, the
+/// client module takes over from the session's last state once loaded.
+export class LiveIsland {
+  constructor(spec, root) {
+    this.index = spec.i;
+    this.spec = spec;
+    this.root = root;
+    this.scope = `i${spec.i}-`;
+    this.flow = spec.flow ?? { t: "root" };
+    this.tree = null;
+    this.snapshot = spec.s ?? null;
+    this.session = null;
+    this.sequence = 0;
+    this.unacknowledged = [];
+    this.socket = null;
+    this.closed = false;
+    this.retries = 0;
+    this.frames = 0;
+    this.listening = new AbortController();
+  }
+
+  connect() {
+    if (this.closed) return;
+    const url = new URL(this.spec.url, location.href);
+    url.protocol = url.protocol === "https:" ? "wss:" : "ws:";
+    const socket = new WebSocket(url);
+    this.socket = socket;
+    socket.onopen = () => {
+      socket.send(JSON.stringify({ frame: "hello", session: this.session, snapshot: this.snapshot, dom: { scope: this.scope, flow: this.flow } }));
+      for (const [event, sequence] of this.unacknowledged) socket.send(JSON.stringify({ frame: "event", event, sequence }));
+    };
+    socket.onmessage = (message) => this.receive(JSON.parse(message.data));
+    socket.onclose = () => {
+      if (this.socket !== socket || this.closed) return;
+      this.socket = null;
+      document.dispatchEvent(new CustomEvent("rn:live-disconnected", { detail: { island: this.index } }));
+      const delay = Math.min(5000, 100 * 2 ** Math.min(this.retries++, 6));
+      setTimeout(() => this.connect(), delay);
+    };
+  }
+
+  receive(frame) {
+    switch (frame.frame) {
+      case "welcome":
+        this.session = frame.session;
+        this.retries = 0;
+        break;
+      case "dom": {
+        this.unacknowledged = this.unacknowledged.filter(([, sequence]) => sequence > frame.acknowledged);
+        if (frame.snapshot !== undefined && frame.snapshot !== null) this.snapshot = frame.snapshot;
+        applySheet({ entries: () => frame.rules || [] });
+        const element = frame.element;
+        if (this.tree === null) {
+          // The server's markup is the session's first tree unless the
+          // session started from somewhere else.
+          if (mismatch(this.root, element)) this.replace(create(element));
+        } else {
+          const root = patch(this.root, this.tree, element);
+          if (root !== this.root) this.replace(root, false);
+        }
+        this.tree = element;
+        this.frames++;
+        document.dispatchEvent(new CustomEvent("rn:live", { detail: { island: this.index, frames: this.frames } }));
+        break;
+      }
+      case "drain":
+        if (frame.snapshot !== undefined && frame.snapshot !== null) this.snapshot = frame.snapshot;
+        this.session = null;
+        if (frame.to) this.spec.url = frame.to;
+        this.socket?.close();
+        this.socket = null;
+        setTimeout(() => this.connect(), frame.after_ms || 0);
+        break;
+      default:
+        break;
+    }
+  }
+
+  replace(node, swap = true) {
+    node.setAttribute("data-rn-i", String(this.index));
+    if (swap) this.root.replaceWith(node);
+    this.root = node;
+  }
+
+  send(event) {
+    const sequence = ++this.sequence;
+    this.unacknowledged.push([event, sequence]);
+    if (this.socket && this.socket.readyState === 1) this.socket.send(JSON.stringify({ frame: "event", event, sequence }));
+  }
+
+  keyOf(target) {
+    for (let node = target; node && node !== this.root.parentNode; node = node.parentNode) {
+      if (node.nodeType === 1 && node.id && node.id.startsWith(this.scope)) return { key: node.id.slice(this.scope.length), element: node };
+    }
+    return null;
+  }
+
+  listen() {
+    const on = (type, handler) => document.addEventListener(type, (event) => {
+      if (this.root.contains(event.target)) handler(event);
+    }, { signal: this.listening.signal });
+    on("click", (event) => {
+      const found = this.keyOf(event.target);
+      if (!found) return;
+      const name = found.element.localName;
+      if (name === "input" || name === "select" || name === "textarea") return;
+      if (name === "a" && found.element.getAttribute("href") === "#") event.preventDefault();
+      this.send({ event: "click", target: found.key });
+    });
+    on("input", (event) => {
+      const found = this.keyOf(event.target);
+      if (!found) return;
+      const element = found.element;
+      if (element.type === "range" || element.type === "number") {
+        if (/^-?\d+$/.test(element.value)) this.send({ event: "value_changed", target: found.key, value: Number(element.value) });
+      } else if (element.localName === "textarea" || element.localName === "input") {
+        this.send({ event: "text_changed", target: found.key, value: element.value });
+      }
+    });
+    on("change", (event) => {
+      const found = this.keyOf(event.target);
+      if (found && found.element.type === "checkbox") this.send({ event: "toggled", target: found.key, on: found.element.checked });
+    });
+  }
+
+  /// `Auto` mode: the client module takes over from the session's last
+  /// state, and the connection closes.
+  async handoff() {
+    if (!this.spec.m || this.closed) return;
+    const runtime = await import(import.meta.url);
+    // A browser remembers a module that failed to load under its URL: a
+    // retry asks under another.
+    const attempt = this.attempts = (this.attempts ?? 0) + 1;
+    const loaded = await import(attempt === 1 ? this.spec.m : `${this.spec.m}?retry=${attempt}`);
+    const module = loaded.default(runtime, this.spec.fns ?? {});
+    this.closed = true;
+    this.listening.abort();
+    this.socket?.close();
+    const island = new Island(this.index, module, this.snapshot, this.root, this.flow);
+    islands[this.index] = island;
+    island.attach();
+    document.dispatchEvent(new CustomEvent("rn:handoff", { detail: { island: this.index } }));
+  }
+}
+
+/// Attaches every island the page declares; `restored` holds island states
+/// to start from instead of the page's (a page returned to).
+export async function start(restored = null) {
   const data = document.getElementById("rn-data");
   if (!data) return;
   const page = JSON.parse(data.textContent);
   Object.assign(config, page.config || {});
   // Generated modules receive this runtime's own namespace.
   const runtime = await import(import.meta.url);
+  navigation();
+  if (restored === null && history.state && history.state.rn && arrivedByHistory()) {
+    const saved = savedEntry(history.state.rn);
+    if (saved) restored = saved.states;
+  }
   await Promise.all((page.islands || []).map(async (spec) => {
     const root = document.querySelector(`[data-rn-i="${spec.i}"]`);
-    if (!root || spec.kind !== "client") return;
-    const loaded = await import(spec.m);
-    const module = loaded.default(runtime, spec.fns ?? {});
-    const island = new Island(spec.i, module, spec.s, root, spec.flow ?? { t: "root" });
-    islands[spec.i] = island;
-    island.attach();
+    if (!root) return;
+    if (spec.kind === "client") {
+      const loaded = await import(spec.m);
+      const module = loaded.default(runtime, spec.fns ?? {});
+      let state = spec.s;
+      if (spec.persist) {
+        try { const kept = localStorage.getItem(`rn:persist:${spec.name}`); if (kept !== null) state = JSON.parse(kept); } catch (_) { /* storage refused */ }
+      }
+      if (restored && restored[spec.i] !== undefined) state = restored[spec.i];
+      const island = new Island(spec.i, module, state, root, spec.flow ?? { t: "root" });
+      island.persist = spec.persist ? `rn:persist:${spec.name}` : null;
+      islands[spec.i] = island;
+      island.attach(Boolean(spec.fresh) || state !== spec.s);
+    } else if (spec.kind === "live") {
+      const island = new LiveIsland(spec, root);
+      islands[spec.i] = island;
+      island.listen();
+      island.connect();
+      if (spec.m) {
+        const handoff = (delay) => island.handoff().catch((error) => {
+          console.error("rn: the client module did not load; the subtree stays on the server", error);
+          if (delay <= 30000) setTimeout(() => handoff(delay * 2), delay);
+        });
+        handoff(2000);
+      }
+    } else if (extraIslands[spec.kind]) {
+      islands[spec.i] = await extraIslands[spec.kind](spec, root, runtime);
+    }
   }));
   document.documentElement.setAttribute("data-rn-ready", "");
   document.dispatchEvent(new CustomEvent("rn:ready"));
+}
+
+/// Island kinds other runtime modules add (WebAssembly subtrees).
+export const extraIslands = {};
+
+// ------------------------------------------------ navigation (G) ----
+
+let navigating = false;
+const adopted = new Set();
+
+function arrivedByHistory() {
+  const entries = typeof performance !== "undefined" && performance.getEntriesByType ? performance.getEntriesByType("navigation") : [];
+  return entries.length > 0 && entries[0].type === "back_forward";
+}
+
+function newEntry() {
+  return `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
+}
+
+function savedEntry(id) {
+  try { return JSON.parse(sessionStorage.getItem(`rn:entry:${id}`) || "null"); } catch (_) { return null; }
+}
+
+/// Keeps what the islands of the page being left hold, for a return to it.
+function saveEntry() {
+  const id = history.state && history.state.rn;
+  if (!id) return;
+  const states = {};
+  islands.forEach((island, index) => { if (island instanceof Island) states[index] = island.state; });
+  try { sessionStorage.setItem(`rn:entry:${id}`, JSON.stringify({ states, scroll: [scrollX, scrollY] })); } catch (_) { /* storage refused */ }
+}
+
+function teardown() {
+  for (const island of islands) {
+    if (!island) continue;
+    island.listening?.abort();
+    if (island instanceof LiveIsland) { island.closed = true; island.socket?.close(); }
+  }
+  islands.length = 0;
+}
+
+/// A stylesheet from another document, through the CSS object model: the
+/// page's policy allows it with no nonce.
+function adoptCss(text) {
+  if (adopted.has(text) || typeof CSSStyleSheet === "undefined") return;
+  adopted.add(text);
+  const sheet = new CSSStyleSheet();
+  sheet.replaceSync(text);
+  document.adoptedStyleSheets = [...document.adoptedStyleSheets, sheet];
+}
+
+const HEAD_KEYED = ['meta[name="description"]', 'meta[property^="og:"]', 'meta[name^="twitter:"]', 'link[rel="canonical"]', 'link[rel="alternate"]', 'script[type="application/ld+json"]'];
+
+/// Client-side navigation: the next page's document replaces this one's
+/// body and head metadata, and its islands attach, while the runtime and
+/// its modules stay loaded. Anything else — another origin, a download, a
+/// failure — is an ordinary navigation.
+export async function go(url, push = true) {
+  const target = new URL(url, location.href);
+  if (target.origin !== location.origin) { location.assign(target.href); return; }
+  let response;
+  try {
+    response = await fetch(target.href, { headers: { accept: "text/html" }, credentials: "same-origin" });
+  } catch (_) {
+    location.assign(target.href);
+    return;
+  }
+  if (!(response.headers.get("content-type") || "").includes("text/html")) { location.assign(target.href); return; }
+  const next = new DOMParser().parseFromString(await response.text(), "text/html");
+  if (push) saveEntry();
+  teardown();
+  for (const style of next.querySelectorAll("style")) adoptCss(style.textContent);
+  document.title = next.title;
+  for (const selector of HEAD_KEYED) {
+    document.head.querySelectorAll(selector).forEach((node) => node.remove());
+    next.head.querySelectorAll(selector).forEach((node) => document.head.appendChild(document.importNode(node, true)));
+  }
+  for (const name of ["lang", "dir"]) {
+    const value = next.documentElement.getAttribute(name);
+    if (value === null) document.documentElement.removeAttribute(name); else document.documentElement.setAttribute(name, value);
+  }
+  const address = response.redirected ? response.url : target.href;
+  if (push) history.pushState({ rn: newEntry() }, "", address);
+  document.body.replaceWith(document.importNode(next.body, true));
+  const saved = push ? null : savedEntry(history.state && history.state.rn);
+  await start(saved ? saved.states : null);
+  if (saved) scrollTo(saved.scroll[0], saved.scroll[1]);
+  else if (target.hash) document.getElementById(decodeURIComponent(target.hash.slice(1)))?.scrollIntoView();
+  else if (push) scrollTo(0, 0);
+  document.dispatchEvent(new CustomEvent("rn:navigated", { detail: { url: address } }));
+}
+
+/// Installs navigation once: links and `fx.navigate` stay in the page,
+/// back and forward restore each page with its islands' state, and the
+/// islands hear when the page is hidden and shown again.
+function navigation() {
+  if (navigating) return;
+  navigating = true;
+  if (!history.state || !history.state.rn) history.replaceState({ ...(history.state || {}), rn: newEntry() }, "");
+  setNavigate((url) => { go(url, true); });
+  document.addEventListener("click", (event) => {
+    if (event.defaultPrevented || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+    const link = event.target.closest ? event.target.closest("a[href]") : null;
+    if (!link || link.target || link.hasAttribute("download")) return;
+    const href = link.getAttribute("href");
+    if (!href || href.startsWith("#")) return;
+    const url = new URL(link.href, location.href);
+    if (url.origin !== location.origin) return;
+    event.preventDefault();
+    go(url.href, true);
+  });
+  window.addEventListener("popstate", (event) => { if (event.state && event.state.rn) go(location.href, false); });
+  window.addEventListener("pagehide", saveEntry);
+  document.addEventListener("visibilitychange", () => {
+    const value = document.visibilityState === "hidden" ? "Suspending" : "Resuming";
+    for (const island of islands) if (island instanceof Island) island.dispatch({ type: "Lifecycle", value });
+  });
+}
+
+if (typeof document !== "undefined" && document.getElementById("rn-data")) {
+  if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", () => { start(); });
+  else start();
 }

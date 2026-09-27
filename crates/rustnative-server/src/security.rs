@@ -195,7 +195,18 @@ impl std::fmt::Display for Cookie {
 }
 
 /// Adds the security headers to a response.
-pub(crate) fn secure_headers(headers: &mut HeaderMap, security: &Security, nonce: &str) {
+/// Marks a response whose page has a WebAssembly subtree: its policy
+/// allows compiling WebAssembly (`'wasm-unsafe-eval'`) and nothing more.
+#[derive(Debug, Clone, Copy)]
+pub(crate) struct WasmPage;
+
+pub(crate) fn secure_headers(
+    headers: &mut HeaderMap,
+    security: &Security,
+    nonce: &str,
+    wasm: bool,
+) {
+    let wasm = if wasm { " 'wasm-unsafe-eval'" } else { "" };
     let mut set = |name: &'static str, value: String| {
         if let Ok(value) = HeaderValue::from_str(&value) {
             headers.entry(name).or_insert(value);
@@ -204,7 +215,7 @@ pub(crate) fn secure_headers(headers: &mut HeaderMap, security: &Security, nonce
     set(
         "content-security-policy",
         format!(
-            "default-src 'self'; script-src 'self' 'nonce-{nonce}'; style-src 'self' 'nonce-{nonce}'; \
+            "default-src 'self'; script-src 'self' 'nonce-{nonce}'{wasm}; style-src 'self' 'nonce-{nonce}'; \
              img-src 'self' data:; object-src 'none'; base-uri 'none'; frame-ancestors 'none'; \
              form-action 'self'"
         ),

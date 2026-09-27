@@ -161,6 +161,24 @@ impl HostExecutor {
             .min()
     }
 
+    /// Drops every task and armed delay: the host is done with them (a
+    /// request has been answered, a page closed). A task's future is
+    /// dropped here even when it holds this executor (a delay it awaits
+    /// does), which would otherwise keep it alive forever.
+    pub fn shutdown(&self) {
+        let tasks =
+            std::mem::take(&mut *self.inner.tasks.lock().unwrap_or_else(PoisonError::into_inner));
+        let timers =
+            std::mem::take(&mut *self.inner.timers.lock().unwrap_or_else(PoisonError::into_inner));
+        // Dropped with no lock held: a future's drop may reach the executor.
+        for entry in &tasks {
+            entry.aborted.store(true, Ordering::Release);
+            let future = entry.future.lock().unwrap_or_else(PoisonError::into_inner).take();
+            drop(future);
+        }
+        drop(timers);
+    }
+
     /// Tasks spawned and not yet finished or aborted.
     #[must_use]
     pub fn pending_task_count(&self) -> usize {
@@ -353,6 +371,30 @@ mod tests {
         executor.run_ready();
         assert_eq!(wakes.load(Ordering::SeqCst), 2, "the armed delay");
         assert_eq!(executor.next_deadline(), Some(Duration::from_secs(1)));
+    }
+
+    #[test]
+    fn shutdown_drops_a_task_that_holds_the_executor() {
+        struct Flag(Arc<AtomicBool>);
+        impl Drop for Flag {
+            fn drop(&mut self) {
+                self.0.store(true, Ordering::SeqCst);
+            }
+        }
+        let executor = HostExecutor::new(Arc::new(ManualClock::new()));
+        let dropped = Arc::new(AtomicBool::new(false));
+        let flag = Flag(Arc::clone(&dropped));
+        let delay = executor.sleep(Duration::from_secs(3600));
+        executor.spawn(Box::pin(async move {
+            delay.await;
+            drop(flag);
+        }));
+        executor.run_ready();
+        assert!(!dropped.load(Ordering::SeqCst));
+        executor.shutdown();
+        assert!(dropped.load(Ordering::SeqCst));
+        assert_eq!(executor.pending_task_count(), 0);
+        assert_eq!(executor.next_deadline(), None);
     }
 
     #[test]
