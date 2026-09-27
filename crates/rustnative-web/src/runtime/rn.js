@@ -1470,6 +1470,11 @@ export function pointerOf(event, element) {
   };
 }
 
+/// Whether the pointer button set `bits` holds `button`.
+export function hasButton(bits, button) {
+  return (bits & ({ Primary: 1, Secondary: 2, Middle: 4, Back: 8, Forward: 16 }[button] ?? 0)) !== 0;
+}
+
 export const config = { fns: {}, base: "", csrf: null, assets: "/_rn/", version: null };
 export const islands = [];
 const topics = new Map();
@@ -1898,7 +1903,29 @@ export async function caps() {
   return Object.keys(have).filter((name) => have[name]).sort();
 }
 
+async function http(url, init, answer, reply) {
+  const headers = { ...(init.headers || {}) };
+  const target = new URL(url, location.href);
+  if (target.origin === location.origin) {
+    const token = csrfToken();
+    if (token) headers["x-csrf-token"] = token;
+  }
+  try {
+    const response = await fetch(target, { ...init, headers, credentials: "same-origin" });
+    const text = await response.text();
+    reply(answer(response.ok ? ok(text) : { Err: String(response.status) }));
+  } catch (error) {
+    reply(answer(err(error)));
+  }
+}
+
 const capabilityEffects = {
+  httpGet(island, [url, answer], reply) { http(url, { method: "GET" }, answer, reply); },
+  httpPost(island, [url, body, answer], reply) {
+    let json = true;
+    try { JSON.parse(body); } catch (_) { json = false; }
+    http(url, { method: "POST", body, headers: { "content-type": json ? "application/json" : "text/plain" } }, answer, reply);
+  },
   share(island, [title, text, url, answer], reply) {
     if (typeof navigator.share !== "function") { reply(answer(err(unsupported))); return; }
     navigator.share({ title, text, url: url || undefined }).then(() => reply(answer(ok())), (error) => reply(answer(err(error))));
@@ -2227,6 +2254,9 @@ export const extraIslands = {};
 
 let navigating = false;
 const adopted = new Set();
+// The history entry the page on screen belongs to (`history.state` has
+// already moved on when `popstate` fires).
+let current = null;
 
 function arrivedByHistory() {
   const entries = typeof performance !== "undefined" && performance.getEntriesByType ? performance.getEntriesByType("navigation") : [];
@@ -2243,7 +2273,7 @@ function savedEntry(id) {
 
 /// Keeps what the islands of the page being left hold, for a return to it.
 function saveEntry() {
-  const id = history.state && history.state.rn;
+  const id = current;
   if (!id) return;
   const states = {};
   islands.forEach((island, index) => { if (island instanceof Island) states[index] = island.state; });
@@ -2287,7 +2317,7 @@ export async function go(url, push = true) {
   }
   if (!(response.headers.get("content-type") || "").includes("text/html")) { location.assign(target.href); return; }
   const next = new DOMParser().parseFromString(await response.text(), "text/html");
-  if (push) saveEntry();
+  saveEntry();
   teardown();
   for (const style of next.querySelectorAll("style")) adoptCss(style.textContent);
   document.title = next.title;
@@ -2301,6 +2331,7 @@ export async function go(url, push = true) {
   }
   const address = response.redirected ? response.url : target.href;
   if (push) history.pushState({ rn: newEntry() }, "", address);
+  current = history.state && history.state.rn;
   document.body.replaceWith(document.importNode(next.body, true));
   const saved = push ? null : savedEntry(history.state && history.state.rn);
   await start(saved ? saved.states : null);
@@ -2317,6 +2348,7 @@ function navigation() {
   if (navigating) return;
   navigating = true;
   if (!history.state || !history.state.rn) history.replaceState({ ...(history.state || {}), rn: newEntry() }, "");
+  current = history.state.rn;
   setNavigate((url) => { go(url, true); });
   document.addEventListener("click", (event) => {
     if (event.defaultPrevented || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;

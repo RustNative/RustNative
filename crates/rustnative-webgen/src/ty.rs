@@ -115,6 +115,20 @@ pub enum Ty {
     Decl,
     ServerFnError,
     ParseError,
+    /// `PointerEvent`: read through its accessors.
+    Pointer,
+    Point,
+    PointerKind,
+    PointerButton,
+    PointerButtons,
+    Wheel,
+    Composition,
+    Clipboard,
+    // Capability results (`rustnative_web::capability`).
+    Position,
+    Permission,
+    FileData,
+    SocketEvent,
     /// A type the translator cannot see into.
     Opaque(String),
 }
@@ -170,6 +184,10 @@ impl Ty {
                 | Self::ControlState
                 | Self::Cursor
                 | Self::Lifecycle
+                | Self::PointerKind
+                | Self::PointerButton
+                | Self::PointerButtons
+                | Self::Permission
         )
     }
 
@@ -282,6 +300,18 @@ pub fn read(ty: &syn::Type, local: &dyn Fn(&str) -> bool) -> Ty {
                 "DeclarationSet" => Ty::Decl,
                 "ServerFnError" => Ty::ServerFnError,
                 "ParseIntError" | "ParseFloatError" | "ParseBoolError" => Ty::ParseError,
+                "PointerEvent" => Ty::Pointer,
+                "Point" => Ty::Point,
+                "PointerKind" => Ty::PointerKind,
+                "PointerButton" => Ty::PointerButton,
+                "PointerButtons" => Ty::PointerButtons,
+                "WheelDelta" => Ty::Wheel,
+                "Composition" => Ty::Composition,
+                "ClipboardAction" => Ty::Clipboard,
+                "Position" => Ty::Position,
+                "PermissionState" => Ty::Permission,
+                "FileData" => Ty::FileData,
+                "SocketEvent" => Ty::SocketEvent,
                 "Self" => Ty::Opaque("Self".into()),
                 other if local(other) => Ty::Adt(other.to_owned()),
                 other => Ty::Opaque(other.to_owned()),

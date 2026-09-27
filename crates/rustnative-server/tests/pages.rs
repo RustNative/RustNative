@@ -188,3 +188,35 @@ async fn explain_says_which_parts_are_static() {
     let body: serde_json::Value = serde_json::from_slice(response.body()).unwrap();
     assert_eq!(body["boundaries"][0], serde_json::json!({ "boundary": "notes", "static": false }));
 }
+
+#[tokio::test]
+async fn the_permissions_policy_opens_only_declared_capabilities() {
+    let closed = app().into_service();
+    let response =
+        closed.handle(http::Request::get("/whole").body(Bytes::new()).unwrap(), None).await;
+    let policy = response.headers()["permissions-policy"].to_str().unwrap().to_owned();
+    for feature in [
+        "camera=()",
+        "geolocation=()",
+        "bluetooth=()",
+        "accelerometer=()",
+        "clipboard-read=()",
+        "usb=()",
+    ] {
+        assert!(policy.contains(feature), "{feature} in {policy}");
+    }
+    let open = app()
+        .capabilities(&[
+            rustnative_core::Capability::Location,
+            rustnative_core::Capability::Sensors,
+        ])
+        .into_service();
+    let response =
+        open.handle(http::Request::get("/whole").body(Bytes::new()).unwrap(), None).await;
+    let policy = response.headers()["permissions-policy"].to_str().unwrap().to_owned();
+    for feature in
+        ["geolocation=(self)", "accelerometer=(self)", "gyroscope=(self)", "camera=()", "usb=()"]
+    {
+        assert!(policy.contains(feature), "{feature} in {policy}");
+    }
+}

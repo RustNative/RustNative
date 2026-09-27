@@ -42,6 +42,11 @@ pub struct Security {
     /// Cross-origin isolation (`COOP`/`COEP`), off by default: it breaks
     /// embedding third-party resources, so an application opts in.
     pub cross_origin_isolation: bool,
+    /// The capabilities the application's pages use: each opens its
+    /// powerful features to the application's own origin in the
+    /// `Permissions-Policy`; every other powerful feature stays closed
+    /// (`C69-1`).
+    pub capabilities: Vec<rustnative_core::Capability>,
 }
 
 impl Default for Security {
@@ -52,6 +57,7 @@ impl Default for Security {
             csrf: true,
             hsts: true,
             cross_origin_isolation: false,
+            capabilities: Vec::new(),
         }
     }
 }
@@ -195,6 +201,44 @@ impl std::fmt::Display for Cookie {
 }
 
 /// Adds the security headers to a response.
+/// The powerful features a page could reach, and the capability that
+/// opens each; a feature no capability opens is always closed.
+const POLICY: &[(&str, Option<rustnative_core::Capability>)] = {
+    use rustnative_core::Capability as C;
+    &[
+        ("accelerometer", Some(C::Sensors)),
+        ("ambient-light-sensor", Some(C::Sensors)),
+        ("bluetooth", Some(C::Bluetooth)),
+        ("camera", Some(C::Camera)),
+        ("clipboard-read", Some(C::Clipboard)),
+        ("display-capture", None),
+        ("geolocation", Some(C::Location)),
+        ("gyroscope", Some(C::Sensors)),
+        ("hid", None),
+        ("magnetometer", Some(C::Sensors)),
+        ("microphone", Some(C::Microphone)),
+        ("midi", None),
+        ("payment", None),
+        ("serial", Some(C::SerialPorts)),
+        ("usb", None),
+        ("web-share", Some(C::SystemShare)),
+    ]
+};
+
+/// The `Permissions-Policy` for pages using `capabilities`: their features
+/// open to this origin (`(self)`), every other powerful feature closed.
+#[must_use]
+pub fn permissions_policy(capabilities: &[rustnative_core::Capability]) -> String {
+    POLICY
+        .iter()
+        .map(|(feature, capability)| {
+            let open = capability.is_some_and(|capability| capabilities.contains(&capability));
+            format!("{feature}={}", if open { "(self)" } else { "()" })
+        })
+        .collect::<Vec<_>>()
+        .join(", ")
+}
+
 /// Marks a response whose page has a WebAssembly subtree: its policy
 /// allows compiling WebAssembly (`'wasm-unsafe-eval'`) and nothing more.
 #[derive(Debug, Clone, Copy)]
@@ -223,7 +267,7 @@ pub(crate) fn secure_headers(
     set("x-content-type-options", "nosniff".into());
     set("x-frame-options", "DENY".into());
     set("referrer-policy", "strict-origin-when-cross-origin".into());
-    set("permissions-policy", "camera=(), microphone=(), geolocation=()".into());
+    set("permissions-policy", permissions_policy(&security.capabilities));
     if security.hsts {
         set("strict-transport-security", "max-age=31536000; includeSubDomains".into());
     }

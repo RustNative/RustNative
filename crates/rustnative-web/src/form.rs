@@ -42,3 +42,20 @@ pub fn form<M: Send + 'static>(
     }
     Node::column(key, children)
 }
+
+/// A link keyed `key` showing `text` that goes to `href`: on a
+/// server-rendered page a real `<a href>`, which works without JavaScript
+/// and which the runtime turns into a client-side navigation; everywhere
+/// else a link node whose click is the application's to handle.
+#[must_use]
+pub fn link<M: Send + 'static>(
+    context: &ComponentContext<'_, M>,
+    key: &str,
+    text: &str,
+    href: &str,
+) -> Node {
+    if let Some(render) = context.services().extension::<ServerRender>() {
+        render.note_link(crate::client::global_id(context.id(), key), href);
+    }
+    Node::link(key, text)
+}

@@ -107,6 +107,7 @@ where
                     owner,
                     kind: IslandKind::Live { url: self.props.url.clone(), then: self.props.then },
                     state,
+                    persist: false,
                 });
             }
         }

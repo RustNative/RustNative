@@ -124,7 +124,7 @@ pub trait ClientLogic: Clone + PartialEq + Serialize + DeserializeOwned + 'stati
     fn view(&self) -> Node;
 }
 
-type Task<M> = Pin<Box<dyn Future<Output = Option<M>> + Send>>;
+pub(crate) type Task<M> = Pin<Box<dyn Future<Output = Option<M>> + Send>>;
 type Perform<M> = Box<dyn FnOnce(&Services) -> Option<Task<M>> + Send>;
 
 /// One requested effect: what it is (for tests and the inspector) and how a
@@ -266,7 +266,7 @@ impl<M: Send + 'static> Effects<M> {
         std::mem::take(&mut self.subscriptions)
     }
 
-    fn push(
+    pub(crate) fn push(
         &mut self,
         kind: &'static str,
         args: serde_json::Value,
@@ -579,6 +579,8 @@ struct RenderMarks {
     boundaries: Vec<(NodeId, bool)>,
     /// Forms, and where each posts.
     forms: HashMap<NodeId, String>,
+    /// Links, and where each goes.
+    links: HashMap<NodeId, String>,
     /// Components that read the request.
     dynamic: HashSet<ComponentId>,
     /// Bumped whenever a boundary's content arrives.
@@ -605,6 +607,9 @@ pub struct Island {
     pub kind: IslandKind,
     /// Its state, as the browser receives it.
     pub state: serde_json::Value,
+    /// Its state is kept in the browser's storage and outlives the page
+    /// ([`Persisted`]).
+    pub persist: bool,
 }
 
 /// How an island runs in the browser.
@@ -677,6 +682,17 @@ impl ServerRender {
     /// Records a form that posts to `action`.
     pub fn note_form(&self, id: NodeId, action: &str) {
         self.marks().forms.insert(id, action.to_owned());
+    }
+
+    /// Records a link to `href`.
+    pub fn note_link(&self, id: NodeId, href: &str) {
+        self.marks().links.insert(id, href.to_owned());
+    }
+
+    /// The links, with where each goes.
+    #[must_use]
+    pub fn links(&self) -> HashMap<NodeId, String> {
+        self.marks().links.clone()
     }
 
     /// Records that `component` read the request.
@@ -772,11 +788,91 @@ pub fn event_json(event: &Event) -> Option<serde_json::Value> {
         Event::TextInput { target, text } => {
             json!({ "type": "TextInput", "target": target.map(key), "text": text })
         }
+        Event::PointerDown { target, pointer }
+        | Event::PointerMove { target, pointer }
+        | Event::PointerUp { target, pointer }
+        | Event::PointerCancel { target, pointer } => json!({
+            "type": match event {
+                Event::PointerDown { .. } => "PointerDown",
+                Event::PointerMove { .. } => "PointerMove",
+                Event::PointerUp { .. } => "PointerUp",
+                _ => "PointerCancel",
+            },
+            "target": key(*target),
+            "pointer": pointer_json(pointer),
+        }),
+        Event::PointerEnter { target } => json!({ "type": "PointerEnter", "target": key(*target) }),
+        Event::PointerLeave { target } => json!({ "type": "PointerLeave", "target": key(*target) }),
+        Event::Wheel { target, delta } => {
+            let (variant, x, y) = match delta {
+                rustnative_core::WheelDelta::Lines { x, y } => ("Lines", x, y),
+                rustnative_core::WheelDelta::Pixels { x, y } => ("Pixels", x, y),
+            };
+            json!({ "type": "Wheel", "target": key(*target), "delta": { variant: { "x": x, "y": y } } })
+        }
+        Event::Composition { target, composition } => {
+            let composition = match composition {
+                rustnative_core::Composition::Started => json!("Started"),
+                rustnative_core::Composition::Updated { text, cursor } => {
+                    json!({ "Updated": { "text": text, "cursor": cursor } })
+                }
+                rustnative_core::Composition::Committed { text } => {
+                    json!({ "Committed": { "text": text } })
+                }
+                rustnative_core::Composition::Cancelled => json!("Cancelled"),
+            };
+            json!({ "type": "Composition", "target": target.map(key), "composition": composition })
+        }
+        Event::Clipboard { target, action } => {
+            let action = match action {
+                rustnative_core::ClipboardAction::Copy => json!("Copy"),
+                rustnative_core::ClipboardAction::Cut => json!("Cut"),
+                rustnative_core::ClipboardAction::Paste { text } => {
+                    json!({ "Paste": { "text": text } })
+                }
+            };
+            json!({ "type": "Clipboard", "target": target.map(key), "action": action })
+        }
         Event::DeepLink { url } => json!({ "type": "DeepLink", "url": url }),
         Event::Lifecycle(lifecycle) => {
             json!({ "type": "Lifecycle", "value": format!("{lifecycle:?}") })
         }
         _ => return None,
+    })
+}
+
+/// A pointer sample as the runtime delivers it (`rn.pointerOf`).
+fn pointer_json(pointer: &rustnative_core::PointerEvent) -> serde_json::Value {
+    use rustnative_core::{PointerButton, PointerKind};
+    let name = |button: PointerButton| match button {
+        PointerButton::Primary => "Primary",
+        PointerButton::Secondary => "Secondary",
+        PointerButton::Middle => "Middle",
+        PointerButton::Back => "Back",
+        PointerButton::Forward => "Forward",
+    };
+    let all = [
+        PointerButton::Primary,
+        PointerButton::Secondary,
+        PointerButton::Middle,
+        PointerButton::Back,
+        PointerButton::Forward,
+    ];
+    let bits = all
+        .iter()
+        .enumerate()
+        .filter(|(_, button)| pointer.buttons().contains(**button))
+        .fold(0, |bits, (index, _)| bits | (1 << index));
+    let modifiers = pointer.modifiers();
+    serde_json::json!({
+        "pointer_id": pointer.pointer_id(),
+        "kind": match pointer.kind() { PointerKind::Mouse => "Mouse", PointerKind::Touch => "Touch", PointerKind::Pen => "Pen" },
+        "position": { "x": pointer.position().x, "y": pointer.position().y },
+        "button": pointer.button().map(name),
+        "buttons": bits,
+        "modifiers": { "shift": modifiers.shift, "ctrl": modifiers.ctrl, "alt": modifiers.alt, "meta": modifiers.meta },
+        "pressure": pointer.pressure(),
+        "region": pointer.region(),
     })
 }
 
@@ -837,7 +933,7 @@ pub fn state_json(state: &impl Serialize) -> Result<serde_json::Value, StateErro
 /// The component that runs a client component's logic ([`ClientLogic`])
 /// on a native target and on the server; see the [module
 /// documentation](self). Its props are the initial state.
-pub struct Client<S: ClientLogic> {
+pub struct Client<S: ClientLogic, const PERSIST: bool = false> {
     initial: S,
     state: S,
     fx: Effects<S::Message>,
@@ -866,7 +962,12 @@ impl<M> std::fmt::Debug for ClientMessage<M> {
     }
 }
 
-impl<S: ClientLogic> Client<S> {
+/// A client component whose state the browser keeps (`localStorage`):
+/// it comes back as the person left it, on any page that has it, until
+/// the site's storage is cleared. Natively it is a [`Client`].
+pub type Persisted<S> = Client<S, true>;
+
+impl<S: ClientLogic, const PERSIST: bool> Client<S, PERSIST> {
     /// The current state.
     #[must_use]
     pub const fn state(&self) -> &S {
@@ -874,7 +975,7 @@ impl<S: ClientLogic> Client<S> {
     }
 }
 
-impl<S: ClientLogic> Component for Client<S> {
+impl<S: ClientLogic, const PERSIST: bool> Component for Client<S, PERSIST> {
     type Props = S;
     type Message = ClientMessage<S::Message>;
 
@@ -927,6 +1028,7 @@ impl<S: ClientLogic> Component for Client<S> {
                     owner: context.id(),
                     kind: IslandKind::Client(S::MODULE),
                     state,
+                    persist: PERSIST,
                 });
             }
             return self.view();
@@ -937,6 +1039,24 @@ impl<S: ClientLogic> Component for Client<S> {
         }
         let services = context.services().clone();
         for effect in self.fx.take() {
+            // Pointer capture is the tree's own input request.
+            if matches!(effect.kind, "capturePointer" | "releasePointer") {
+                let key =
+                    effect.args.get(0).and_then(serde_json::Value::as_str).unwrap_or_default();
+                let id = effect
+                    .args
+                    .get(1)
+                    .and_then(serde_json::Value::as_u64)
+                    .and_then(|id| u32::try_from(id).ok());
+                if let Some(id) = id {
+                    if effect.kind == "capturePointer" {
+                        context.input().capture_pointer(key, id);
+                    } else {
+                        context.input().release_pointer(key, id);
+                    }
+                }
+                continue;
+            }
             let delay = if effect.kind == "after" {
                 effect.args.get(0).and_then(serde_json::Value::as_u64)
             } else {

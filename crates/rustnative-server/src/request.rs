@@ -220,13 +220,9 @@ fn decode(text: &str) -> String {
 }
 
 fn pairs_to<T: DeserializeOwned>(pairs: Vec<(String, String)>) -> Result<T, ServerError> {
-    // Numbers and booleans read as such; if the type wanted them as text,
-    // the second attempt gives it every value as a string.
-    let typed = pairs.iter().map(|(key, value)| (key.clone(), scalar(value))).collect();
-    let text =
-        pairs.into_iter().map(|(key, value)| (key, serde_json::Value::String(value))).collect();
-    serde_json::from_value(serde_json::Value::Object(typed))
-        .or_else(|_| serde_json::from_value(serde_json::Value::Object(text)))
+    // Each value is read as its field's type asks: a number, a boolean,
+    // text — so a numeric-looking value for a text field stays text.
+    rustnative_web::request::from_pairs(pairs)
         .map_err(|error| ServerError::bad_request(format!("Invalid input: {error}")))
 }
 

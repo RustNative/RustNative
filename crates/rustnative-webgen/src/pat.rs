@@ -227,6 +227,12 @@ impl Cx<'_> {
                 Ty::Int(IntK::U8),
                 format!("rn.tag({value}) === \"Function\""),
             ),
+            ("SocketEvent", "Message" | "Failed") => single(
+                self,
+                format!("{value}.{name}"),
+                Ty::Str,
+                format!("rn.tag({value}) === {}", string(&name)),
+            ),
             ("SizeMode", "Fixed") => single(
                 self,
                 format!("{value}.Fixed"),
@@ -308,6 +314,12 @@ impl Cx<'_> {
                 );
             };
             (Some(format!("{value}.type === {}", string(&name))), value.to_owned(), fields)
+        } else if let Some(fields) = crate::methods::framework_variant_fields(&owner, &name) {
+            (
+                Some(format!("rn.tag({value}) === {}", string(&name))),
+                format!("{value}.{name}"),
+                fields,
+            )
         } else if let Some(def) = self.module.enums.get(&owner).cloned() {
             let Some((_, Shape::Struct(fields))) =
                 def.variants.iter().find(|(variant, _)| *variant == name)

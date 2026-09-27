@@ -212,6 +212,8 @@ pub struct Marks {
     pub islands: HashMap<ComponentId, usize>,
     /// Form nodes, with the path each posts to.
     pub forms: HashMap<NodeId, String>,
+    /// Link nodes, with where each goes.
+    pub links: HashMap<NodeId, String>,
     /// The request-forgery token.
     pub csrf: String,
     /// Islands are rendered by the browser (a client-only page): their
@@ -713,7 +715,11 @@ impl<'a> Realizer<'a> {
                 None,
             ),
             Control::Link { text } => {
-                let element = Element::new("a").attr("href", "#").text(text.clone());
+                // A real address where the page gave one: it works with no
+                // JavaScript, opens in a new tab, and can be bookmarked.
+                let href =
+                    self.marks.links.get(&node.id()).cloned().unwrap_or_else(|| "#".to_owned());
+                let element = Element::new("a").attr("href", href).text(text.clone());
                 self.decorate(
                     element,
                     node,

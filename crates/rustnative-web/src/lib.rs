@@ -58,6 +58,7 @@
 //! ```
 #![deny(missing_docs)]
 
+pub mod capability;
 pub mod client;
 pub mod css;
 pub mod dom;

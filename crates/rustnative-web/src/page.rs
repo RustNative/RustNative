@@ -385,6 +385,7 @@ impl Session {
         let mut marks = Marks {
             csrf: self.csrf.clone(),
             forms: self.render.forms(),
+            links: self.render.links(),
             client_only: self.strategy == Strategy::ClientOnly,
             ..Marks::default()
         };
@@ -406,6 +407,10 @@ impl Session {
             match &island.kind {
                 IslandKind::Client(module) => {
                     spec.insert("kind".into(), json!("client"));
+                    spec.insert("name".into(), json!(module.name));
+                    if island.persist {
+                        spec.insert("persist".into(), json!(true));
+                    }
                     spec.insert("m".into(), json!(module.url(&cx.assets)));
                     spec.insert("fns".into(), fns(module));
                     if !modules.iter().any(|known| std::ptr::eq(*known, *module)) {

@@ -34,15 +34,11 @@ pub fn event_fields(variant: &str) -> Option<Vec<(String, Ty)>> {
         "DateChanged" => vec![target(), ("date".into(), Ty::Date)],
         "DeepLink" => vec![("url".into(), Ty::Str)],
         "PointerDown" | "PointerMove" | "PointerUp" | "PointerCancel" => {
-            vec![target(), ("pointer".into(), Ty::Opaque("PointerEvent".into()))]
+            vec![target(), ("pointer".into(), Ty::Pointer)]
         }
-        "Wheel" => vec![target(), ("delta".into(), Ty::Opaque("WheelDelta".into()))],
-        "Composition" => {
-            vec![optional_target(), ("composition".into(), Ty::Opaque("Composition".into()))]
-        }
-        "Clipboard" => {
-            vec![optional_target(), ("action".into(), Ty::Opaque("ClipboardAction".into()))]
-        }
+        "Wheel" => vec![target(), ("delta".into(), Ty::Wheel)],
+        "Composition" => vec![optional_target(), ("composition".into(), Ty::Composition)],
+        "Clipboard" => vec![optional_target(), ("action".into(), Ty::Clipboard)],
         "VisibleRangeChanged" => {
             vec![target(), ("range".into(), Ty::Opaque("VirtualRange".into()))]
         }
@@ -71,6 +67,59 @@ pub fn framework_struct_fields(name: &str) -> Option<Vec<(String, Ty)>> {
             ("size".into(), Ty::Int(IntK::U16)),
             ("weight".into(), Ty::Int(IntK::U16)),
         ],
+        "Point" => vec![("x".into(), Ty::Int(IntK::I32)), ("y".into(), Ty::Int(IntK::I32))],
+        "Position" => ["latitude", "longitude", "accuracy"]
+            .iter()
+            .map(|field| ((*field).to_owned(), Ty::Float(false)))
+            .collect(),
+        "FileData" => vec![("name".into(), Ty::Str), ("text".into(), Ty::Str)],
+        _ => return None,
+    })
+}
+
+/// The fields of a framework enum's struct variant, for patterns.
+pub fn framework_variant_fields(owner: &str, variant: &str) -> Option<Vec<(String, Ty)>> {
+    Some(match (owner, variant) {
+        ("WheelDelta", "Lines" | "Pixels") => {
+            vec![("x".into(), Ty::Int(IntK::I32)), ("y".into(), Ty::Int(IntK::I32))]
+        }
+        ("Composition", "Updated") => vec![("text".into(), Ty::Str), ("cursor".into(), USIZE)],
+        ("Composition", "Committed") => vec![("text".into(), Ty::Str)],
+        ("ClipboardAction", "Paste") => vec![("text".into(), Ty::Opt(Box::new(Ty::Str)))],
+        _ => return None,
+    })
+}
+
+/// A capability effect: its name in the runtime, and what it takes (a
+/// reply is a function to the component's message).
+pub fn capability_signature(method: &str, message: &Ty) -> Option<(&'static str, Vec<Ty>)> {
+    let reply = || Ty::Fn(Box::new(message.clone()));
+    Some(match method {
+        "http_get" => ("httpGet", vec![Ty::Str, reply()]),
+        "http_post" => ("httpPost", vec![Ty::Str, Ty::Str, reply()]),
+        "share" => ("share", vec![Ty::Str, Ty::Str, Ty::Str, reply()]),
+        "locate" => ("locate", vec![reply()]),
+        "permission" => ("permission", vec![Ty::Str, reply()]),
+        "request_permission" => ("requestPermission", vec![Ty::Str, reply()]),
+        "open_file" => ("openFile", vec![Ty::Str, reply()]),
+        "save_file" => ("saveFile", vec![Ty::Str, Ty::Str, reply()]),
+        "db_put" => ("dbPut", vec![Ty::Str, Ty::Str, Ty::Opaque("_".into())]),
+        "db_get" => ("dbGet", vec![Ty::Str, Ty::Str, reply()]),
+        "cache_put" => ("cachePut", vec![Ty::Str]),
+        "cache_get" => ("cacheGet", vec![Ty::Str, reply()]),
+        "read_clipboard" => ("readClipboard", vec![reply()]),
+        "socket_open" => ("socketOpen", vec![Ty::Str, Ty::Str, reply()]),
+        "socket_send" => ("socketSend", vec![Ty::Str, Ty::Str]),
+        "socket_close" => ("socketClose", vec![Ty::Str]),
+        "worker" => ("worker", vec![Ty::Str, Ty::Opaque("_".into()), reply()]),
+        "vibrate" => ("vibrate", vec![Ty::Int(IntK::U32)]),
+        "online" => ("online", vec![reply()]),
+        "media" => ("media", vec![Ty::Bool, Ty::Bool, reply()]),
+        "bluetooth" => ("bluetooth", vec![Ty::Str, reply()]),
+        "sensor" => ("sensor", vec![Ty::Str, reply()]),
+        "capabilities" => ("capabilities", vec![reply()]),
+        "capture_pointer" => ("capturePointer", vec![Ty::Str, Ty::Int(IntK::U32)]),
+        "release_pointer" => ("releasePointer", vec![Ty::Str, Ty::Int(IntK::U32)]),
         _ => return None,
     })
 }
@@ -80,6 +129,9 @@ pub fn framework_field(ty: &Ty, name: &str) -> Option<Ty> {
     let fields = match ty {
         Ty::Modifiers => framework_struct_fields("KeyModifiers")?,
         Ty::Date => framework_struct_fields("CalendarDate")?,
+        Ty::Point => framework_struct_fields("Point")?,
+        Ty::Position => framework_struct_fields("Position")?,
+        Ty::FileData => framework_struct_fields("FileData")?,
         Ty::Insets => framework_struct_fields("EdgeInsets")?,
         Ty::Typography => framework_struct_fields("Typography")?,
         Ty::Opaque(kind) if kind == "VirtualRange" => {
@@ -134,6 +186,12 @@ fn unit_variant(owner: &str, name: &str) -> Option<(String, Ty)> {
         "Lifecycle" => (quoted(), Ty::Lifecycle),
         "AccessibilityRole" => (quoted(), Ty::Role),
         "Control" if name == "Separator" => (quoted(), Ty::Control),
+        "PointerKind" => (quoted(), Ty::PointerKind),
+        "PointerButton" => (quoted(), Ty::PointerButton),
+        "PermissionState" => (quoted(), Ty::Permission),
+        "Composition" if matches!(name, "Started" | "Cancelled") => (quoted(), Ty::Composition),
+        "ClipboardAction" if matches!(name, "Copy" | "Cut") => (quoted(), Ty::Clipboard),
+        "SocketEvent" if matches!(name, "Opened" | "Closed") => (quoted(), Ty::SocketEvent),
         _ => return None,
     })
 }
@@ -1250,8 +1308,14 @@ impl Cx<'_> {
                 |a, fx| format!("{fx}.js(String({}), String({}), {}, {})", a[0], a[1], a[2], a[3]),
             ),
             other => {
-                if let Some(extra) = crate::methods::capability_effect(other) {
-                    let (pre, args, _) = arguments(self, &mut call.args, &[])?;
+                if let Some((extra, expected)) = capability_signature(other, &message) {
+                    let (pre, mut args, _) = arguments(self, &mut call.args, &expected)?;
+                    // Values crossing to the runtime are copies, as in Rust.
+                    if other == "db_put" || other == "worker" {
+                        if let Some(value) = args.get_mut(if other == "db_put" { 2 } else { 1 }) {
+                            *value = format!("rn.clone({value})");
+                        }
+                    }
                     let mut all = fx.pre;
                     all.extend(pre);
                     all.push(format!("{}.{extra}({});", fx.js, args.join(", ")));
@@ -1536,6 +1600,25 @@ impl Cx<'_> {
             },
             Ty::NodeId => match method {
                 "local_key" => done!(r, Ty::Opt(Box::new(Ty::Str))),
+                _ => unknown(self, &ty),
+            },
+            Ty::Pointer => match method {
+                "pointer_id" => done!(format!("{r}.pointer_id"), Ty::Int(IntK::U32)),
+                "kind" => done!(format!("{r}.kind"), Ty::PointerKind),
+                "position" => done!(format!("{r}.position"), Ty::Point),
+                "button" => done!(format!("{r}.button"), Ty::Opt(Box::new(Ty::PointerButton))),
+                "buttons" => done!(format!("{r}.buttons"), Ty::PointerButtons),
+                "modifiers" => done!(format!("{r}.modifiers"), Ty::Modifiers),
+                "pressure" => done!(format!("{r}.pressure"), Ty::Opt(Box::new(Ty::Float(true)))),
+                "region" => done!(format!("{r}.region"), Ty::Opt(Box::new(Ty::Int(IntK::U32)))),
+                _ => unknown(self, &ty),
+            },
+            Ty::PointerButtons => match method {
+                "contains" => {
+                    let (args, _) = args!(Ty::PointerButton);
+                    done!(format!("rn.hasButton({r}, {})", args[0]), Ty::Bool);
+                }
+                "is_empty" => done!(format!("({r} === 0)"), Ty::Bool),
                 _ => unknown(self, &ty),
             },
             Ty::Date => unknown(self, &ty),
@@ -2663,34 +2746,6 @@ fn strip_ref(expr: &mut syn::Expr) -> &mut syn::Expr {
         syn::Expr::Reference(reference) => strip_ref(&mut reference.expr),
         other => other,
     }
-}
-
-/// An effect beyond the built-in ones: the browser capabilities (Web
-/// milestone E) — its runtime name.
-pub fn capability_effect(method: &str) -> Option<&'static str> {
-    Some(match method {
-        "share" => "share",
-        "locate" => "locate",
-        "permission" => "permission",
-        "request_permission" => "requestPermission",
-        "open_file" => "openFile",
-        "save_file" => "saveFile",
-        "db_put" => "dbPut",
-        "db_get" => "dbGet",
-        "cache_put" => "cachePut",
-        "cache_get" => "cacheGet",
-        "socket_open" => "socketOpen",
-        "socket_send" => "socketSend",
-        "socket_close" => "socketClose",
-        "worker" => "worker",
-        "vibrate" => "vibrate",
-        "online" => "online",
-        "visibility" => "visibility",
-        "media" => "media",
-        "bluetooth" => "bluetooth",
-        "sensor" => "sensor",
-        _ => return None,
-    })
 }
 
 // ------------------------------------------------------ format strings ----

@@ -8,6 +8,7 @@
     clippy::expect_used,
     clippy::needless_pass_by_value,
     clippy::must_use_candidate,
+    clippy::semicolon_if_nothing_returned,
     missing_docs,
     reason = "tests, with client logic written as an application would"
 )]
@@ -300,7 +301,7 @@ fn a_partial_page_caches_its_shell_and_streams_its_hole() {
 
     let mut chunks = Vec::new();
     let rendered = render_streamed(page, &cx("/greet?name=Ada"), Some(&shell), &mut |chunk| {
-        chunks.push(chunk)
+        chunks.push(chunk);
     });
     assert!(chunks[0].starts_with(&shell.html), "the cached shell goes first");
     assert!(chunks.concat().contains(">Hello, Ada</span>"));

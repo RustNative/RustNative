@@ -148,7 +148,7 @@ order and a test can compare them.
 | `fx.publish(topic, value)`, `fx.subscribe(topic, reply)` | values shared between the islands of a page |
 | `fx.download(name, bytes)` | offers a file to save |
 | `fx.js(module, function, args, reply)` | calls hand-written JavaScript |
-| `fx.share`, `fx.locate`, `fx.open_file`, `fx.save_file`, `fx.db_put`, `fx.cache_put`, `fx.socket_open`, `fx.worker`, … | the platform capabilities, each gated by the capability it names |
+| `fx.http_get`, `fx.share`, `fx.locate`, `fx.open_file`, `fx.db_put`, `fx.socket_open`, `fx.worker`, `fx.capture_pointer`, … | the platform capabilities (`docs/web/capabilities.md`) |
 
 Natively, a native host performs each through `Services`; `fx.js` answers
 with an error, since there is no JavaScript.

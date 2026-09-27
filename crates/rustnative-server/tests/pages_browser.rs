@@ -13,6 +13,7 @@
     clippy::expect_used,
     clippy::needless_pass_by_value,
     clippy::must_use_candidate,
+    clippy::semicolon_if_nothing_returned,
     clippy::unused_async,
     missing_docs,
     reason = "tests, with client logic written as an application would"
@@ -65,7 +66,7 @@ pub mod counter {
                     fx.call::<Double>(self.count, Msg::Doubled);
                 }
                 Event::TextChanged { target, value } if target == NodeId::from_key("name") => {
-                    self.name = value
+                    self.name = value;
                 }
                 Event::Toggled { target, on } if target == NodeId::from_key("on") => self.on = on,
                 _ => {}

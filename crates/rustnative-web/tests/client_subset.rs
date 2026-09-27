@@ -23,6 +23,7 @@
     clippy::cast_sign_loss,
     clippy::cast_possible_wrap,
     clippy::cast_lossless,
+    clippy::semicolon_if_nothing_returned,
     missing_docs,
     reason = "test modules written the way an application would write client logic"
 )]
@@ -423,6 +424,131 @@ pub mod effects {
     }
 }
 
+#[rustnative_web::client]
+pub mod gestures {
+    use rustnative_core::{
+        ClipboardAction, Composition, Event, Node, NodeId, PointerButton, PointerKind, WheelDelta,
+    };
+    use rustnative_web::Effects;
+    use rustnative_web::capability::{PermissionState, Position, SocketEvent};
+    use serde::{Deserialize, Serialize};
+
+    #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+    pub struct Gestures {
+        pub log: Vec<String>,
+        pub dragging: bool,
+        pub x: i32,
+        pub y: i32,
+    }
+
+    pub enum Msg {
+        Located(Result<Position, String>),
+        Permission(PermissionState),
+        Socket(SocketEvent),
+        Capabilities(Vec<String>),
+        Online(bool),
+    }
+
+    impl Gestures {
+        pub fn update(&mut self, event: Event, fx: &mut Effects<Msg>) {
+            match event {
+                Event::PointerDown { target, pointer } if target == NodeId::from_key("pad") => {
+                    let position = pointer.position();
+                    self.dragging = true;
+                    self.x = position.x;
+                    self.y = position.y;
+                    let primary = pointer.buttons().contains(PointerButton::Primary);
+                    let pen = pointer.kind() == PointerKind::Pen;
+                    let pressed = pointer.button() == Some(PointerButton::Primary);
+                    let shift = pointer.modifiers().shift;
+                    self.log.push(format!(
+                        "down {} {primary} {pen} {pressed} {shift}",
+                        pointer.pointer_id()
+                    ));
+                    fx.capture_pointer("pad", pointer.pointer_id());
+                }
+                Event::PointerMove { pointer, .. } if self.dragging => {
+                    let position = pointer.position();
+                    self.log.push(format!("move {} {}", position.x - self.x, position.y - self.y));
+                }
+                Event::PointerUp { pointer, .. } => {
+                    self.dragging = false;
+                    fx.release_pointer("pad", pointer.pointer_id());
+                    self.log.push(format!("up {}", pointer.pressure().unwrap_or(-1.0)));
+                }
+                Event::Wheel { delta: WheelDelta::Lines { y, .. }, .. } => {
+                    self.log.push(format!("lines {y}"))
+                }
+                Event::Wheel { delta: WheelDelta::Pixels { x, y }, .. } => {
+                    self.log.push(format!("pixels {x} {y}"));
+                }
+                Event::Composition { composition: Composition::Started, .. } => {
+                    self.log.push("started".to_owned());
+                }
+                Event::Composition {
+                    composition: Composition::Updated { text, cursor }, ..
+                } => {
+                    self.log.push(format!("composing {text} {cursor}"));
+                }
+                Event::Composition { composition: Composition::Committed { text }, .. } => {
+                    self.log.push(format!("committed {text}"));
+                }
+                Event::Clipboard { action: ClipboardAction::Paste { text }, .. } => {
+                    self.log.push(format!("paste {}", text.unwrap_or_default()));
+                }
+                Event::Clipboard { action: ClipboardAction::Copy, .. } => {
+                    self.log.push("copy".to_owned())
+                }
+                Event::Click { target } if target == NodeId::from_key("where") => {
+                    fx.locate(Msg::Located)
+                }
+                Event::Click { target } if target == NodeId::from_key("may") => {
+                    fx.permission("geolocation", Msg::Permission);
+                }
+                Event::Click { target } if target == NodeId::from_key("socket") => {
+                    fx.socket_open("chat", "/chat", Msg::Socket);
+                }
+                Event::Click { target } if target == NodeId::from_key("caps") => {
+                    fx.capabilities(Msg::Capabilities);
+                    fx.online(Msg::Online);
+                    fx.db_put("notes", "a", &self.x);
+                    fx.vibrate(20);
+                }
+                _ => {}
+            }
+        }
+
+        pub fn message(&mut self, message: Msg, fx: &mut Effects<Msg>) {
+            let _ = fx;
+            match message {
+                Msg::Located(Ok(position)) => self.log.push(format!("at {}", position.latitude)),
+                Msg::Located(Err(error)) => self.log.push(format!("nowhere: {error}")),
+                Msg::Permission(PermissionState::Granted) => self.log.push("granted".to_owned()),
+                Msg::Permission(state) => {
+                    self.log.push(format!("unsupported {}", state == PermissionState::Unsupported))
+                }
+                Msg::Socket(SocketEvent::Message(text)) => self.log.push(text),
+                Msg::Socket(SocketEvent::Failed(error)) => {
+                    self.log.push(format!("failed: {error}"))
+                }
+                Msg::Socket(_) => {}
+                Msg::Capabilities(names) => self.log.push(format!("caps [{}]", names.join(","))),
+                Msg::Online(online) => self.log.push(format!("online {online}")),
+            }
+        }
+
+        pub fn view(&self) -> Node {
+            Node::column(
+                "gestures",
+                self.log
+                    .iter()
+                    .enumerate()
+                    .map(|(index, line)| Node::label(format!("l{index}"), line.clone())),
+            )
+        }
+    }
+}
+
 /// Polls a future that is ready at once (an effect run with no services).
 fn ready<T>(future: Pin<Box<dyn Future<Output = T> + Send>>) -> T {
     let mut future = future;
@@ -527,12 +653,35 @@ const step = (run) => {
     if (kind === "call") message = args[2]({ Err: { Transport: "no HTTP service" } });
     else if (kind === "after") message = args[1];
     else if (kind === "load") message = args[1](null);
+    else if (NO_SERVICES[kind]) message = NO_SERVICES[kind](args);
     else continue;
     module.message(state, message, new Proxy({}, { get: () => () => {} }));
     replies.push({ state: JSON.parse(JSON.stringify(state)), view: realize() });
   }
   record.replies = replies;
   out.push(record);
+};
+// What a host with no services answers each capability with.
+const UNAVAILABLE = "this capability is not available on this platform";
+const NO_SERVICES = {
+  httpGet: (args) => args[1]({ Err: UNAVAILABLE }),
+  httpPost: (args) => args[2]({ Err: UNAVAILABLE }),
+  share: (args) => args[3]({ Err: UNAVAILABLE }),
+  locate: (args) => args[0]({ Err: UNAVAILABLE }),
+  permission: (args) => args[1]("Unsupported"),
+  requestPermission: (args) => args[1]("Unsupported"),
+  openFile: (args) => args[1](null),
+  saveFile: (args) => args[2]({ Err: UNAVAILABLE }),
+  dbGet: (args) => args[2](null),
+  cacheGet: (args) => args[1](null),
+  readClipboard: (args) => args[0]({ Err: UNAVAILABLE }),
+  socketOpen: (args) => args[2]({ Failed: UNAVAILABLE }),
+  worker: (args) => args[2]({ Err: UNAVAILABLE }),
+  online: (args) => args[0](true),
+  media: (args) => args[2]({ Err: UNAVAILABLE }),
+  bluetooth: (args) => args[1]({ Err: UNAVAILABLE }),
+  sensor: (args) => args[1]({ Err: UNAVAILABLE }),
+  capabilities: (args) => args[0]([]),
 };
 // The arguments the Rust side records (functions and messages are not data).
 function kindArgs(kind, args) {
@@ -676,4 +825,47 @@ fn numbers_text_and_control_flow_agree_including_their_failures() {
 fn effects_are_requested_and_answered_alike() {
     let events = vec![click("tick"), click("ask"), click("go"), click("tick")];
     agree(effects::Effectful::default(), &events, true);
+}
+
+#[test]
+fn pointers_wheels_compositions_and_capabilities_agree() {
+    use rustnative_core::{
+        ClipboardAction, Composition, Point, PointerButton, PointerButtons, PointerEvent,
+        PointerKind, WheelDelta,
+    };
+    let sample = |x: i32, y: i32| {
+        PointerEvent::new(7, PointerKind::Pen, Point::new(x, y), std::time::Duration::ZERO)
+            .with_buttons(PointerButtons::none().with(PointerButton::Primary))
+            .with_modifiers(KeyModifiers { shift: true, ..KeyModifiers::default() })
+    };
+    let pad = || NodeId::from_key("pad");
+    let events = vec![
+        Event::PointerDown {
+            target: pad(),
+            pointer: sample(10, 20).with_button(PointerButton::Primary),
+        },
+        Event::PointerMove { target: pad(), pointer: sample(250, -5) },
+        Event::PointerUp { target: pad(), pointer: sample(250, -5).with_pressure(0.5) },
+        Event::Wheel { target: pad(), delta: WheelDelta::Lines { x: 0, y: 240 } },
+        Event::Wheel { target: pad(), delta: WheelDelta::Pixels { x: -3, y: 17 } },
+        Event::Composition { target: None, composition: Composition::Started },
+        Event::Composition {
+            target: None,
+            composition: Composition::Updated { text: "にほ".into(), cursor: 2 },
+        },
+        Event::Composition {
+            target: None,
+            composition: Composition::Committed { text: "日本".into() },
+        },
+        Event::Clipboard {
+            target: None,
+            action: ClipboardAction::Paste { text: Some("pasted".into()) },
+        },
+        Event::Clipboard { target: None, action: ClipboardAction::Copy },
+        click("where"),
+        click("may"),
+        click("socket"),
+        click("caps"),
+    ];
+    agree(gestures::Gestures::default(), &events, false);
 }

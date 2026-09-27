@@ -189,6 +189,14 @@ impl ServerApp {
         self
     }
 
+    /// Declares the capabilities the application's pages use, which opens
+    /// their features, and only theirs, in the `Permissions-Policy`.
+    #[must_use]
+    pub fn capabilities(mut self, capabilities: &[rustnative_core::Capability]) -> Self {
+        self.security.capabilities = capabilities.to_vec();
+        self
+    }
+
     /// Replaces the security settings.
     #[must_use]
     pub fn security(mut self, security: Security) -> Self {
@@ -261,7 +269,8 @@ impl ServerApp {
                 None => "rate limit: off (turned off by the application)".into(),
             },
             format!("request forgery protection: {}", if security.csrf { "on" } else { "off" }),
-            "security headers: content security policy with a nonce, nosniff, frame denial, referrer and permissions policy".into(),
+            "security headers: content security policy with a nonce, nosniff, frame denial, referrer policy".into(),
+            format!("permissions policy: {}", crate::security::permissions_policy(&security.capabilities)),
             format!("strict transport security: {}", if security.hsts { "on" } else { "off" }),
             format!(
                 "health: {}",
