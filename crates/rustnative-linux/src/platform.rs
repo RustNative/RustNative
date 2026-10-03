@@ -18,6 +18,36 @@ pub struct LinuxPlatform {
     toolkit: ToolkitKind,
 }
 
+#[cfg(target_os = "linux")]
+impl LinuxPlatform {
+    /// Runs `application` under the host's own main loop (guest-runtime
+    /// mode, Milestone 40): its windows open now and work as the host's
+    /// loop iterates GLib's default context. Drop the result to close them.
+    ///
+    /// # Errors
+    ///
+    /// There is no display, or the first windows could not be realized.
+    pub fn start_external<'a>(
+        &self,
+        application: &'a mut Application,
+    ) -> Result<crate::ExternalLoop<'a>, Error> {
+        crate::gtk::embed::ExternalLoop::start(application, false)
+    }
+
+    /// Realizes `application`'s primary window as a widget for the host to
+    /// place in its own widget tree (embedding inward, Milestone 40).
+    ///
+    /// # Errors
+    ///
+    /// As [`Self::start_external`].
+    pub fn embed<'a>(
+        &self,
+        application: &'a mut Application,
+    ) -> Result<crate::EmbeddedRoot<'a>, Error> {
+        crate::gtk::embed::EmbeddedRoot::start(application)
+    }
+}
+
 impl LinuxPlatform {
     /// Creates the backend, realizing the tree with GTK 4. Equivalent to
     /// [`Default::default`].
@@ -71,8 +101,10 @@ impl Platform for LinuxPlatform {
     type Error = Error;
 
     fn run(&mut self, application: &mut Application) -> Result<(), Self::Error> {
-        let options =
-            crate::toolkit::RunOptions { launch_url: crate::toolkit::launch_url(std::env::args()) };
+        let options = crate::toolkit::RunOptions {
+            launch_url: crate::toolkit::launch_url(std::env::args()),
+            app_id: self.app_id.clone(),
+        };
         crate::toolkit::run(self.toolkit, application, &options, &Session::detect())
     }
 

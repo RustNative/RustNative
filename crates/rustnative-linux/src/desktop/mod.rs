@@ -18,6 +18,10 @@ pub mod portal;
 mod session;
 #[cfg(target_os = "linux")]
 pub mod settings;
+#[cfg(target_os = "linux")]
+pub mod single_instance;
+#[cfg(target_os = "linux")]
+pub mod tray;
 
 pub use session::{DesktopEnvironment, DisplayServer, Session};
 
@@ -37,7 +41,18 @@ pub(crate) fn capabilities(session: &Session) -> Vec<rustnative_core::Capability
         Capability::StatePersistence,
         Capability::SerialPorts,
         Capability::Permissions,
+        // logind, the memory monitor, and the idle flush
+        // (`gtk::lifecycle`); launch URLs and a second launch's link
+        // (`desktop::single_instance`).
+        Capability::Lifecycle,
+        Capability::DeepLinks,
+        // The launcher entry's progress (`desktop::tray::set_progress`).
+        Capability::Surface(rustnative_core::SurfaceKind::TaskbarProgress),
     ];
+    // A tray icon only where a tray host runs.
+    if tray::available() {
+        answered.push(Capability::Surface(rustnative_core::SurfaceKind::TrayExtra));
+    }
     // X11 honours a client's requested position; a Wayland compositor
     // places every window itself and tells the client nothing.
     if session.display_server() == Some(DisplayServer::X11) {

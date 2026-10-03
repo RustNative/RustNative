@@ -49,10 +49,12 @@
 
 mod anchor;
 mod extent;
+mod lists;
 mod range;
 
 pub use anchor::ScrollAnchor;
 pub use extent::ExtentCache;
+pub use lists::{VirtualLists, index_of, item_at};
 pub use range::VirtualRange;
 
 /// The axis a virtual list runs along.

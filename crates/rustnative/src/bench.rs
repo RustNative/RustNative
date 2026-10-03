@@ -31,6 +31,8 @@ use crate::error::{Error, Result};
 pub enum BenchTarget {
     /// The Windows backend.
     Windows,
+    /// The Linux backend (GTK 4), measured on a Linux host.
+    Linux,
     /// The headless reference backend.
     Headless,
     /// The web backend, in headless Edge (`examples/web-bench`).
@@ -44,6 +46,7 @@ impl BenchTarget {
     const fn name(self) -> &'static str {
         match self {
             Self::Windows => "windows",
+            Self::Linux => "linux",
             Self::Headless => "headless",
             Self::Web => "web",
             Self::Serverless => "serverless",
@@ -53,7 +56,7 @@ impl BenchTarget {
     /// The package whose binary runs this target's scenarios.
     const fn package(self) -> &'static str {
         match self {
-            Self::Windows | Self::Headless => "bench-app",
+            Self::Windows | Self::Linux | Self::Headless => "bench-app",
             Self::Web => "web-bench",
             Self::Serverless => "web-notes",
         }
@@ -62,7 +65,7 @@ impl BenchTarget {
     /// The bench-app scenarios this target runs, with how many times each.
     const fn scenarios(self) -> &'static [(&'static str, usize)] {
         match self {
-            Self::Windows => &[
+            Self::Windows | Self::Linux => &[
                 ("startup", 5),
                 ("interaction", 3),
                 ("filter", 3),
@@ -259,7 +262,7 @@ fn build_times(root: &Path) -> Result<BTreeMap<String, f64>> {
 fn dev_loop(root: &Path) -> Result<f64> {
     let exe = std::env::current_exe().map_err(io("find rustnative itself"))?;
     let mut command = Command::new(exe);
-    command.current_dir(root.join("examples/hello-label")).args(["dev", "windows", "--once"]);
+    command.current_dir(root.join("examples/hello-label")).args(["dev", host_platform(), "--once"]);
     let output = checked("rustnative dev", command)?;
     let text = String::from_utf8_lossy(&output.stdout);
     let restart: crate::dev::Restart = text
@@ -289,11 +292,16 @@ fn first_run(root: &Path, target: &Path) -> Result<f64> {
     checked("rustnative new", new)?;
     let mut run = Command::new(&exe);
     run.current_dir(parent.join("first-run"))
-        .args(["run", "windows"])
+        .args(["run", host_platform()])
         .env("CARGO_TARGET_DIR", target)
         .env("RUSTNATIVE_EXIT_AT", "interactive");
     checked("rustnative run", run)?;
     Ok(started.elapsed().as_secs_f64())
+}
+
+/// The desktop platform this machine builds for.
+const fn host_platform() -> &'static str {
+    if cfg!(target_os = "linux") { "linux" } else { "windows" }
 }
 
 /// Runs the harness.
@@ -320,7 +328,11 @@ pub fn run(
     let mut command = cargo();
     command.current_dir(&root).args(["build", "--release", "-p", target.package()]);
     checked("cargo", command)?;
-    let exe = root.join("target/release").join(format!(
+    // `CARGO_TARGET_DIR` moves the build, as on a Linux host sharing a
+    // checkout with Windows.
+    let target_dir = std::env::var_os("CARGO_TARGET_DIR")
+        .map_or_else(|| root.join("target"), std::path::PathBuf::from);
+    let exe = target_dir.join("release").join(format!(
         "{}{}",
         target.package(),
         std::env::consts::EXE_SUFFIX
@@ -336,6 +348,12 @@ pub fn run(
             if low_end {
                 command.arg("--low-end");
             }
+            if target == BenchTarget::Linux {
+                // A compositor releases a closed client's surfaces (and a
+                // virtual GPU its buffers) after the process exits; a launch
+                // in that window measures the release, not the application.
+                std::thread::sleep(std::time::Duration::from_secs(3));
+            }
             let output = checked("bench-app", command)?;
             let line = String::from_utf8_lossy(&output.stdout);
             let value: Value = serde_json::from_str(line.trim()).map_err(|error| {
@@ -346,7 +364,7 @@ pub fn run(
         measured.extend(medians(&results));
     }
     measured.remove("frames");
-    if target == BenchTarget::Windows {
+    if matches!(target, BenchTarget::Windows | BenchTarget::Linux) {
         let size = std::fs::metadata(&exe).map_err(io("read bench-app's size"))?.len();
         #[allow(clippy::cast_precision_loss, reason = "kilobytes")]
         measured.insert("artifact_size_kb".to_owned(), size as f64 / 1024.0);

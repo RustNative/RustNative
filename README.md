@@ -19,10 +19,11 @@ tree, reach the same API, and cost the same at runtime. See
 
 ## Current status
 
-The working backends are Windows/Win32 and the Web (semantic HTML and CSS,
+The working backends are Windows/Win32, Linux (GTK 4 on Wayland and X11; see
+[`docs/linux.md`](docs/linux.md)), and the Web (semantic HTML and CSS,
 in the browser, on a server, as a function, or on an edge host; see
 [`docs/web.md`](docs/web.md)), with the headless reference backend for
-tests. The framework core is designed to remain platform-independent so macOS, Linux, Android, iOS, Web, terminal, and embedded targets are added as separate adapters, each planned to the same depth: native host objects, native measurement, native input, native accessibility, its own toolchain and packaging.
+tests. The framework core is designed to remain platform-independent so macOS, Android, iOS, terminal, and embedded targets are added as separate adapters, each planned to the same depth: native host objects, native measurement, native input, native accessibility, its own toolchain and packaging.
 
 Two notes on what "planned" means here. macOS and iOS are fully planned platforms that this project has no hardware to build or verify on yet, so their milestones are specified and designed for but not started — order follows hardware, not priority. And a backend advertises a capability only once it genuinely realizes it, so "planned" never reaches an application as a claim of support.
 
@@ -698,9 +699,11 @@ windows    macos     linux    android    ios       web       tui
 measurement, the responder chain, `NSAccessibility`, the macOS menu bar, and
 `.app` bundling with signing and notarization.
 
-**Linux** (Milestone 34) — one native toolkit first, kept pluggable, with
-Pango measurement, AT-SPI2 accessibility, desktop portals for services, and
-both Wayland and X11 sessions with their differences reported as capabilities.
+**Linux** (Milestone 34, **built**: [`docs/linux.md`](docs/linux.md)) — GTK 4
+behind a toolkit seam, Pango measurement, AT-SPI2 accessibility, desktop
+portals and the freedesktop services, both Wayland and X11 sessions with
+their differences reported as capabilities, and `.deb`, tarball, and
+AppImage packaging.
 
 **Android** (Milestone 35) — a native `View` hierarchy over a disciplined JNI
 boundary, the activity/process lifecycle mapped onto the existing lifecycle
@@ -1413,8 +1416,8 @@ cargo test --workspace -- --ignored
 
 The complete master roadmap—including completed milestones, architectural invariants, and all planned future stages—is maintained in [`PLAN.md`](PLAN.md).
 
-Milestones 25–32 are complete, and so is the Web track (Web milestones A–K).
-What remains is the rest of the platform matrix — macOS, Linux, Android, iOS,
+Milestones 25–32 and 34 are complete, and so is the Web track (Web milestones A–K).
+What remains is the rest of the platform matrix — macOS, Android, iOS,
 embedded, and terminal — plus the
 core work those targets share: a `no_std`-capable core subset, an executor
 seam for single-threaded hosts, and time from the host clock rather than

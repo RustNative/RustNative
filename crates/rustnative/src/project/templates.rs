@@ -72,12 +72,16 @@ pub fn previews() -> Vec<Preview> {
 pub const MAIN_RS: &str = r#"#![cfg_attr(windows, windows_subsystem = "windows")]
 
 use rustnative_core::{Application, Component, Platform, Size, Window};
-use rustnative_windows::WindowsPlatform;
+// The host's backend: GTK on Linux, Win32 elsewhere.
+#[cfg(target_os = "linux")]
+use rustnative_linux::{LinuxPlatform as HostPlatform, run_catalogue};
+#[cfg(not(target_os = "linux"))]
+use rustnative_windows::{WindowsPlatform as HostPlatform, run_catalogue};
 use {{crate_name}}::{APP_ID, APP_NAME, App};
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     if let Some(first) = rustnative_core::preview::requested() {
-        rustnative_windows::run_catalogue({{crate_name}}::previews(), &first)?;
+        run_catalogue({{crate_name}}::previews(), &first)?;
         return Ok(());
     }
     let mut application = Application::new(
@@ -86,7 +90,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     );
     // The theme `app.css` describes, compiled by the build script.
     application.set_theme(rustnative_core::app_theme!());
-    WindowsPlatform::new().with_app_id(APP_ID).run(&mut application)?;
+    HostPlatform::new().with_app_id(APP_ID).run(&mut application)?;
     Ok(())
 }
 "#;

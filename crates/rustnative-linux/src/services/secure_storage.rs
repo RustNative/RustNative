@@ -159,7 +159,11 @@ impl Session {
                         );
                         return Err(error("prompt", "the person did not answer"));
                     }
-                    context.iteration(true);
+                    // Polled, so the deadline holds even if the service
+                    // never answers.
+                    if !context.iteration(false) {
+                        std::thread::sleep(Duration::from_millis(10));
+                    }
                 }
                 Ok(outcome.get().unwrap_or(false))
             })

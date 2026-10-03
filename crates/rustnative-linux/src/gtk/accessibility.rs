@@ -188,7 +188,12 @@ impl AccessibilityBridge {
             if previous == Some(&next) {
                 continue;
             }
-            apply(target.upcast_ref(), previous, &next, registry);
+            crate::mappers::apply(
+                &object.widget,
+                node,
+                crate::mappers::MappedProperty::Accessibility,
+                || apply(target.upcast_ref(), previous, &next, registry),
+            );
             let live = info.live_region();
             if live != LiveRegion::Off
                 && previous.is_some_and(|previous| {

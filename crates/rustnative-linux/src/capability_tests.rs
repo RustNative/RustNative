@@ -19,6 +19,10 @@ fn capabilities_only_advertise_realized_backend_features() {
         Capability::Printing,
         Capability::SerialPorts,
         Capability::Permissions,
+        Capability::Menus,
+        Capability::Lifecycle,
+        Capability::DeepLinks,
+        Capability::Surface(SurfaceKind::TaskbarProgress),
         Capability::DragAndDrop,
         Capability::Touch,
         Capability::Pen,
@@ -43,6 +47,8 @@ fn capabilities_only_advertise_realized_backend_features() {
         Capability::Bluetooth,
         Capability::Location,
         Capability::SystemShare,
+        Capability::Surface(SurfaceKind::JumpList),
+        Capability::GlobalMenuBar,
         Capability::Surface(SurfaceKind::Widget),
         Capability::Surface(SurfaceKind::LiveActivity),
         Capability::Surface(SurfaceKind::Tile),
@@ -74,4 +80,29 @@ fn window_placement_is_answered_by_the_display_server() {
         false,
     );
     assert!(crate::desktop::capabilities(&session).contains(&Capability::WindowPlacement));
+}
+
+#[test]
+fn decorations_are_answered_per_display_server_and_desktop() {
+    let session = |pairs: &'static [(&'static str, &'static str)]| {
+        crate::Session::from_environment(
+            move |name| {
+                pairs.iter().find(|(key, _)| *key == name).map(|(_, value)| (*value).to_owned())
+            },
+            false,
+        )
+    };
+    let decorated = |pairs| crate::gtk::decorated_by_server(&session(pairs));
+    assert!(
+        decorated(&[("DISPLAY", ":0"), ("XDG_CURRENT_DESKTOP", "GNOME")]),
+        "X11: the window manager"
+    );
+    assert!(
+        !decorated(&[("WAYLAND_DISPLAY", "wayland-0"), ("XDG_CURRENT_DESKTOP", "GNOME")]),
+        "Mutter: GTK draws"
+    );
+    assert!(
+        decorated(&[("WAYLAND_DISPLAY", "wayland-0"), ("XDG_CURRENT_DESKTOP", "KDE")]),
+        "KWin: server-side"
+    );
 }

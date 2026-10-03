@@ -38,6 +38,8 @@ jobs:
         with:
           components: rustfmt, clippy
       - uses: Swatinem/rust-cache@v2
+      - name: GTK 4 and libsoup 3 (the Linux backend's libraries)
+        run: sudo apt-get update && sudo apt-get install -y libgtk-4-dev libsoup-3.0-dev
       - name: cargo fmt --check
         run: cargo fmt --all -- --check
       - name: cargo clippy
@@ -50,12 +52,33 @@ jobs:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
+      - name: GTK 4 and libsoup 3 (the Linux backend's libraries)
+        run: sudo apt-get update && sudo apt-get install -y libgtk-4-dev libsoup-3.0-dev
       - name: cargo check
         run: cargo check --workspace --all-targets
       - name: cargo test
-        run: cargo test --workspace
+        # The GTK backend's own tests need a display; `linux-backend` runs them.
+        run: cargo test --workspace --exclude rustnative-linux
       - name: cargo doc
         run: cargo doc --workspace --no-deps
+
+  linux-backend:
+    # Milestone 34: the GTK backend against real GTK, on a virtual X server
+    # and a private session bus (`tools/linux-session.sh`), with AT-SPI,
+    # a keyring, and the test locales the services' tests read back.
+    name: Linux backend (GTK 4 on Xvfb)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - name: GTK, libsoup, and the session's services
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libgtk-4-dev libsoup-3.0-dev xvfb xdotool dbus dbus-x11 at-spi2-core gnome-keyring locales
+          sudo locale-gen en_NZ.UTF-8 de_DE.UTF-8 fr_FR.UTF-8 tr_TR.UTF-8
+      - name: cargo test -p rustnative-linux -p adoption-gtk (Xvfb)
+        run: tools/linux-session.sh xvfb cargo test -p rustnative-linux -p adoption-gtk
 
   msrv:
     name: MSRV (1.85)
@@ -64,6 +87,8 @@ jobs:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@1.85
       - uses: Swatinem/rust-cache@v2
+      - name: GTK 4 and libsoup 3 (the Linux backend's libraries)
+        run: sudo apt-get update && sudo apt-get install -y libgtk-4-dev libsoup-3.0-dev
       - name: cargo check (MSRV)
         run: cargo check --workspace --all-targets
 

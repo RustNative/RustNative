@@ -441,6 +441,6 @@ pub use style::{
 pub use teardown::{Restoration, TeardownPolicy};
 pub use text_profile::{Script, TextProfile, UnsupportedText};
 pub use virtualization::{
-    Axis, ExtentCache, ItemExtent, ScrollAnchor, VirtualListStyle, VirtualRange,
+    Axis, ExtentCache, ItemExtent, ScrollAnchor, VirtualListStyle, VirtualLists, VirtualRange,
 };
 pub use window::{Window, WindowPresentation, WindowState};

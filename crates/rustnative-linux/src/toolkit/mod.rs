@@ -60,6 +60,9 @@ pub(crate) struct RunOptions {
     /// A URL the application was launched with (the first `scheme://…`
     /// argument), delivered as `Event::DeepLink` once its windows exist.
     pub(crate) launch_url: Option<String>,
+    /// The application's id (`LinuxPlatform::with_app_id`): its desktop
+    /// entry's name, its single-instance bus name, and its state's home.
+    pub(crate) app_id: Option<String>,
 }
 
 /// The implementation of `kind`.

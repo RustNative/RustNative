@@ -14,6 +14,7 @@
 //! `build.rs` runs, so an executable carries its resources however it was
 //! built, not only when it was packaged.
 
+pub mod linux;
 pub mod msix;
 pub mod sign;
 pub mod zip;
@@ -32,7 +33,15 @@ pub enum Format {
     Zip,
     /// An installable, optionally signed MSIX package.
     Msix,
-    /// Both.
+    /// A Debian package (Linux).
+    Deb,
+    /// A tarball of the installed files (Linux).
+    Tar,
+    /// A self-contained AppImage (Linux; needs `appimagetool`).
+    #[value(name = "appimage")]
+    AppImage,
+    /// Every format of the platform (on Linux, the AppImage only when
+    /// `appimagetool` is installed).
     All,
 }
 
@@ -44,6 +53,57 @@ impl Format {
     const fn wants_msix(self) -> bool {
         matches!(self, Self::Msix | Self::All)
     }
+
+    /// Whether this format is one of Windows' (`zip`, `msix`, or `all`).
+    #[must_use]
+    pub const fn is_windows(self) -> bool {
+        matches!(self, Self::Zip | Self::Msix | Self::All)
+    }
+
+    /// Whether this format is one of Linux's (`deb`, `tar`, `appimage`, or
+    /// `all`).
+    #[must_use]
+    pub const fn is_linux(self) -> bool {
+        matches!(self, Self::Deb | Self::Tar | Self::AppImage | Self::All)
+    }
+}
+
+/// Builds the application for Linux and packages it, returning what was
+/// produced.
+///
+/// # Errors
+///
+/// The build's error, a missing `appimagetool` for an AppImage asked for
+/// by name, or anything that could not be written.
+pub fn package_linux(root: &Path, config: &Config, format: Format) -> Result<Vec<PathBuf>> {
+    cargo::run(root, ["build", "--release"])?;
+    let target =
+        std::env::var_os("CARGO_TARGET_DIR").map_or_else(|| root.join("target"), PathBuf::from);
+    let executable = target.join("release").join(&config.app.name);
+    if !executable.is_file() {
+        return Err(Error::Io {
+            what: format!("find the built executable at {}", executable.display()),
+            cause: std::io::Error::new(std::io::ErrorKind::NotFound, "no such file"),
+        });
+    }
+    let output = root.join("target").join("package");
+    std::fs::create_dir_all(&output)
+        .map_err(|cause| Error::Io { what: "create target/package".to_owned(), cause })?;
+    let icon = config.app.icon.as_ref().map(|icon| root.join(icon));
+    let icon = icon.as_deref();
+    let mut produced = Vec::new();
+    if matches!(format, Format::Deb | Format::All) {
+        produced.push(linux::build_deb(&output, &executable, icon, config)?);
+    }
+    if matches!(format, Format::Tar | Format::All) {
+        produced.push(linux::build_tar(&output, &executable, icon, config)?);
+    }
+    let appimage = format == Format::AppImage
+        || (format == Format::All && linux::which("appimagetool").is_some());
+    if appimage {
+        produced.push(linux::build_appimage(&output, &executable, icon, config)?);
+    }
+    Ok(produced)
 }
 
 /// Builds the application and packages it, returning what was produced.

@@ -23,9 +23,10 @@ use std::collections::{HashMap, HashSet};
 use std::rc::Rc;
 
 use gtk::prelude::*;
+use rustnative_core::virtualization::{index_of, item_at};
 use rustnative_core::{
-    AnimatedOverrides, LayoutDirection, LayoutEngine, LayoutResult, NodeId, NodeKind, Rect, Size,
-    Theme, TreeDiff, TreeNode, TreeOp, TreeSnapshot,
+    AnimatedOverrides, LayoutDirection, LayoutEngine, LayoutResult, NodeId, NodeKind, Point, Rect,
+    Size, Theme, TreeDiff, TreeNode, TreeOp, TreeSnapshot, VirtualLists, VirtualRange,
 };
 
 use super::controls;
@@ -34,6 +35,7 @@ use super::{NativeRegistry, unparent};
 use crate::Error;
 use crate::gtk::layout_widget::RnLayout;
 use crate::gtk::measure::{GtkMeasurer, Prototypes};
+use crate::mappers::MappedProperty;
 
 /// The CSS cursor name for a portable cursor, which GDK resolves through
 /// the desktop's cursor theme.
@@ -88,6 +90,12 @@ pub(crate) struct Renderer {
     pub(super) matched: Vec<rustnative_core::MatchedGeometry>,
     /// The providers animated colours are applied through, per node.
     pub(super) animation_providers: HashMap<NodeId, gtk::CssProvider>,
+    /// Every virtual list's extents and visible range
+    /// (`rustnative_core::VirtualLists`).
+    pub(crate) virtual_lists: VirtualLists,
+    /// Widgets a virtual list's removed rows left, for the rows this same
+    /// render inserts: keyed by the container they are in and their kind.
+    pool: HashMap<(usize, NodeKind), Vec<super::HostObject>>,
 }
 
 impl std::fmt::Debug for Renderer {
@@ -117,7 +125,15 @@ impl Renderer {
             removed_nodes: Vec::new(),
             matched: Vec::new(),
             animation_providers: HashMap::new(),
+            virtual_lists: VirtualLists::default(),
+            pool: HashMap::new(),
         }
+    }
+
+    /// Every laid-out node's rectangle in its parent (logical), for the
+    /// inspector.
+    pub(crate) const fn layout_rects(&self) -> &HashMap<NodeId, Rect> {
+        &self.layout
     }
 
     /// A node's laid-out size, if it has been laid out.
@@ -159,6 +175,16 @@ impl Renderer {
                 }
             })?;
         let diff = TreeDiff::between(&self.snapshot, &next);
+        // Which item each list is scrolled to, captured against the tree
+        // still on screen: the operations below may remove the items that
+        // answer it.
+        if diff.invalidates_layout() && !self.virtual_lists.is_empty() {
+            let Self { virtual_lists, snapshot, registry, .. } = self;
+            virtual_lists.capture_anchors(
+                |id| scroll_offset(registry, id),
+                |list, index| item_at(snapshot, list, index),
+            );
+        }
         // Before the operations: they apply the new tree, and a transition
         // must start from what is on screen.
         self.matched = rustnative_core::matched_geometry(&self.snapshot, &self.placed, &next);
@@ -167,6 +193,10 @@ impl Renderer {
         self.theme = theme.clone();
         let direction_changed = std::mem::replace(&mut self.direction, direction) != direction;
         let restyle_all = std::mem::take(&mut self.restyle_all) || theme_changed;
+        if restyle_all {
+            // Fonts or the theme changed: what was measured no longer holds.
+            self.prototypes.forget();
+        }
 
         let mut touched_parents: HashSet<Option<NodeId>> = HashSet::new();
         let mut replaced = false;
@@ -177,7 +207,9 @@ impl Renderer {
             match operation {
                 TreeOp::Insert(node) => {
                     touched_parents.insert(node.parent);
-                    self.insert(node, window_root)?;
+                    if !self.reuse(node, window_root) {
+                        self.insert(node, window_root)?;
+                    }
                 }
                 TreeOp::Update(node) => {
                     let replace = self
@@ -189,7 +221,10 @@ impl Renderer {
                         self.replace(node, window_root)?;
                         replaced = true;
                     } else if let Some(object) = self.registry.get(node.id) {
-                        controls::update(object, node);
+                        let widget = object.widget.clone();
+                        crate::mappers::apply(&widget, node, MappedProperty::Text, || {
+                            controls::update(object, node);
+                        });
                         self.apply_appearance(node);
                     }
                 }
@@ -200,10 +235,20 @@ impl Renderer {
                 }
                 TreeOp::Remove(node) => {
                     touched_parents.insert(node.parent);
-                    self.remove(node.id);
+                    if is_virtual_item(&previous, node) {
+                        self.park(node, window_root);
+                    } else {
+                        self.remove(node.id);
+                    }
                 }
             }
         }
+        // A parked widget no row took back is gone with the render.
+        for object in std::mem::take(&mut self.pool).into_values().flatten() {
+            unparent(&object.widget);
+            self.registry.destroyed += 1;
+        }
+        self.virtual_lists.sync(&self.snapshot);
         if restyle_all {
             for node in self.snapshot.nodes().cloned().collect::<Vec<_>>() {
                 self.apply_appearance(&node);
@@ -230,9 +275,63 @@ impl Renderer {
             .unwrap_or_else(|| window_root.clone())
     }
 
+    /// Parks a removed virtual-list row's widget for a row this render
+    /// inserts into the same list. Only a widget that reports nothing is
+    /// parked: a handler is connected for the node it was created for.
+    fn park(&mut self, node: &TreeNode, window_root: &RnLayout) {
+        let parked = self
+            .registry
+            .get(node.id)
+            .is_some_and(|object| object.signals.is_empty() && object.drop.is_none());
+        if !parked {
+            self.remove(node.id);
+            return;
+        }
+        let container = self.content_of(node.parent, window_root);
+        // Parked, not destroyed: the census counts it if no row takes it.
+        let object = self.registry.take(node.id);
+        self.layout.remove(&node.id);
+        self.placed.remove(&node.id);
+        self.animated.forget(node.id);
+        self.removed_nodes.push(node.id);
+        self.animation_providers.remove(&node.id);
+        if let Some(object) = object {
+            let key = (container.as_ptr() as usize, slot(node.kind));
+            self.pool.entry(key).or_default().push(object);
+        }
+    }
+
+    /// Realizes `node` on a parked widget of the same shape in the same
+    /// list, if there is one; the widget is given everything that is the
+    /// node's (text, style, accessible properties).
+    fn reuse(&mut self, node: &TreeNode, window_root: &RnLayout) -> bool {
+        if node.foreign.is_some() || !is_virtual_item(&self.snapshot, node) {
+            return false;
+        }
+        let container = self.content_of(node.parent, window_root);
+        let key = (container.as_ptr() as usize, slot(node.kind));
+        let Some(index) = self.pool.get(&key).and_then(|parked| {
+            parked.iter().position(|object| !controls::needs_replacement(object, node))
+        }) else {
+            return false;
+        };
+        let Some(object) = self.pool.get_mut(&key).map(|parked| parked.swap_remove(index)) else {
+            return false;
+        };
+        let widget = object.widget.clone();
+        crate::mappers::apply(&widget, node, MappedProperty::Text, || {
+            controls::update(&object, node);
+        });
+        self.registry.adopt(node.id, object);
+        self.apply_appearance(node);
+        true
+    }
+
     fn insert(&mut self, node: &TreeNode, window_root: &RnLayout) -> Result<(), Error> {
         let object = controls::create(node, self.window)?;
         self.content_of(node.parent, window_root).append(&object.widget);
+        // Created with its text; a registered mapper has its say now.
+        crate::mappers::apply(&object.widget, node, MappedProperty::Text, || {});
         self.registry.insert(node.id, object);
         self.apply_appearance(node);
         Ok(())
@@ -340,12 +439,21 @@ impl Renderer {
 
     /// Realizes a node's style, visibility, sensitivity, and opacity.
     fn apply_appearance(&mut self, node: &TreeNode) {
-        self.apply_style_class(node);
+        match self.registry.get(node.id).map(|object| object.widget.clone()) {
+            Some(widget) => {
+                crate::mappers::apply(&widget, node, MappedProperty::Style, || {
+                    self.apply_style_class(node);
+                });
+            }
+            None => self.apply_style_class(node),
+        }
         self.apply_opacity(node.id);
         let Some(object) = self.registry.get(node.id) else { return };
-        if object.widget.is_visible() == node.hidden {
-            object.widget.set_visible(!node.hidden);
-        }
+        crate::mappers::apply(&object.widget, node, MappedProperty::Visibility, || {
+            if object.widget.is_visible() == node.hidden {
+                object.widget.set_visible(!node.hidden);
+            }
+        });
         if object.widget.is_sensitive() == node.disabled {
             object.widget.set_sensitive(!node.disabled);
         }
@@ -375,6 +483,7 @@ impl Renderer {
     /// Lays the whole window out at `size` and places every widget.
     pub(crate) fn relayout(&mut self, window_root: &RnLayout, size: Size) {
         let output = self.lay_out(size);
+        let lists = !self.virtual_lists.is_empty();
         let physical = output.physical_rects(&self.snapshot, self.direction);
         let directions = LayoutResult::directions(&self.snapshot, self.direction);
         // Layout is where a node's position and size change, so it is where
@@ -406,11 +515,77 @@ impl Renderer {
                 )));
             }
         }
+        if lists {
+            self.resolve_anchors();
+            self.update_visible_ranges();
+        }
     }
 
-    fn lay_out(&self, size: Size) -> LayoutResult {
+    /// Runs layout, and once more if measuring a virtual list's realized
+    /// items moved any of its offsets (bounded: a measurement does not
+    /// depend on where the item was placed).
+    fn lay_out(&mut self, size: Size) -> LayoutResult {
         let measurer = GtkMeasurer::new(&self.prototypes, &self.styles);
-        self.engine.layout_result_with(&self.snapshot, size, &measurer, &HashMap::new())
+        let output = self.engine.layout_result_with(
+            &self.snapshot,
+            size,
+            &measurer,
+            self.virtual_lists.extents(),
+        );
+        if !self.virtual_lists.record(&output.measured_items) {
+            return output;
+        }
+        self.engine.layout_result_with(
+            &self.snapshot,
+            size,
+            &measurer,
+            self.virtual_lists.extents(),
+        )
+    }
+
+    /// Scrolls each virtual list back to its anchored item, now that the
+    /// new tree is laid out: an insertion above the viewport grows the list
+    /// upward instead of sliding what the person is looking at.
+    fn resolve_anchors(&mut self) {
+        let Self { virtual_lists, snapshot, .. } = self;
+        let offsets = virtual_lists.resolve_anchors(|node| index_of(snapshot, node));
+        for (id, offset) in offsets {
+            let Some(scrolled) = self.scrolled(id) else { continue };
+            // The content's new size must be known to the adjustment first.
+            if let Some(content) = self.registry.get(id).and_then(|object| object.content.clone()) {
+                let size = self.content_sizes.get(&id).copied().unwrap_or_default();
+                let (width, height) = (
+                    i32::try_from(size.width).unwrap_or(i32::MAX),
+                    i32::try_from(size.height).unwrap_or(i32::MAX),
+                );
+                content.set_content_size(Some((width, height)));
+                let (hadjustment, vadjustment) = (scrolled.hadjustment(), scrolled.vadjustment());
+                hadjustment.set_upper(hadjustment.upper().max(f64::from(width)));
+                vadjustment.set_upper(vadjustment.upper().max(f64::from(height)));
+            }
+            scrolled.hadjustment().set_value(f64::from(offset.x));
+            scrolled.vadjustment().set_value(f64::from(offset.y));
+        }
+    }
+
+    /// Recomputes every virtual list's visible range from where it is now
+    /// scrolled and how big its viewport is; changes wait in
+    /// [`Self::take_range_changes`].
+    pub(crate) fn update_visible_ranges(&mut self) {
+        let Self { virtual_lists, layout, registry, .. } = self;
+        virtual_lists
+            .update_ranges(|id| layout.get(&id).copied(), |id| scroll_offset(registry, id));
+    }
+
+    /// Virtual lists that need a different window of items, for the
+    /// registry to report to their components.
+    pub(crate) fn take_range_changes(&mut self) -> Vec<(NodeId, VirtualRange)> {
+        self.virtual_lists.take_changes()
+    }
+
+    /// The scrolled window realizing `id`, if it scrolls.
+    fn scrolled(&self, id: NodeId) -> Option<gtk::ScrolledWindow> {
+        self.registry.get(id)?.widget.clone().downcast::<gtk::ScrolledWindow>().ok()
     }
 
     /// The widget realizing `id`.
@@ -431,4 +606,40 @@ impl Renderer {
     pub(crate) const fn is_container(kind: NodeKind) -> bool {
         matches!(kind, NodeKind::Column | NodeKind::Row)
     }
+}
+
+/// Which parked widgets a node can take back: a row and a column are the
+/// same widget.
+const fn slot(kind: NodeKind) -> NodeKind {
+    match kind {
+        NodeKind::Row => NodeKind::Column,
+        other => other,
+    }
+}
+
+/// Whether `node` is inside a virtual list in `snapshot`, and so
+/// interchangeable with the rows around it.
+fn is_virtual_item(snapshot: &TreeSnapshot, node: &TreeNode) -> bool {
+    let mut parent = node.parent;
+    while let Some(id) = parent {
+        let Some(ancestor) = snapshot.get(id) else { return false };
+        if ancestor.virtualization.is_some() {
+            return true;
+        }
+        parent = ancestor.parent;
+    }
+    false
+}
+
+/// Where the container realizing `id` is scrolled to.
+fn scroll_offset(registry: &super::NativeRegistry, id: NodeId) -> Point {
+    let Some(scrolled) = registry
+        .get(id)
+        .and_then(|object| object.widget.downcast_ref::<gtk::ScrolledWindow>().cloned())
+    else {
+        return Point::new(0, 0);
+    };
+    #[allow(clippy::cast_possible_truncation, reason = "a scroll offset in pixels, rounded")]
+    let pixels = |value: f64| value.round().clamp(0.0, f64::from(i32::MAX)) as i32;
+    Point::new(pixels(scrolled.hadjustment().value()), pixels(scrolled.vadjustment().value()))
 }

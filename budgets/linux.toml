@@ -1,0 +1,59 @@
+# The Linux backend's budgets (`PLAN.md` Milestones 34 and 42). See
+# SCHEMA.md for every key's meaning and scenario. `max` is the budget; a
+# measurement fails `rustnative bench --target linux --check` above
+# `max × (1 + tolerance)`.
+#
+# Reference machine: the development desktop's WSLg session (Ubuntu 24.04,
+# GTK 4.14, Wayland through WSLg's compositor, GTK's GL renderer on Mesa's
+# D3D12 driver), x86-64. Measured values at the time are in the comments.
+# The bench pauses between launches: a compositor releases a closed client
+# after it exits, and a launch in that window measures the release.
+target = "linux"
+
+[budget]
+# Startup phases, from the process's creation (median of 5 runs).
+runtime_ready_ms = { max = 80, tolerance = 1.0 }          # 25–35
+first_frame_ms = { max = 600, tolerance = 0.5 }           # 430–650
+first_content_ms = { max = 750, tolerance = 0.5 }         # 540–620
+interactive_ms = { max = 800, tolerance = 0.5 }           # 590–630
+cold_start_ms = { max = 800, tolerance = 0.5 }            # 590–630
+# GTK's GL renderer maps its driver's memory into the process: most of
+# this is Mesa (with GSK_RENDERER=cairo the same scenario is 48 MB).
+resident_memory_mb = { max = 220, tolerance = 0.1 }       # 204–207
+# The GTK, GLib, and Pango bindings are most of it.
+artifact_size_kb = { max = 6500, tolerance = 0.05 }       # 5960–5990
+
+# Frame times of a running size transition (GTK's frame clock).
+frame_time_p50_ms = { max = 17.5, tolerance = 0.1 }       # 16.5
+frame_time_p99_ms = { max = 34, tolerance = 0.5 }         # 20
+frame_time_max_ms = { max = 60, tolerance = 1.0 }         # 20–38
+
+# A click delivered to the real button, to the change realized (median of
+# 3 runs of 31 clicks).
+input_latency_ms = { max = 16, tolerance = 0.5 }          # 4.4–6.4
+input_latency_max_ms = { max = 40, tolerance = 1.0 }      # 18–34
+
+# Keystrokes typed into the entry of the filter over 200 000 rows
+# (`examples/filter-demo`, Milestone 54).
+filter_input_latency_ms = { max = 16, tolerance = 0.5 }   # 4–8
+filter_input_latency_max_ms = { max = 60, tolerance = 1.0 }  # 57–71
+filter_results_ms = { max = 250, tolerance = 1.0 }        # 0.2–0.3
+
+# The shared core, on a tree of a thousand nodes.
+tree_diff_us_1k_nodes = { max = 1000, tolerance = 1.0 }   # 360–950
+layout_us_1k_nodes = { max = 900, tolerance = 1.0 }       # 460–810
+render_us_1k_nodes = { max = 5000, tolerance = 1.5 }      # 1500–2850
+
+# The markup and style compile steps.
+rsx_compile_ms_per_kloc = { max = 12, tolerance = 1.0 }   # 5–8
+class_resolve_us = { max = 30, tolerance = 1.0 }          # 7–8
+
+# Build time (`--build-times`): `examples/hello-label`, debug.
+build_time_clean_s = { max = 600, tolerance = 0.5, optional = true }
+build_time_incremental_s = { max = 30, tolerance = 0.5, optional = true }
+
+# The development loop (Milestone 43): `rustnative dev linux --once` on
+# `examples/hello-label`.
+dev_loop_restart_ms = { max = 15000, tolerance = 0.5, optional = true }
+# The first-run target: `rustnative new`, `cd`, `rustnative run linux`.
+first_run_s = { max = 90, tolerance = 0.5, optional = true }

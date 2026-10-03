@@ -136,6 +136,21 @@ pub(crate) fn pump_until(what: &str, timeout: Duration, mut done: impl FnMut() -
     }
 }
 
+/// Waits until `widget` has been through `frames` more frames of its frame
+/// clock — so a change GTK applies at its next layout (a scroll offset, an
+/// allocation) has been applied, however loaded the machine is.
+pub(crate) fn wait_frames(widget: &impl IsA<gtk::Widget>, frames: u32) {
+    let seen = Rc::new(std::cell::Cell::new(0_u32));
+    let counter = Rc::clone(&seen);
+    // A tick callback keeps the clock running even when nothing redraws.
+    let id = widget.as_ref().add_tick_callback(move |_, _| {
+        counter.set(counter.get() + 1);
+        glib::ControlFlow::Continue
+    });
+    pump_until("the frames to pass", Duration::from_secs(10), || seen.get() >= frames);
+    id.remove();
+}
+
 impl Harness {
     /// Attaches to `application`, creates every window it wants open, and
     /// waits until the primary window has been allocated.

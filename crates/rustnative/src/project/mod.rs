@@ -63,13 +63,17 @@ impl FrameworkSource {
     fn dependencies(&self) -> String {
         match self {
             Self::Published(version) => {
-                format!("rustnative-core = \"{version}\"\nrustnative-windows = \"{version}\"\n")
+                format!(
+                    "rustnative-core = \"{version}\"\nrustnative-windows = \"{version}\"\n\
+                     rustnative-linux = \"{version}\"\n"
+                )
             }
             Self::Path(path) => {
                 let path = normalized(path);
                 format!(
                     "rustnative-core = {{ path = \"{path}/crates/rustnative-core\" }}\n\
-                     rustnative-windows = {{ path = \"{path}/crates/rustnative-windows\" }}\n"
+                     rustnative-windows = {{ path = \"{path}/crates/rustnative-windows\" }}\n\
+                     rustnative-linux = {{ path = \"{path}/crates/rustnative-linux\" }}\n"
                 )
             }
         }

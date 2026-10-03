@@ -52,6 +52,41 @@ pub(crate) struct WindowRuntime {
     pub(crate) animation: super::animation::AnimationState,
     /// Native surfaces (`gtk::surface`).
     pub(crate) surfaces: super::surface::NativeSurfaces,
+    /// The window's menu bar (`gtk::menu`).
+    pub(crate) menu: Option<super::menu::WindowMenu>,
+    /// The virtual lists whose scrolling is watched.
+    watched_lists: std::collections::HashSet<rustnative_core::NodeId>,
+    /// The inspector's overlay, while shown (`gtk::inspect`).
+    pub(crate) overlay: Option<super::canvas::RnCanvas>,
+}
+
+impl WindowRuntime {
+    /// Watches each virtual list's adjustments, so scrolling one recomputes
+    /// its range (inside a range, nothing more happens).
+    fn watch_list_scrolling(&mut self) {
+        let snapshot = &self.renderer.snapshot;
+        self.watched_lists.retain(|id| snapshot.contains(*id));
+        let window = self.id;
+        let lists: Vec<rustnative_core::NodeId> = snapshot
+            .nodes()
+            .filter(|node| node.virtualization.is_some())
+            .map(|node| node.id)
+            .filter(|id| !self.watched_lists.contains(id))
+            .collect();
+        for id in lists {
+            let Some(scrolled) = self
+                .renderer
+                .widget(id)
+                .and_then(|widget| widget.clone().downcast::<gtk::ScrolledWindow>().ok())
+            else {
+                continue;
+            };
+            for adjustment in [scrolled.hadjustment(), scrolled.vadjustment()] {
+                adjustment.connect_value_changed(move |_| post(Work::ListScrolled(window)));
+            }
+            self.watched_lists.insert(id);
+        }
+    }
 }
 
 impl std::fmt::Debug for WindowRuntime {
@@ -78,6 +113,14 @@ pub(crate) struct WindowRegistry {
     settings_handlers: Vec<glib::SignalHandlerId>,
     /// The desktop's reduced-motion setting, which every timeline follows.
     motion: rustnative_core::MotionPreference,
+    /// The desktop's lifecycle sources and the idle flush (`gtk::lifecycle`).
+    lifecycle: super::lifecycle::Watchers,
+    /// The application's id, for its tray icon and launcher entry.
+    pub(crate) app_id: Option<String>,
+    /// The tray icon, while shown.
+    tray: Option<crate::desktop::tray::Tray>,
+    /// Whether visible-range changes are being reported (`report_ranges`).
+    reporting_ranges: bool,
 }
 
 impl WindowRegistry {
@@ -105,7 +148,111 @@ impl WindowRegistry {
             portal,
             settings_handlers,
             motion: rustnative_core::MotionPreference::Full,
+            lifecycle: super::lifecycle::Watchers::start(),
+            app_id: None,
+            tray: None,
+            reporting_ranges: false,
         }
+    }
+
+    /// The lifecycle watchers (the idle flush clears its pending source).
+    pub(crate) fn lifecycle_watchers(&self) -> &super::lifecycle::Watchers {
+        &self.lifecycle
+    }
+
+    /// `window`'s menu bar, for tests.
+    #[cfg(test)]
+    pub(crate) fn window_menu(&self, window: WindowId) -> Option<&super::menu::WindowMenu> {
+        self.windows.get(&window)?.menu.as_ref()
+    }
+
+    /// Brings every window's command-bound menu items up to date.
+    fn refresh_menus(&mut self) {
+        let ids: Vec<WindowId> = self.windows.keys().copied().collect();
+        for id in ids {
+            let Some(runtime) = self.windows.get_mut(&id) else { continue };
+            let Some(mut menu) = runtime.menu.take() else { continue };
+            let focused = runtime.input.focused;
+            menu.refresh(|command| {
+                self.with_application(|application| {
+                    application.command_state(id, command, focused).map(|declared| {
+                        (declared.is_enabled(), declared.is_checked(), declared.shortcut_key())
+                    })
+                })
+            });
+            if let Some(runtime) = self.windows.get_mut(&id) {
+                runtime.menu = Some(menu);
+            }
+        }
+    }
+
+    /// Applies what the application asked of its surfaces (the tray, the
+    /// launcher's progress, notifications from the tray).
+    fn apply_surfaces(&mut self) {
+        use rustnative_core::surfaces::{ACTIVATE, NOTIFICATION, SurfaceCommand};
+        let commands =
+            self.with_application(|application| application.services().surfaces().take());
+        let action = |action: String| {
+            post(Work::Event(
+                WindowId::PRIMARY,
+                Event::SurfaceAction {
+                    window: WindowId::PRIMARY,
+                    surface: rustnative_core::capability::SurfaceKind::TrayExtra,
+                    action,
+                },
+            ));
+        };
+        let app_id = self
+            .app_id
+            .clone()
+            .unwrap_or_else(|| glib::prgname().map(|name| name.to_string()).unwrap_or_default());
+        for command in commands {
+            match command {
+                SurfaceCommand::ShowTray { tooltip, menu } => {
+                    let menu: Vec<(String, String)> =
+                        menu.into_iter().map(|item| (item.id, item.label)).collect();
+                    if let Some(tray) = &self.tray {
+                        tray.update(&tooltip, menu);
+                    } else {
+                        let icon = if app_id.is_empty() {
+                            "application-x-executable".to_owned()
+                        } else {
+                            app_id.clone()
+                        };
+                        // Without a tray host the icon is not shown; the
+                        // capability says so up front.
+                        self.tray = crate::desktop::tray::Tray::show(
+                            &app_id, &icon, &tooltip, menu, action,
+                        )
+                        .ok();
+                    }
+                }
+                SurfaceCommand::HideTray => self.tray = None,
+                SurfaceCommand::Progress(progress) => {
+                    crate::desktop::tray::set_progress(&app_id, progress);
+                }
+                SurfaceCommand::Notify { title, body } => {
+                    let application =
+                        glib::application_name().map(|name| name.to_string()).unwrap_or_default();
+                    glib::MainContext::default().spawn_local(async move {
+                        let clicked: Box<dyn Fn()> =
+                            Box::new(move || action(NOTIFICATION.to_owned()));
+                        let _ = crate::desktop::notifications::notify(
+                            &application,
+                            &title,
+                            &body,
+                            Some(clicked),
+                        )
+                        .await;
+                    });
+                }
+                // A jump list is the desktop entry's actions, fixed when the
+                // application is packaged (`Capability::Surface(JumpList)`
+                // is not advertised).
+                _ => {}
+            }
+        }
+        let _ = ACTIVATE;
     }
 
     /// Reads the host's traits, makes GTK follow them, feeds them into the
@@ -126,6 +273,11 @@ impl WindowRegistry {
             .map(|(id, _)| *id)
             .collect();
         for window in live {
+            // The desktop's theme decides the widgets' padding and fonts, so
+            // every node is restyled and measured again.
+            if let Some(runtime) = self.windows.get_mut(&window) {
+                runtime.renderer.restyle_all();
+            }
             self.render(window)?;
         }
         Ok(())
@@ -166,6 +318,25 @@ impl WindowRegistry {
             Work::LongPress(window) => self.long_press(window)?,
             Work::Frame(window) => self.animation_frame(window)?,
             Work::SurfaceAllocated(window, node) => self.surface_allocated(window, node)?,
+            // Every native surface is told its new scale, as the surface
+            // hand-off contract requires (`docs/interop/surface-handoff.md`);
+            // GTK's own widgets and the canvas redraw at it by themselves.
+            Work::ScaleChanged(window) => {
+                let nodes = self
+                    .windows
+                    .get(&window)
+                    .map(|runtime| runtime.surfaces.nodes())
+                    .unwrap_or_default();
+                for node in nodes {
+                    self.surface_allocated(window, node)?;
+                }
+            }
+            Work::ListScrolled(window) => {
+                if let Some(runtime) = self.windows.get_mut(&window) {
+                    runtime.renderer.update_visible_ranges();
+                }
+                self.report_ranges(window)?;
+            }
             Work::Call(call) => call(self),
         }
         Ok(self.flow())
@@ -194,6 +365,8 @@ impl WindowRegistry {
         self.apply_input_requests(window);
         self.apply_animation_requests(window);
         self.schedule_deferred(window);
+        let unsaved = self.with_application(|application| application.has_unsaved_state());
+        self.lifecycle.after_change(unsaved);
         self.sync()
     }
 
@@ -201,7 +374,13 @@ impl WindowRegistry {
         if let Some(runtime) = self.windows.get(&window) {
             runtime.wake_pending.store(false, Ordering::Release);
         }
-        if self.with_application(|application| application.pump_tasks_for(window)) {
+        // An inspector's requests wake the loop as a task does (`PLAN.md`
+        // Milestone 44); an answered edit or overlay change is realized like
+        // a task's result.
+        let inspected = self.windows.get(&window).is_some_and(|runtime| {
+            self.with_application(|application| super::inspect::poll(runtime, application))
+        });
+        if self.with_application(|application| application.pump_tasks_for(window)) || inspected {
             self.render(window)?;
         }
         if self.with_application(|application| application.pump_deferred_for(window)) {
@@ -285,10 +464,56 @@ impl WindowRegistry {
         super::input::pointer::prune(runtime);
         let snapshot = &runtime.renderer.snapshot;
         runtime.surfaces.retain(|node| snapshot.contains(node));
+        runtime.watch_list_scrolling();
         self.report_container_sizes(window)?;
         self.after_animation_change(window);
+        self.report_ranges(window)?;
+        if let Some(mut runtime) = self.windows.remove(&window) {
+            self.with_application(|application| {
+                super::inspect::sync_overlay(&mut runtime, application);
+            });
+            self.windows.insert(window, runtime);
+        }
         rustnative_core::perf::realized();
         Ok(())
+    }
+
+    /// Reports every virtual list whose visible range changed, rendering
+    /// the items each component returns. A render inside this loop queues
+    /// its own change rather than nesting a dispatch; the loop picks it up.
+    /// Two passes is the normal maximum (a range, then the measurement it
+    /// settles at); the cap is a backstop against a component that renders
+    /// a different item count than it was asked for.
+    fn report_ranges(&mut self, window: WindowId) -> Result<(), Error> {
+        const MAX_PASSES: usize = 8;
+        if self.reporting_ranges {
+            return Ok(());
+        }
+        self.reporting_ranges = true;
+        let mut outcome = Ok(());
+        for _ in 0..MAX_PASSES {
+            let changes = self
+                .windows
+                .get_mut(&window)
+                .map(|runtime| runtime.renderer.take_range_changes())
+                .unwrap_or_default();
+            if changes.is_empty() {
+                break;
+            }
+            for (target, range) in changes {
+                if let Err(error) =
+                    self.dispatch(window, Event::VisibleRangeChanged { target, range })
+                {
+                    outcome = Err(error);
+                    break;
+                }
+            }
+            if outcome.is_err() {
+                break;
+            }
+        }
+        self.reporting_ranges = false;
+        outcome
     }
 
     /// Lays `window` out again at its current size.
@@ -345,6 +570,8 @@ impl WindowRegistry {
                 self.create_window(id)?;
             }
         }
+        self.refresh_menus();
+        self.apply_surfaces();
         Ok(())
     }
 
@@ -361,7 +588,16 @@ impl WindowRegistry {
         runtime.surfaces.release();
         let modal_parent = runtime.modal_parent;
         GTK_WINDOWS.with(|windows| windows.borrow_mut().remove(&id));
-        if let Some(window) = runtime.window.take() {
+        let window = runtime.window.take();
+        runtime.menu = None;
+        if let Some(window) = window {
+            if id == WindowId::PRIMARY {
+                if let Some(store) = self
+                    .with_application(|application| application.services().state_store().cloned())
+                {
+                    super::lifecycle::save_placement(&window, store.as_ref());
+                }
+            }
             window.destroy();
         }
         if let Some(parent) = modal_parent.and_then(|parent| self.windows.get(&parent)) {
@@ -372,17 +608,25 @@ impl WindowRegistry {
     }
 
     fn create_window(&mut self, id: WindowId) -> Result<(), Error> {
-        let Some((title, size, modal_parent)) = self.with_application(|application| {
-            application.window_for(id).map(|definition| {
-                (
-                    definition.title().to_owned(),
-                    definition.size(),
-                    application
-                        .window_state(id)
-                        .and_then(rustnative_core::WindowState::modal_parent),
-                )
+        let Some((title, size, modal_parent, menu_bar, placement)) =
+            self.with_application(|application| {
+                application.window_for(id).map(|definition| {
+                    (
+                        definition.title().to_owned(),
+                        definition.size(),
+                        application
+                            .window_state(id)
+                            .and_then(rustnative_core::WindowState::modal_parent),
+                        definition.menu().cloned(),
+                        // The primary window opens where it was last closed.
+                        (id == WindowId::PRIMARY)
+                            .then(|| application.services().state_store().cloned())
+                            .flatten()
+                            .and_then(|store| super::lifecycle::saved_placement(store.as_ref())),
+                    )
+                })
             })
-        }) else {
+        else {
             return Ok(());
         };
         let root = RnLayout::default();
@@ -396,13 +640,30 @@ impl WindowRegistry {
             post_later(Work::Resized(id, size));
         });
         let embedded = id == WindowId::PRIMARY && self.embedded;
+        let mut menus = None;
         let window = if embedded {
             None
         } else {
             let window = gtk::Window::new();
             window.set_title(Some(&title));
             window.set_default_size(clamp_dimension(size.width), clamp_dimension(size.height));
-            window.set_child(Some(&root));
+            if let Some(placement) = placement {
+                super::lifecycle::restore_placement(&window, placement);
+            }
+            if let Some(bar) = &menu_bar {
+                // The bar above, the content filling the rest.
+                let menu = super::menu::WindowMenu::build(bar, id, &window);
+                let content = gtk::Box::new(gtk::Orientation::Vertical, 0);
+                content.append(menu.widget());
+                root.set_vexpand(true);
+                root.set_hexpand(true);
+                content.append(&root);
+                window.set_child(Some(&content));
+                menus.replace(menu);
+            } else {
+                window.set_child(Some(&root));
+            }
+            window.connect_scale_factor_notify(move |_| post_later(Work::ScaleChanged(id)));
             window.connect_close_request(move |_| {
                 post(Work::CloseRequested(id));
                 // The application decides; `sync` closes the window.
@@ -422,9 +683,11 @@ impl WindowRegistry {
         let wake_pending = Arc::new(AtomicBool::new(false));
         // Input is attached before the first render, so a window is never
         // shown without it.
-        let input = window.as_ref().map_or_else(super::input::InputState::default, |window| {
-            super::input::attach(window, &root, id)
-        });
+        let input = match &window {
+            Some(window) => super::input::attach(window.upcast_ref(), &root, id),
+            // An embedded root hears the input that reaches it in the host.
+            None => super::input::attach(root.upcast_ref(), &root, id),
+        };
         let runtime = WindowRuntime {
             id,
             window,
@@ -437,6 +700,9 @@ impl WindowRegistry {
             input,
             animation: super::animation::AnimationState::default(),
             surfaces: super::surface::NativeSurfaces::default(),
+            menu: menus,
+            watched_lists: std::collections::HashSet::new(),
+            overlay: None,
         };
         if let Some(window) = &runtime.window {
             GTK_WINDOWS.with(|windows| windows.borrow_mut().insert(id, window.clone()));
@@ -457,6 +723,9 @@ impl WindowRegistry {
         });
         self.render(id)?;
         if let Some(window) = self.windows.get(&id).and_then(|runtime| runtime.window.clone()) {
+            if id == WindowId::PRIMARY {
+                super::app::watch_startup(&window);
+            }
             window.present();
         }
         Ok(())
@@ -491,6 +760,8 @@ impl WindowRegistry {
 
     /// Releases every window (the run is over).
     pub(crate) fn release_all(&mut self) {
+        self.lifecycle.release();
+        self.tray = None;
         let ids: Vec<WindowId> = self.windows.keys().copied().collect();
         for id in ids {
             self.destroy(id);

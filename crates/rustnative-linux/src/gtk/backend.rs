@@ -70,6 +70,11 @@ pub(crate) enum Work {
     LongPress(WindowId),
     /// The frame clock ticked while something animates.
     Frame(WindowId),
+    /// A virtual list in a window scrolled.
+    ListScrolled(WindowId),
+    /// A window's display scale changed (it moved to a monitor of another
+    /// scale, or the monitor's scale changed under it).
+    ScaleChanged(WindowId),
     /// GTK allocated a native surface's host widget.
     SurfaceAllocated(WindowId, rustnative_core::NodeId),
     /// Run a closure against the backend's state (inspection, tests, and
@@ -94,6 +99,8 @@ impl std::fmt::Debug for Work {
             Self::FocusChanged(window) => write!(f, "FocusChanged({window:?})"),
             Self::LongPress(window) => write!(f, "LongPress({window:?})"),
             Self::Frame(window) => write!(f, "Frame({window:?})"),
+            Self::ListScrolled(window) => write!(f, "ListScrolled({window:?})"),
+            Self::ScaleChanged(window) => write!(f, "ScaleChanged({window:?})"),
             Self::SurfaceAllocated(window, node) => {
                 write!(f, "SurfaceAllocated({window:?}, {node:?})")
             }
@@ -221,7 +228,6 @@ impl Backend {
 
     /// Whether the application has finished (its last window closed, or a
     /// failure ended it).
-    #[cfg(test)]
     pub(crate) fn is_finished(&self) -> bool {
         self.finished.get()
     }
@@ -229,6 +235,12 @@ impl Backend {
     /// The failure that ended the run, if one did.
     pub(crate) fn take_error(&self) -> Option<Error> {
         self.error.borrow_mut().take()
+    }
+
+    /// Ends the run as the last window closing would (the scripted startup
+    /// of `RUSTNATIVE_EXIT_AT=interactive`).
+    pub(crate) fn quit(&self) {
+        self.finish(None);
     }
 
     fn finish(&self, error: Option<Error>) {
@@ -304,6 +316,8 @@ impl Backend {
             | Work::FocusChanged(window)
             | Work::LongPress(window)
             | Work::Frame(window)
+            | Work::ListScrolled(window)
+            | Work::ScaleChanged(window)
             | Work::SurfaceAllocated(window, _) => Some(*window),
             Work::HostTraitsChanged | Work::Call(_) => None,
         };

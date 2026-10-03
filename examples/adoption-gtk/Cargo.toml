@@ -1,0 +1,25 @@
+[package]
+name = "adoption-gtk"
+version = "0.1.0"
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+description = "The adoption ladder on Linux: an existing GTK 4 application hosting a Rust Native subtree that itself adopts one of the host's widgets"
+repository.workspace = true
+homepage.workspace = true
+readme.workspace = true
+keywords.workspace = true
+categories.workspace = true
+publish = false
+
+[lints]
+workspace = true
+
+[dependencies]
+rustnative-core.workspace = true
+
+[target.'cfg(target_os = "linux")'.dependencies]
+rustnative-linux.workspace = true
+# The host is an ordinary GTK 4 application; this is the version
+# `rustnative-linux` itself uses.
+gtk = { package = "gtk4", version = "0.10", features = ["v4_14"] }

@@ -13,6 +13,9 @@ mod atspi_reader;
 pub(crate) mod backend;
 pub(crate) mod canvas;
 mod context;
+pub(crate) mod embed;
+#[cfg(test)]
+mod embed_integration;
 pub(crate) mod foreign;
 #[cfg(test)]
 mod guarantees;
@@ -20,10 +23,17 @@ mod host_traits;
 pub(crate) mod input;
 #[cfg(test)]
 mod input_integration;
+pub(crate) mod inspect;
+#[cfg(test)]
+mod inspect_integration;
 #[cfg(test)]
 mod integration;
 pub(crate) mod layout_widget;
+pub(crate) mod lifecycle;
 mod measure;
+pub(crate) mod menu;
+#[cfg(test)]
+mod menu_integration;
 pub(crate) mod registry;
 pub(crate) mod rendering;
 #[cfg(test)]
@@ -37,6 +47,8 @@ mod teardown;
 #[cfg(test)]
 pub(crate) mod testing;
 pub(crate) mod virtual_accessible;
+#[cfg(test)]
+mod virtual_list_integration;
 
 use rustnative_core::{Application, Capability};
 
@@ -58,7 +70,7 @@ impl Toolkit for Gtk4 {
         app::run_application(application, options, session)
     }
 
-    fn capabilities(&self, _session: &Session) -> Vec<Capability> {
+    fn capabilities(&self, session: &Session) -> Vec<Capability> {
         let media = foreign::media_available().then_some(Capability::MediaPlayback);
         let mut realized = vec![
             Capability::MultipleWindows,
@@ -69,6 +81,8 @@ impl Toolkit for Gtk4 {
             Capability::FileDialogs,
             // GTK's print operation over CUPS.
             Capability::Printing,
+            // Menu bars (`gtk::menu`).
+            Capability::Menus,
             // Input (`gtk::input`): GTK's drop targets, touch sequences and
             // pen samples through the legacy controller, an input method for
             // custom text targets, per-node cursors, hover, and shortcuts
@@ -99,6 +113,23 @@ impl Toolkit for Gtk4 {
         ];
         // Media through GTK's media backend, where one is installed.
         realized.extend(media);
+        if decorated_by_server(session) {
+            realized.push(Capability::ServerSideDecorations);
+        }
         realized
+    }
+}
+
+/// Whether GTK leaves a window's frame to the host in `session`. On X11
+/// GTK asks the window manager to decorate (no custom title bar is set); on
+/// Wayland it draws its own unless the compositor offers `KWin`'s
+/// server-side decoration protocol, which only Plasma's does — GTK 4 does
+/// not use `xdg-decoration`.
+pub(crate) fn decorated_by_server(session: &Session) -> bool {
+    use crate::desktop::{DesktopEnvironment, DisplayServer};
+    match session.display_server() {
+        Some(DisplayServer::X11) => true,
+        Some(DisplayServer::Wayland) => matches!(session.desktop(), DesktopEnvironment::Kde),
+        _ => false,
     }
 }

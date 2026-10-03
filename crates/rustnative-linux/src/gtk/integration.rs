@@ -474,3 +474,119 @@ fn foreign_widgets_and_media_are_adopted_and_laid_out() {
         assert_eq!(harness.expect("clip").type_().name(), "GtkVideo", "media is GTK's own player");
     });
 }
+
+/// A mapper extends every button and replaces one label's text, and the
+/// inspector lists both (`C24`).
+#[test]
+fn mappers_extend_and_replace_what_the_backend_applies() {
+    use crate::{MappedProperty, MapperMode, MapperTarget, register_mapper};
+    use rustnative_core::NodeKind;
+    on_gtk(|| {
+        register_mapper(
+            MapperTarget::Kind(NodeKind::Button),
+            MappedProperty::Text,
+            MapperMode::Extend,
+            |context| {
+                context.widget.set_tooltip_text(Some("added by a mapper"));
+            },
+        );
+        register_mapper(
+            MapperTarget::Key("count".into()),
+            MappedProperty::Text,
+            MapperMode::Replace,
+            |context| {
+                if let Some(label) = context.widget.downcast_ref::<gtk::Label>() {
+                    label.set_text("drawn my way");
+                }
+            },
+        );
+        let mut application =
+            Application::new(Counter::new(()), Window::new("Mappers", Size::new(320, 240)));
+        // SAFETY: `application` outlives `harness`, declared after it.
+        let harness = unsafe { Harness::attach(&mut application) };
+        assert_eq!(
+            harness.expect("increment").tooltip_text().as_deref(),
+            Some("added by a mapper")
+        );
+        harness.click("increment");
+        assert_eq!(
+            harness.expect_as::<gtk::Label>("count").text(),
+            "drawn my way",
+            "replaced, also on update"
+        );
+        let listed = harness.with_registry(|registry| {
+            use rustnative_core::inspect::InspectBackend as _;
+            super::inspect::GtkInspect { runtime: &registry.windows[&WindowId::PRIMARY] }
+                .mappers()
+                .len()
+        });
+        assert_eq!(listed, 2);
+        crate::clear_mappers();
+    });
+}
+
+/// Two fixed-width labels in a row.
+struct TwoInARow;
+
+impl Component for TwoInARow {
+    type Props = ();
+    type Message = ();
+    fn new((): ()) -> Self {
+        Self
+    }
+    fn props(&self) -> &() {
+        &()
+    }
+    fn set_props(&mut self, (): ()) {}
+    fn view(&self) -> Node {
+        use rustnative_core::{LayoutStyle, SizeMode};
+        let fixed = LayoutStyle::new().width(SizeMode::Fixed(80));
+        Node::row(
+            "row",
+            [
+                Node::label_with_layout("first", "First", fixed),
+                Node::label_with_layout("second", "Second", fixed),
+            ],
+        )
+    }
+    fn update(&mut self, _event: Event) {}
+}
+
+/// A right-to-left locale mirrors the row once — the engine places, GTK
+/// draws each widget's inside right-to-left — and switching back at run
+/// time restores it on the same widgets.
+///
+/// Catches: mirroring applied twice (the engine's rectangles flipped *and*
+/// GTK mirroring the container), or not at all.
+#[test]
+fn a_right_to_left_locale_mirrors_the_window() {
+    on_gtk(|| {
+        let mut application = Application::new(TwoInARow, Window::new("rtl", Size::new(320, 120)));
+        // SAFETY: `application` outlives `harness`, declared after it.
+        let harness = unsafe { Harness::attach(&mut application) };
+        let set_locale = |tag: &'static str| {
+            harness.with_registry(|registry| {
+                registry.with_application(|application| {
+                    application.set_locale(rustnative_core::Locale::new(tag));
+                });
+                registry.render(WindowId::PRIMARY).expect("re-render after the locale change");
+            });
+            harness.pump();
+            // GTK allocates at its next frame.
+            super::testing::pump_for(Duration::from_millis(50));
+        };
+        // The desktop's locale is in the environment; the application's
+        // own choice overrides it.
+        set_locale("ar-EG");
+        let window = harness.gtk_window(WindowId::PRIMARY).expect("a window");
+        let left = |key: &str| harness.expect(key).compute_bounds(&window).expect("placed").x();
+        let first = harness.expect("first");
+        assert_eq!(first.direction(), gtk::TextDirection::Rtl, "GTK draws it right-to-left");
+        assert!(left("first") > left("second"), "in right-to-left the first item is on the right");
+
+        set_locale("en-GB");
+        assert_eq!(harness.expect("first"), first, "the same widget");
+        assert_eq!(first.direction(), gtk::TextDirection::Ltr);
+        assert!(left("first") < left("second"), "left-to-right again");
+    });
+}

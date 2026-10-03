@@ -1,5 +1,5 @@
 //! Creating, updating, and wiring the widget that realizes each node kind
-//! (`docs/linux/widget-mapping.md`).
+//! (`docs/linux.md`, "How the tree is realized").
 //!
 //! | Node | GTK widget |
 //! |---|---|

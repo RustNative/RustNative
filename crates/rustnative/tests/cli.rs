@@ -103,7 +103,6 @@ fn every_platform_without_a_backend_is_refused_by_name() {
     let project = new_project("no-backend");
     let expected = [
         ("macos", "Milestone 33"),
-        ("linux", "Milestone 34"),
         ("android", "Milestone 35"),
         ("ios", "Milestone 36"),
         ("embedded", "Milestone 37"),
@@ -119,6 +118,22 @@ fn every_platform_without_a_backend_is_refused_by_name() {
         assert!(message.contains(&format!("no backend for {platform} yet")), "{message}");
         assert!(message.contains(mention), "{message}");
     }
+}
+
+/// Linux has a backend, built on a Linux host; elsewhere the command says
+/// where to build it rather than building a stub.
+#[cfg(not(target_os = "linux"))]
+#[test]
+fn linux_is_built_on_linux_and_the_error_says_where() {
+    let project = new_project("linux-elsewhere");
+    let output = rustnative()
+        .current_dir(&project)
+        .args(["build", "linux"])
+        .output()
+        .expect("rustnative runs");
+    assert!(!output.status.success());
+    let message = stderr(&output);
+    assert!(message.contains("build for Linux on Linux") && message.contains("WSL"), "{message}");
 }
 
 #[test]

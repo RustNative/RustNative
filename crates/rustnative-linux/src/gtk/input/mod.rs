@@ -99,12 +99,15 @@ impl InputState {
     }
 }
 
-/// Installs a window's controllers.
+/// Installs a window's controllers on `host`: its `GtkWindow`, or — for a
+/// root embedded in a host application's widget tree — the root itself,
+/// which then hears the input that reaches it there.
 pub(crate) fn attach(
-    window: &gtk::Window,
+    host: &gtk::Widget,
     root: &super::layout_widget::RnLayout,
     id: WindowId,
 ) -> InputState {
+    let window = host;
     let mut state = InputState::default();
 
     let keys = gtk::EventControllerKey::new();
@@ -167,12 +170,31 @@ pub(crate) fn attach(
 
     let pointer = gtk::EventControllerLegacy::new();
     pointer.set_propagation_phase(gtk::PropagationPhase::Capture);
-    let native = window.clone();
     let origin = root.clone();
-    pointer.connect_event(move |_, event| pointer::legacy_event(id, &native, &origin, event));
+    pointer.connect_event(move |controller, event| {
+        // The surface the event's coordinates are in: the window's, wherever
+        // the host put the root.
+        let Some(native) = controller.widget().and_then(|widget| widget.native()) else {
+            return glib::Propagation::Proceed;
+        };
+        pointer::legacy_event(id, &native, &origin, event)
+    });
     window.add_controller(pointer);
 
-    window.connect_focus_widget_notify(move |_| post(Work::FocusChanged(id)));
+    // Focus moves within the toplevel the root is in (the host's, when
+    // embedded), known once the root is realized.
+    match window.downcast_ref::<gtk::Window>() {
+        Some(toplevel) => {
+            toplevel.connect_focus_widget_notify(move |_| post(Work::FocusChanged(id)));
+        }
+        None => {
+            window.connect_realize(move |widget| {
+                if let Some(toplevel) = widget.root().and_downcast::<gtk::Window>() {
+                    toplevel.connect_focus_widget_notify(move |_| post(Work::FocusChanged(id)));
+                }
+            });
+        }
+    }
 
     let clipboard = window.clipboard();
     let handler = clipboard

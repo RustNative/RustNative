@@ -85,7 +85,10 @@ impl Component for Screen {
 }
 
 /// A box whose width transitions each time a timer flips it.
-#[cfg_attr(not(windows), allow(dead_code, reason = "measured by the native scenarios"))]
+#[cfg_attr(
+    not(any(windows, target_os = "linux")),
+    allow(dead_code, reason = "measured by the native scenarios")
+)]
 struct Animated {
     wide: bool,
 }
@@ -301,6 +304,11 @@ fn headless() -> Value {
         "filter_input_latency_ms": millis(keystroke),
     })
 }
+
+#[cfg(target_os = "linux")]
+mod native_linux;
+#[cfg(target_os = "linux")]
+use native_linux as native;
 
 #[cfg(windows)]
 mod native {
@@ -577,13 +585,13 @@ fn main() -> ExitCode {
         "core" => core(),
         "compile" => compile(),
         "headless" => headless(),
-        #[cfg(windows)]
+        #[cfg(any(windows, target_os = "linux"))]
         "startup" => native::startup(),
-        #[cfg(windows)]
+        #[cfg(any(windows, target_os = "linux"))]
         "interaction" => native::interaction(),
-        #[cfg(windows)]
+        #[cfg(any(windows, target_os = "linux"))]
         "animation" => native::animation(),
-        #[cfg(windows)]
+        #[cfg(any(windows, target_os = "linux"))]
         "filter" => native::filter(),
         other => {
             eprintln!("bench-app: no scenario `{other}` on this platform");

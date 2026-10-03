@@ -17,5 +17,24 @@ Rules:
 - the group crate depends on `rustnative-core` only; members depend on it;
 - a backend never depends on another backend.
 
-No group crate exists yet: Windows is the only native backend, and a
-one-member group is exactly the premature abstraction this rule avoids.
+No group crate exists yet.
+
+**Desktop shell, decided at its second member (Linux, Milestone 34).** With
+Windows and Linux both written, what the two backends actually share for the
+shell surfaces was compared:
+
+| Surface | Windows | Linux | Shared beyond `rustnative-core` |
+|---|---|---|---|
+| Tray icon and its menu | `Shell_NotifyIconW`, a popup `HMENU` | a StatusNotifierItem and a `com.canonical.dbusmenu` menu over D-Bus | nothing: the portable model (`surfaces::SurfaceCommand`, `TrayMenuItem`, `Event::SurfaceAction`) is already in the core |
+| Taskbar progress | `ITaskbarList3` | the `LauncherEntry` D-Bus signal | nothing |
+| Jump list | `ICustomDestinationList`, at run time | the desktop entry's actions, fixed at packaging | nothing (Linux does not advertise it) |
+| Single instance, deep links | a named mutex and `WM_COPYDATA` | a bus name and `org.freedesktop.Application` | nothing |
+| Menu bar | `HMENU` | `GMenu` | the core's `MenuBar` model |
+
+Every shared piece is a portable model, and every model is in the core; what
+remains per backend is entirely the host's API. A `framework-desktop-shell`
+crate would hold no code, so it is **not created**. The decision is
+revisited when macOS (Milestone 33) arrives: its dock menu and status item
+are the most likely place for a third member to share a host-level
+algorithm (menu diffing against a live native menu, say) with one of the
+other two.

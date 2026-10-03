@@ -12,11 +12,11 @@ use clap::ValueEnum;
 #[derive(Debug, Clone, Copy, PartialEq, Eq, ValueEnum)]
 #[value(rename_all = "lower")]
 pub enum Platform {
-    /// Win32 desktop — the backend this workspace has.
+    /// Win32 desktop.
     Windows,
     /// macOS (Milestone 33).
     Macos,
-    /// Linux (Milestone 34).
+    /// Linux desktops: GTK 4 on Wayland or X11 (Milestone 34).
     Linux,
     /// Android (Milestone 35).
     Android,
@@ -36,6 +36,7 @@ impl Platform {
     pub const fn backend(self) -> Option<&'static str> {
         match self {
             Self::Windows => Some("rustnative-windows"),
+            Self::Linux => Some("rustnative-linux"),
             Self::Web => Some("rustnative-web"),
             _ => None,
         }
@@ -48,9 +49,8 @@ impl Platform {
         match self {
             // The web target has a roadmap section rather than a numbered
             // milestone, so it names none either.
-            Self::Windows | Self::Web => None,
+            Self::Windows | Self::Linux | Self::Web => None,
             Self::Macos => Some(33),
-            Self::Linux => Some(34),
             Self::Android => Some(35),
             Self::Ios => Some(36),
             Self::Embedded => Some(37),
@@ -78,11 +78,10 @@ mod tests {
     use super::*;
 
     #[test]
-    fn windows_and_web_have_backends_and_every_other_names_its_milestone() {
+    fn windows_linux_and_web_have_backends_and_every_other_names_its_milestone() {
         assert_eq!(Platform::Windows.backend(), Some("rustnative-windows"));
-        for platform in
-            [Platform::Macos, Platform::Linux, Platform::Android, Platform::Ios, Platform::Embedded]
-        {
+        assert_eq!(Platform::Linux.backend(), Some("rustnative-linux"));
+        for platform in [Platform::Macos, Platform::Android, Platform::Ios, Platform::Embedded] {
             assert!(platform.backend().is_none(), "{platform} has no backend yet");
             assert!(platform.planned_milestone().is_some(), "{platform} names its milestone");
         }

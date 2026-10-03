@@ -43,6 +43,8 @@
 
 pub mod desktop;
 mod error;
+#[cfg(target_os = "linux")]
+mod mappers;
 mod platform;
 mod toolkit;
 
@@ -61,11 +63,38 @@ pub use services::{
 };
 
 #[cfg(target_os = "linux")]
+pub use gtk::embed::{EmbeddedRoot, ExternalLoop};
+#[cfg(target_os = "linux")]
 pub use gtk::foreign::{ForeignWidget, Ownership, register_foreign};
 #[cfg(target_os = "linux")]
 pub use gtk::surface::{SurfaceHandle, native_surface};
+#[cfg(target_os = "linux")]
+pub use mappers::{
+    MappedProperty, MapperContext, MapperInfo, MapperMode, MapperTarget, active_mappers,
+    clear_mappers, register_mapper,
+};
 
 pub use desktop::{DesktopEnvironment, DisplayServer, Session};
 pub use error::{Error, NativeContext};
 pub use platform::LinuxPlatform;
 pub use toolkit::ToolkitKind;
+
+/// Runs the preview catalogue (`rustnative_core::preview::Catalogue`) on
+/// this backend, opened at the preview named `first` — what an
+/// application's `main` does when `rustnative preview` runs it
+/// (`rustnative_core::preview::requested`).
+///
+/// # Errors
+///
+/// As [`LinuxPlatform`]'s `run`.
+pub fn run_catalogue(
+    previews: Vec<rustnative_core::preview::Preview>,
+    first: &str,
+) -> Result<(), Error> {
+    use rustnative_core::Platform as _;
+    let mut application = rustnative_core::Application::new(
+        rustnative_core::preview::Catalogue::open(previews, first),
+        rustnative_core::Window::new("Previews", rustnative_core::Size::new(960, 640)),
+    );
+    LinuxPlatform::new().run(&mut application)
+}

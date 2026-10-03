@@ -10,6 +10,7 @@
 //! drift from the widget the first time a theme changed its padding.
 
 use std::cell::RefCell;
+use std::collections::HashMap;
 
 use gtk::prelude::*;
 use rustnative_core::{Control, IntrinsicMeasurer, NodeKind, Size, Typography};
@@ -30,13 +31,52 @@ impl<'a> GtkMeasurer<'a> {
 }
 
 /// One unparented widget of each measured kind, kept for the life of a
-/// window and reconfigured per measurement.
+/// window and reconfigured per measurement, and what each measurement
+/// answered: GTK's measurement is the expensive part of a relayout, and the
+/// same text in the same font at the same width measures the same until
+/// the styles change ([`Prototypes::forget`]).
 #[derive(Debug)]
 pub(crate) struct Prototypes {
     label: gtk::Label,
     button: gtk::Button,
     entry: gtk::Entry,
     tabs: gtk::Label,
+    measured: RefCell<HashMap<MeasureKey, Size>>,
+}
+
+/// What a measurement depends on: what is measured, its text or control,
+/// the width it may take, and its font.
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+struct MeasureKey {
+    what: String,
+    text: String,
+    max_width: Option<i32>,
+    font: Option<String>,
+}
+
+/// Measurements kept before the cache starts over (a list scrolled through
+/// many distinct rows would otherwise grow it without bound).
+// ponytail: whole-cache reset at the cap; an LRU if a workload thrashes it.
+const MEASURED_CAP: usize = 8192;
+
+impl Prototypes {
+    /// Forgets every measurement: the fonts, theme, or text scale changed.
+    pub(crate) fn forget(&self) {
+        self.measured.borrow_mut().clear();
+    }
+
+    fn remembered(&self, key: MeasureKey, measure: impl FnOnce() -> Size) -> Size {
+        if let Some(size) = self.measured.borrow().get(&key) {
+            return *size;
+        }
+        let size = measure();
+        let mut measured = self.measured.borrow_mut();
+        if measured.len() >= MEASURED_CAP {
+            measured.clear();
+        }
+        measured.insert(key, size);
+        size
+    }
 }
 
 impl Default for Prototypes {
@@ -46,7 +86,13 @@ impl Default for Prototypes {
         label.set_wrap_mode(gtk::pango::WrapMode::WordChar);
         label.set_xalign(0.0);
         let tabs = gtk::Label::new(None);
-        Self { label, button: gtk::Button::with_label(""), entry: gtk::Entry::new(), tabs }
+        Self {
+            label,
+            button: gtk::Button::with_label(""),
+            entry: gtk::Entry::new(),
+            tabs,
+            measured: RefCell::default(),
+        }
     }
 }
 
@@ -107,6 +153,52 @@ impl IntrinsicMeasurer for GtkMeasurer<'_> {
         typography: Option<&Typography>,
     ) -> Size {
         let text = text.unwrap_or_default();
+        if matches!(
+            kind,
+            NodeKind::Control
+                | NodeKind::Column
+                | NodeKind::Row
+                | NodeKind::Canvas
+                | NodeKind::Surface
+        ) {
+            return Size::new(0, 0);
+        }
+        let key = MeasureKey {
+            what: format!("{kind:?}"),
+            text: text.to_owned(),
+            max_width,
+            font: typography.map(|typography| format!("{typography:?}")),
+        };
+        self.prototypes.remembered(key, || self.measure_uncached(kind, text, max_width, typography))
+    }
+
+    fn measure_foreign(&self, kind: &str) -> Size {
+        super::foreign::preferred_size(kind).unwrap_or(Size::new(0, 0))
+    }
+
+    fn measure_control(&self, control: &Control) -> Size {
+        let key = MeasureKey {
+            what: "control".to_owned(),
+            text: format!("{control:?}"),
+            max_width: None,
+            font: None,
+        };
+        self.prototypes.remembered(key, || {
+            // Measured on a real widget of the kind that realizes it.
+            let widget = controls::prototype(control);
+            self.widget(&widget, None)
+        })
+    }
+}
+
+impl GtkMeasurer<'_> {
+    fn measure_uncached(
+        &self,
+        kind: NodeKind,
+        text: &str,
+        max_width: Option<i32>,
+        typography: Option<&Typography>,
+    ) -> Size {
         match kind {
             NodeKind::Label => self.label(text, max_width, typography),
             NodeKind::Button => {
@@ -125,21 +217,7 @@ impl IntrinsicMeasurer for GtkMeasurer<'_> {
                 let size = self.widget(&self.prototypes.tabs, typography);
                 Size::new(size.width, size.height.saturating_add(16))
             }
-            NodeKind::Control
-            | NodeKind::Column
-            | NodeKind::Row
-            | NodeKind::Canvas
-            | NodeKind::Surface => Size::new(0, 0),
+            _ => Size::new(0, 0),
         }
-    }
-
-    fn measure_foreign(&self, kind: &str) -> Size {
-        super::foreign::preferred_size(kind).unwrap_or(Size::new(0, 0))
-    }
-
-    fn measure_control(&self, control: &Control) -> Size {
-        // Measured on a real widget of the kind that realizes it.
-        let widget = controls::prototype(control);
-        self.widget(&widget, None)
     }
 }

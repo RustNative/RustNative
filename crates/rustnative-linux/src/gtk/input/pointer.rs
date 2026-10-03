@@ -73,7 +73,7 @@ pub(crate) enum Raw {
 /// The legacy controller's handler.
 pub(crate) fn legacy_event(
     window: WindowId,
-    native: &gtk::Window,
+    native: &gtk::Native,
     root: &RnLayout,
     event: &gdk::Event,
 ) -> glib::Propagation {
@@ -162,7 +162,7 @@ pub(crate) fn wheel_delta(
     })
 }
 
-fn translate(native: &gtk::Window, root: &RnLayout, event: &gdk::Event) -> Option<Raw> {
+fn translate(native: &gtk::Native, root: &RnLayout, event: &gdk::Event) -> Option<Raw> {
     let kind = kind_of(event);
     let at = || -> Option<(f64, f64)> {
         let (x, y) = event.position()?;

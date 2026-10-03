@@ -31,6 +31,60 @@ call past the pretty-printer's line width.
 
 <!-- milestone entries, newest first -->
 
+### Milestone 34 — the Linux backend — complete
+
+**Built.** Plan: `docs/superpowers/plans/2026-09-29-linux-milestone-34.md`,
+Phases 0–9. Guide: `docs/linux.md`, with `docs/linux/desktop-matrix.md` and
+`docs/linux/accessibility.md`. Crate: `rustnative-linux` (GTK 4.14+, through
+gtk4-rs 0.10, the release that keeps the workspace's Rust 1.85 floor).
+
+- **The realization**: every node kind as a GTK widget, placed by the
+  portable layout engine in `RnLayout`; measurement through GTK and Pango,
+  cached until fonts or theme change; styles as one display-wide sheet,
+  applied only where a node differs from the desktop's theme; animation on
+  GTK's frame clock; virtual lists with anchoring and widget recycling; the
+  canvas on cairo and Pango; native surfaces as Wayland subsurfaces or X11
+  child windows; host content (`GtkVideo`); per-property mappers.
+- **Input and accessibility**: GTK's controllers for keys, pointer, touch,
+  pen, gestures, IME, and drops; accessibility through `GtkAccessible`,
+  read back over AT-SPI2 by the tests.
+- **The desktop**: the services (clipboard, dialogs, URLs, notifications,
+  state, locale, keyring, HTTP with pins, printing, serial, permissions,
+  data conditions and decoding, push and billing answered as unavailable),
+  menu bars, lifecycle, placement, one instance with deep links, a
+  StatusNotifierItem tray, `LauncherEntry` progress, and the display-server
+  and desktop answers (`WindowPlacement`, `ServerSideDecorations`, no
+  `GlobalMenuBar`). The desktop-shell platform group was decided at its
+  second member: no shared crate (`docs/conformance/platform-groups.md`).
+- **Embedding**: `start_external`, `embed`, and `register_foreign`
+  (`examples/adoption-gtk`).
+- **Tooling**: `rustnative build|run|package linux` — `.deb`, tarball, and
+  AppImage, with the desktop entry, AppStream metadata, and icon; a `doctor`
+  row; a `rustnative new` template that runs on both desktops;
+  `rustnative bench --target linux` and `budgets/linux.toml`.
+- **The examples** select their backend per target; the Win32 adoption hosts
+  build only on Windows.
+- **Found on the way**: the GTK measurer re-measured every node through GTK
+  on each relayout (a click cost 36 ms on the bench screen; 4–6 ms with the
+  cache); workspace tests that assumed Windows now run on Linux (the C host
+  through the system compiler, `file://` URIs, the dev agent's execute bit).
+
+**Verified.** The Linux gate (fmt, clippy, the workspace's portable tests,
+the backend's tests under Wayland, Xwayland, and Xvfb, doc, MSRV, deny) on
+Ubuntu 24.04 in WSL (GTK 4.14), and the Windows gate; the backend's tests in
+all three sessions on Kali Rolling (GTK 4.22, libsoup 3.6), where GTK reports
+the automation id as AT-SPI's `AccessibleId`. Kali showed the private test
+bus was not isolated — its real portal was started on demand and took names
+the tests' fakes own — so `tools/linux-session.sh` now runs a bus that starts
+only the accessibility bus; and that a virtual-list test held a recycled
+widget instead of its row. The checklist's Linux column
+(`docs/conformance/new-backend-checklist.md`) names the test for every row.
+
+**Owed.** Nothing in Milestone 34's scope. Verified only through WSLg and
+Xvfb, not on a physical GNOME or Plasma session: the per-desktop rows of the
+matrix other than WSLg are the documented expectation, answered at run time
+from the session rather than assumed.
+
 ### Web milestones A–K — the Web backend — complete (Chromium engines; provider accounts owed)
 
 **Built.** Plan: `docs/superpowers/plans/2026-09-27-web-milestones-a-k.md`,

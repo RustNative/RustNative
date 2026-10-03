@@ -122,6 +122,7 @@ impl Report {
                         (false, "missing the MSVC build tools or the Windows SDK".to_owned())
                     }
                 }
+                _ if platform == Platform::Linux => linux_readiness(),
                 Some(milestone) => (false, format!("no backend yet — Milestone {milestone}")),
                 None => (false, "no backend yet — see PLAN.md's web roadmap".to_owned()),
             };
@@ -224,6 +225,44 @@ pub fn install(dry_run: bool) -> crate::error::Result<()> {
     Ok(())
 }
 
+/// Whether this machine builds the Linux backend: a Linux host with GTK
+/// 4.14 or newer and libsoup 3's development files, as `pkg-config` finds
+/// them, and whether it can make an AppImage.
+fn linux_readiness() -> (bool, String) {
+    if !cfg!(target_os = "linux") {
+        return (false, "build on Linux (from Windows: inside WSL)".to_owned());
+    }
+    let version = |library: &str| {
+        std::process::Command::new("pkg-config")
+            .args(["--modversion", library])
+            .output()
+            .ok()
+            .filter(|output| output.status.success())
+            .map(|output| String::from_utf8_lossy(&output.stdout).trim().to_owned())
+    };
+    let Some(gtk) = version("gtk4") else {
+        return (false, "GTK 4 development files missing (apt install libgtk-4-dev)".to_owned());
+    };
+    let recent =
+        gtk.split('.').take(2).map(|part| part.parse::<u32>().unwrap_or(0)).collect::<Vec<_>>()
+            >= vec![4, 14];
+    if !recent {
+        return (false, format!("GTK {gtk} is older than 4.14"));
+    }
+    if version("libsoup-3.0").is_none() {
+        return (
+            false,
+            "libsoup 3 development files missing (apt install libsoup-3.0-dev)".to_owned(),
+        );
+    }
+    let appimage = if crate::package::linux::which("appimagetool").is_some() {
+        "AppImage tool present"
+    } else {
+        "deb and tar (appimagetool missing for AppImages)"
+    };
+    (true, format!("ready — GTK {gtk}; packages: {appimage}"))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -238,7 +277,14 @@ mod tests {
         assert_eq!(report.platforms.len(), 7);
         let windows = &report.platforms[0];
         assert_eq!(windows.platform, "windows");
-        for platform in &report.platforms[1..] {
+        let linux = &report.platforms[2];
+        assert_eq!(linux.platform, "linux");
+        if !cfg!(target_os = "linux") {
+            assert!(!linux.ready && linux.detail.contains("build on Linux"), "{}", linux.detail);
+        }
+        for platform in
+            report.platforms.iter().filter(|p| !["windows", "linux"].contains(&p.platform.as_str()))
+        {
             assert!(!platform.ready, "{} has no backend yet", platform.platform);
             assert!(platform.detail.contains("no backend yet"));
         }

@@ -243,6 +243,11 @@ impl NativeSurfaces {
         }
     }
 
+    /// The nodes that have a surface.
+    pub(crate) fn nodes(&self) -> Vec<NodeId> {
+        self.surfaces.keys().copied().collect()
+    }
+
     /// Destroys every surface.
     pub(crate) fn release(&mut self) {
         self.retain(|_| false);

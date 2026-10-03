@@ -103,4 +103,32 @@ esac
 # activates on demand (`org.a11y.Bus`).
 export GTK_A11Y=atspi
 export NO_AT_BRIDGE=0
-exec dbus-run-session -- "$@"
+
+# The private bus starts nothing but the accessibility bus on demand. A
+# desktop's own services (the portal, a keyring, a notification server)
+# would otherwise be started by the first call to their name — and differ
+# from one distribution to the next — taking names the tests' fakes must own
+# and routing dialogs to a portal instead of GTK's in-process chooser.
+bus_dir="$(mktemp -d)"
+trap 'rm -rf "$bus_dir"' EXIT
+mkdir -p "$bus_dir/services"
+for dir in /usr/share/dbus-1/services /usr/local/share/dbus-1/services; do
+    [[ -f "$dir/org.a11y.Bus.service" ]] && ln -sf "$dir/org.a11y.Bus.service" "$bus_dir/services/"
+done
+cat > "$bus_dir/session.conf" <<CONF
+<!DOCTYPE busconfig PUBLIC "-//freedesktop//DTD D-Bus Bus Configuration 1.0//EN"
+ "http://www.freedesktop.org/standards/dbus/1.0/busconfig.dtd">
+<busconfig>
+  <type>session</type>
+  <keep_umask/>
+  <listen>unix:tmpdir=/tmp</listen>
+  <auth>EXTERNAL</auth>
+  <servicedir>$bus_dir/services</servicedir>
+  <policy context="default">
+    <allow send_destination="*" eavesdrop="true"/>
+    <allow eavesdrop="true"/>
+    <allow own="*"/>
+  </policy>
+</busconfig>
+CONF
+dbus-run-session --config-file="$bus_dir/session.conf" -- "$@"

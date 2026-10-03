@@ -1,7 +1,10 @@
 # Budget files
 
 `PLAN.md` Milestone 42. There is one file per shipped target:
-`windows.toml`, `headless.toml`, `web.toml` (measured by
+`windows.toml`, `linux.toml` (measured on a Linux desktop session —
+`rustnative bench --target linux`; CI's runners have no compositor or GPU to
+measure GTK on, so it is run on the reference machine), `headless.toml`,
+`web.toml` (measured by
 `examples/web-bench` in headless Edge on a throttled profile), and
 `serverless.toml` (measured by `rustnative bench` itself, running
 `examples/web-notes` under its emulators). `rustnative bench --target <target>`

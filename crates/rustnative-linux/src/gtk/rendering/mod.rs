@@ -120,6 +120,22 @@ impl NativeRegistry {
         removed
     }
 
+    /// Removes `id`'s object without counting it destroyed: a recycled
+    /// virtual-list row, about to be [`Self::adopt`]ed by another.
+    pub(crate) fn take(&mut self, id: NodeId) -> Option<HostObject> {
+        let taken = self.objects.remove(&id);
+        if let Some(object) = &taken {
+            self.by_widget.remove(&object.widget);
+        }
+        taken
+    }
+
+    /// Registers a recycled object for `id`, without counting it created.
+    pub(crate) fn adopt(&mut self, id: NodeId, object: HostObject) {
+        self.by_widget.insert(object.widget.clone(), id);
+        self.objects.insert(id, object);
+    }
+
     pub(crate) fn len(&self) -> usize {
         self.objects.len()
     }

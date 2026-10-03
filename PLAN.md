@@ -1051,6 +1051,20 @@ Start with one supported native toolkit and keep the backend pluggable so additi
 - tray integration through the desktop's status-notifier protocol where the environment provides one, answered as a capability where it does not (Milestone 57);
 - verification on real Linux sessions under both display servers.
 
+Implemented (`rustnative-linux`; guide: `docs/linux.md`):
+
+- **GTK 4** behind an internal toolkit seam (`toolkit::Toolkit`; `ToolkitKind::Gtk4`), with the toolkit-independent half (`desktop`: session and display-server detection, the freedesktop services over GDBus) reusable by a second toolkit;
+- every node kind realized as a GTK widget, laid out by the portable engine in a custom container (`RnLayout`), measured through GTK and Pango on prototype widgets with the answers cached until fonts or theme change; styles compiled to one display-wide style sheet, applied only where a node differs from the desktop's theme (`rustnative_style::LINUX`, `LINUX_UNITS`);
+- input from GTK's controllers: keys (XKB keyvals, unshifted for shortcuts), pointer, touch, pen, wheel, gestures with scroll-versus-pan arbitration, hover, cursors, IME through `GtkIMMulticontext`, drag-and-drop through `GtkDropTarget`, command shortcuts in the capture phase;
+- both display servers, answered per session: `WindowPlacement` on X11, `ServerSideDecorations` on X11 and Plasma's Wayland, no `GlobalMenuBar` (GTK 4 exports only an application-wide menu); the conventions of each desktop in `docs/linux/desktop-matrix.md`;
+- accessibility through GTK's `GtkAccessible`, verified over AT-SPI2 itself (`docs/linux/accessibility.md`), with a canvas' virtual elements as accessible objects;
+- services: clipboard, file dialogs (the FileChooser portal or GTK's chooser), URL launch (OpenURI portal or GIO), notifications (server or portal, with clicks), crash-safe state files under `$XDG_STATE_HOME`, glibc locale formatting, Secret Service storage, libsoup HTTP with certificate pins checked at the handshake, GTK printing, termios serial ports, portal-gated permissions in a sandbox, gdk-pixbuf decoding and GIO/UPower conditions, and push/billing answered as unavailable with the reason;
+- animation from GTK's frame clock; virtual lists with anchoring and widget recycling; canvas drawing with cairo and Pango; native surfaces as Wayland subsurfaces or X11 child windows, told their scale when it changes (mixed DPI); host content (`GtkVideo`);
+- menu bars (`GMenu` and `GtkPopoverMenuBar`, command-bound items following their commands), lifecycle (logind sleep and shutdown, GIO's memory monitor, idle flush), window placement restored, one instance per application id over `org.freedesktop.Application` with launch URLs handed on, a StatusNotifierItem tray where a tray host runs, and `LauncherEntry` progress;
+- inspection (realized widgets, the census, the overlay), per-property mappers, the preview catalogue, and embedding both ways: `start_external` and `embed` into a GTK host, `register_foreign` adopting the host's widgets (`examples/adoption-gtk`);
+- tooling: `rustnative build|run|package linux` (a `.deb`, a tarball, and an AppImage through `appimagetool`, each with the desktop entry, AppStream metadata, and icon), a `doctor` row, a template that runs on Windows and Linux, and `budgets/linux.toml`;
+- verified on WSLg's Wayland and Xwayland sessions and on Xvfb with XTest input, on Ubuntu 24.04 (GTK 4.14) and on Kali Rolling (GTK 4.22), and in CI's `linux-backend` job.
+
 ## Milestone 35 — Android backend
 
 Native Android view hierarchy, lifecycle integration, and a disciplined JNI boundary:

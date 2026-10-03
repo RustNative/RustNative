@@ -1115,15 +1115,12 @@ fn colorref_to_color(color: u32) -> rustnative_core::Color {
 /// The node realizing item `index` of the virtual list `list`, if it is
 /// realized at all.
 fn item_at(snapshot: &TreeSnapshot, list: NodeId, index: usize) -> Option<NodeId> {
-    snapshot
-        .children_of(list)
-        .find(|child| child.item_index.unwrap_or(child.index) == index)
-        .map(|child| child.id)
+    rustnative_core::virtualization::item_at(snapshot, list, index)
 }
 
 /// Which item of its virtual list `node` realizes.
 fn index_of(snapshot: &TreeSnapshot, node: NodeId) -> Option<usize> {
-    snapshot.get(node).map(|node| node.item_index.unwrap_or(node.index))
+    rustnative_core::virtualization::index_of(snapshot, node)
 }
 
 /// A transition the renderer found and `native::animation` will start.

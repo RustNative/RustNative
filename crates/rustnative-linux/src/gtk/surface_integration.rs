@@ -89,7 +89,22 @@ fn a_rendered_surface_is_a_live_native_surface_that_follows_its_node() {
             !log.borrow().is_empty()
         });
         let (surface, size) = log.borrow()[0];
-        assert!(size.width >= 80 && size.height >= 60, "device pixels of an 80×60 node: {size:?}");
+        let scale = harness
+            .gtk_window(rustnative_core::WindowId::PRIMARY)
+            .map_or(1, |window| gtk::prelude::WidgetExt::scale_factor(&window));
+        let device = |logical: u32| logical * u32::try_from(scale).unwrap_or(1);
+        assert!(
+            size.width >= device(80) && size.height >= device(60),
+            "device pixels of an 80×60 node at scale {scale}: {size:?}"
+        );
+        // A scale notification at the same scale reports nothing new; a
+        // different one reports the new device size (mixed DPI).
+        let reports = log.borrow().len();
+        super::backend::post(super::backend::Work::ScaleChanged(
+            rustnative_core::WindowId::PRIMARY,
+        ));
+        harness.pump();
+        assert_eq!(log.borrow().len(), reports, "an unchanged scale is not reported again");
         let handle = crate::native_surface(surface).expect("a live surface");
         let raw = handle.window_handle().expect("available").as_raw();
         match (std::env::var("GDK_BACKEND").as_deref(), raw) {

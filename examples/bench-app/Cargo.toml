@@ -28,3 +28,7 @@ serde_json = "1"
 
 [target.'cfg(windows)'.dependencies]
 windows-sys.workspace = true
+
+[target.'cfg(target_os = "linux")'.dependencies]
+rustnative-linux.workspace = true
+gtk = { package = "gtk4", version = "0.10", features = ["v4_14"] }

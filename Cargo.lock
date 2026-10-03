@@ -12,6 +12,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "adoption-gtk"
+version = "0.1.0"
+dependencies = [
+ "gtk4",
+ "rustnative-core",
+ "rustnative-linux",
+]
+
+[[package]]
 name = "adoption-library"
 version = "0.1.0"
 dependencies = [
@@ -193,8 +202,10 @@ name = "bench-app"
 version = "0.1.0"
 dependencies = [
  "filter-demo",
+ "gtk4",
  "rustnative-core",
  "rustnative-headless",
+ "rustnative-linux",
  "rustnative-markup",
  "rustnative-style",
  "rustnative-windows",

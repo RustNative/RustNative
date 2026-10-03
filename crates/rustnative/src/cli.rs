@@ -393,7 +393,10 @@ impl Cli {
                 let root = create(&parent, &name, &framework, syntax)?;
                 println!("Created {}", root.display());
                 println!("  cd {name}");
-                println!("  rustnative run windows");
+                println!(
+                    "  rustnative run {}",
+                    if cfg!(target_os = "linux") { "linux" } else { "windows" }
+                );
                 Ok(())
             }
             Command::Build { platform: Platform::Web, release, mode, host, .. } => {
@@ -637,12 +640,28 @@ impl Cli {
             }
             Command::Lsp { server } => crate::lsp::serve(&server),
             Command::EchoLsp => crate::lsp::echo_server(),
+            Command::Package { platform: Platform::Linux, format, .. } => {
+                if !format.is_linux() {
+                    return Err(Error::Usage(
+                        "Linux packages are deb, tar, appimage, or all".to_owned(),
+                    ));
+                }
+                linux_host(Platform::Linux)?;
+                let project = Project::find(&here)?;
+                for path in crate::package::package_linux(&project.root, &project.config, format)? {
+                    println!("Packaged {}", path.display());
+                }
+                Ok(())
+            }
             Command::Package { platform, format, sign, password_env, appinstaller } => {
                 if platform.backend().is_none() {
                     return Err(Error::NoBackend {
                         platform,
                         milestone: platform.planned_milestone(),
                     });
+                }
+                if !format.is_windows() {
+                    return Err(Error::Usage("Windows packages are zip, msix, or all".to_owned()));
                 }
                 let project = Project::find(&here)?;
                 let signing = sign
@@ -733,6 +752,7 @@ fn cargo_for(
     if platform.backend().is_none() {
         return Err(Error::NoBackend { platform, milestone: platform.planned_milestone() });
     }
+    linux_host(platform)?;
     let project = Project::find(here)?;
     println!("{subcommand}: {} for {platform}", project.config.app.display_name);
     let mut arguments = vec![subcommand.to_owned()];
@@ -743,6 +763,18 @@ fn cargo_for(
     // Structured diagnostics, so positions in lowered `.rsx` files are
     // reported in the `.rsx` file (see `diagnostics`).
     crate::diagnostics::run_cargo(&project.root, &arguments)
+}
+
+/// A Linux application is built on Linux: GTK and its libraries are the
+/// host's. On Windows, WSL is a Linux host (`wsl rustnative run linux`).
+fn linux_host(platform: Platform) -> Result<()> {
+    if platform == Platform::Linux && !cfg!(target_os = "linux") {
+        return Err(Error::Usage(
+            "build for Linux on Linux (from Windows, inside WSL: `wsl rustnative run linux`)"
+                .to_owned(),
+        ));
+    }
+    Ok(())
 }
 
 /// `rustnative serve`.
