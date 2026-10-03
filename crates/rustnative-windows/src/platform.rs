@@ -37,7 +37,7 @@ impl WindowsPlatform {
     /// front, and exits. The first launch's own URL, if any, is delivered
     /// the same way once its windows exist.
     ///
-    /// Use the same id as [`crate::FileStateStore::for_app`]; a reverse
+    /// Use the same id as `FileStateStore::for_app` (Windows); a reverse
     /// domain name (`com.example.notes`) is conventional.
     #[must_use]
     pub fn with_app_id(mut self, app_id: impl Into<String>) -> Self {
@@ -148,6 +148,12 @@ impl Platform for WindowsPlatform {
                 Capability::Surface(rustnative_core::SurfaceKind::TrayExtra),
                 Capability::Surface(rustnative_core::SurfaceKind::JumpList),
                 Capability::Surface(rustnative_core::SurfaceKind::TaskbarProgress),
+                // Milestone 34's display-server answers, which Windows gives
+                // unconditionally: a top-level window goes where it is put
+                // (its saved placement is restored), and the system draws
+                // its frame. The menu bar is in the window, never global.
+                Capability::WindowPlacement,
+                Capability::ServerSideDecorations,
             ]
             .into_iter()
             .chain(crate::native::accelerator::gpu_available().then_some(Capability::Accelerator(
@@ -267,5 +273,9 @@ mod tests {
         ] {
             assert!(!capabilities.supports(Capability::Surface(surface)), "{surface:?}");
         }
+        // Milestone 34's display-server answers.
+        assert!(capabilities.supports(Capability::WindowPlacement));
+        assert!(capabilities.supports(Capability::ServerSideDecorations));
+        assert!(!capabilities.supports(Capability::GlobalMenuBar));
     }
 }

@@ -85,6 +85,7 @@ impl Component for Screen {
 }
 
 /// A box whose width transitions each time a timer flips it.
+#[cfg_attr(not(windows), allow(dead_code, reason = "measured by the native scenarios"))]
 struct Animated {
     wide: bool,
 }

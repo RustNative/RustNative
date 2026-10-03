@@ -26,6 +26,7 @@ categories = ["gui", "os::windows-apis"]
 rustnative-build = { path = "crates/rustnative-build", version = "0.1.0" }
 rustnative-core = { path = "crates/rustnative-core", version = "0.1.0" }
 rustnative-windows = { path = "crates/rustnative-windows", version = "0.1.0" }
+rustnative-linux = { path = "crates/rustnative-linux", version = "0.1.0" }
 rustnative-types = { path = "crates/rustnative-types", version = "0.1.0" }
 rustnative-headless = { path = "crates/rustnative-headless", version = "0.1.0" }
 rustnative-markup = { path = "crates/rustnative-markup", version = "0.1.0" }

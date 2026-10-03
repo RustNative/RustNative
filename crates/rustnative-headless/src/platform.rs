@@ -162,6 +162,10 @@ mod tests {
             Capability::Menus,
             Capability::Animations,
             Capability::FileDialogs,
+            // There is no display server: nothing is placed or decorated.
+            Capability::WindowPlacement,
+            Capability::ServerSideDecorations,
+            Capability::GlobalMenuBar,
         ] {
             assert!(
                 !capabilities.supports(unrealized),

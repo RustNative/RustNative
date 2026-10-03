@@ -708,6 +708,15 @@ fn serve_deployment(
     {
         return failed(format!("cannot write {}: {error}", path.display()));
     }
+    // Runnable where the file system has an execute bit.
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt as _;
+        if let Err(error) = std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o755))
+        {
+            return failed(format!("cannot make {} executable: {error}", path.display()));
+        }
+    }
     let bind = SocketAddr::new(listen.ip(), 0);
     let child = Command::new(&path)
         .args(&header.args)

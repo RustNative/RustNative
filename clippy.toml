@@ -30,3 +30,8 @@ allowed-duplicate-crates = ["syn"]
 # test module.
 allow-unwrap-in-tests = true
 allow-expect-in-tests = true
+
+# Proper names the Linux backend's documentation uses, which
+# `doc_markdown` would otherwise ask to be code (`..` keeps clippy's own
+# list).
+doc-valid-idents = ["..", "XTest", "LXQt", "WSLg", "Xwayland", "GNOME", "KDE", "AppImage", "AppStream", "GDBus", "GLib", "GObject", "OpenURI", "FileChooser", "NetworkManager", "UPower", "UnifiedPush", "KWallet", "KeePassXC"]

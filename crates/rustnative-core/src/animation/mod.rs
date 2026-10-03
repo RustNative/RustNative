@@ -45,9 +45,11 @@
 mod easing;
 mod interpolate;
 mod matched;
+mod overrides;
 mod timeline;
 
 pub use matched::{MatchedGeometry, matched_geometry};
+pub use overrides::{AnimatedOverrides, NodeOverrides};
 
 pub use easing::Easing;
 pub use timeline::{Finished, Frame, TickOutput, Timeline};

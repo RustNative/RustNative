@@ -18,4 +18,9 @@ workspace = true
 [dependencies]
 rustnative-conformance.workspace = true
 rustnative-core.workspace = true
+
+[target.'cfg(target_os = "linux")'.dependencies]
+rustnative-linux.workspace = true
+
+[target.'cfg(not(target_os = "linux"))'.dependencies]
 rustnative-windows.workspace = true

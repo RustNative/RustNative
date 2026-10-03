@@ -16,8 +16,13 @@ workspace = true
 
 [dependencies]
 rustnative-core.workspace = true
-rustnative-windows.workspace = true
 serde_json = "1"
 
 [build-dependencies]
 rustnative-build.workspace = true
+
+[target.'cfg(target_os = "linux")'.dependencies]
+rustnative-linux.workspace = true
+
+[target.'cfg(not(target_os = "linux"))'.dependencies]
+rustnative-windows.workspace = true

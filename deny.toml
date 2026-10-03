@@ -11,6 +11,8 @@ allow = [
     "Apache-2.0 WITH LLVM-exception",
     "Unicode-3.0",
     "BSD-3-Clause",
+    # `libloading`, through the Wayland client library (Linux backend).
+    "ISC",
 ]
 confidence-threshold = 0.8
 

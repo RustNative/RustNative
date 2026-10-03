@@ -15,7 +15,7 @@ use std::time::SystemTime;
 use proc_macro::TokenStream;
 use proc_macro2::Span;
 use quote::{quote, quote_spanned};
-use rustnative_style::{StyleSupport, StyleValue, Vocabulary, WINDOWS};
+use rustnative_style::{LINUX, StyleSupport, StyleValue, Vocabulary, WINDOWS};
 
 /// The markup syntax, delimited, inside any `.rs` file (`PLAN.md` 2.9).
 ///
@@ -164,22 +164,27 @@ fn style_macro(input: proc_macro2::TokenStream, kind: Kind) -> proc_macro2::Toke
             std::iter::repeat_n(piece.clone(), count)
         })
         .collect();
+    // One native backend per operating system today, so the target OS
+    // selects the table; the error is emitted under that OS's `cfg`, which
+    // the *application's* build evaluates.
+    let targets = [(WINDOWS, "windows", "WINDOWS"), (LINUX, "linux", "LINUX")];
     let unavailable = pieces.iter().flat_map(|piece| {
         let declarations = resolve(piece).unwrap_or_default();
-        declarations.into_iter().filter_map(move |declaration| {
+        declarations.into_iter().flat_map(move |declaration| {
             let property = declaration.declaration.property;
             // "No shadow" is realized by every backend.
             let nothing = matches!(&declaration.declaration.value, StyleValue::Shadow(layers) if layers.is_empty());
-            match WINDOWS.support(property) {
+            targets.into_iter().filter_map(move |(table, os, name)| match table.support(property) {
                 StyleSupport::Unavailable(reason) if !nothing => {
                     let message = format!(
-                        "`{piece}` sets `{property}`, which the Windows backend cannot realize: {reason} \
-                         (its capability table, `rustnative_style::WINDOWS`)"
+                        "`{piece}` sets `{property}`, which the {} backend cannot realize: {reason} \
+                         (its capability table, `rustnative_style::{name}`)",
+                        table.backend
                     );
-                    Some(quote_spanned!(span=> #[cfg(target_os = "windows")] ::core::compile_error!(#message);))
+                    Some(quote_spanned!(span=> #[cfg(target_os = #os)] ::core::compile_error!(#message);))
                 }
                 _ => None,
-            }
+            })
         })
     });
     let unavailable: Vec<_> = unavailable.collect();

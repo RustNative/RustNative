@@ -3,6 +3,8 @@
 //! plain Win32, resizes itself, and drops the subtree — and checks each
 //! step from the host's side.
 
+#![cfg(windows)]
+
 #[test]
 fn a_win32_application_hosts_a_rust_native_subtree() {
     let output = std::process::Command::new(env!("CARGO_BIN_EXE_adoption-subtree"))

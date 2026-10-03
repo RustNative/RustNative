@@ -57,7 +57,10 @@
     "History",
     "BackgroundWorkers",
     "ServiceWorker",
-    "Installable"
+    "Installable",
+    "WindowPlacement",
+    "ServerSideDecorations",
+    "GlobalMenuBar"
   ],
   "component": {
     "methods": [

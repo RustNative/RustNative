@@ -9,10 +9,13 @@ use std::sync::{Arc, Mutex};
 
 use collab_notes::{Doc, Editor, EditorProps, merge_policy};
 use rustnative_core::{Application, Component, Platform, Size, Window};
+#[cfg(target_os = "linux")]
+use rustnative_linux::{LinuxPlatform as HostPlatform, SoupHttp as Http};
 use rustnative_server::ServerApp;
 use rustnative_sync::SyncServer;
 use rustnative_sync::http::HttpSync;
-use rustnative_windows::{WinHttp, WindowsPlatform};
+#[cfg(not(target_os = "linux"))]
+use rustnative_windows::{WinHttp as Http, WindowsPlatform as HostPlatform};
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let argument = std::env::args().nth(1).unwrap_or_else(|| "1".into());
@@ -30,11 +33,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     }
     let replica = argument.parse().unwrap_or(1);
     let transport =
-        Arc::new(HttpSync::new(Arc::new(WinHttp::new()), "http://127.0.0.1:8090", Vec::new()));
+        Arc::new(HttpSync::new(Arc::new(Http::new()), "http://127.0.0.1:8090", Vec::new()));
     let mut application = Application::new(
         Editor::new(EditorProps { replica, doc: "shopping".into(), transport }),
         Window::new("Collaborative notes", Size::new(420, 320)),
     );
-    WindowsPlatform::new().run(&mut application)?;
+    HostPlatform::new().run(&mut application)?;
     Ok(())
 }

@@ -116,6 +116,17 @@ pub enum Capability {
     /// Being installed by the person as an application from where it runs
     /// (an installable Progressive Web App).
     Installable,
+    /// Putting a window at coordinates the application chooses. Wayland
+    /// compositors refuse this by design — the compositor places windows —
+    /// so a backend answers it per display server rather than per OS.
+    WindowPlacement,
+    /// The host drawing each window's title bar and frame, rather than the
+    /// application drawing them inside its own surface (client-side
+    /// decorations).
+    ServerSideDecorations,
+    /// A menu bar outside the window, owned by the desktop (the macOS menu
+    /// bar, a global menu applet), rather than one drawn in each window.
+    GlobalMenuBar,
 }
 
 impl Capability {
@@ -180,6 +191,9 @@ impl Capability {
         Self::BackgroundWorkers,
         Self::ServiceWorker,
         Self::Installable,
+        Self::WindowPlacement,
+        Self::ServerSideDecorations,
+        Self::GlobalMenuBar,
     ];
 }
 

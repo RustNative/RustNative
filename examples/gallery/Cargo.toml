@@ -20,10 +20,15 @@ workspace = true
 [dependencies]
 rustnative-core.workspace = true
 rustnative-components.workspace = true
-rustnative-windows.workspace = true
 
 [dev-dependencies]
 rustnative-headless.workspace = true
 
 [build-dependencies]
 rustnative-build.workspace = true
+
+[target.'cfg(target_os = "linux")'.dependencies]
+rustnative-linux.workspace = true
+
+[target.'cfg(not(target_os = "linux"))'.dependencies]
+rustnative-windows.workspace = true

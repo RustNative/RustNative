@@ -411,7 +411,9 @@ mod tests {
         let uri = location["uri"].as_str().unwrap();
         assert!(uri.ends_with("rustnative-core/src/layout/constraints.rs"), "{uri}");
         let line = usize::try_from(location["range"]["start"]["line"].as_u64().unwrap()).unwrap();
-        let path = uri.trim_start_matches("file:///");
+        // `file:///C:/…` on Windows, `file:///home/…` elsewhere.
+        let path = uri.trim_start_matches("file://");
+        let path = if cfg!(windows) { path.trim_start_matches('/') } else { path };
         let text = std::fs::read_to_string(path).unwrap();
         assert!(text.lines().nth(line).unwrap().contains("fn width("));
     }

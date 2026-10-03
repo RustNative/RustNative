@@ -126,6 +126,27 @@ table!(WINDOWS, "Windows", [
     Display => StyleSupport::Realized,
 ]);
 
+table!(LINUX, "Linux", [
+    // GTK 4 draws every widget through its own CSS engine, so each property
+    // is a rule in the backend's style provider applied to the real widget
+    // (`rustnative_linux`'s styling module) — the host's own mechanism, not
+    // owner drawing.
+    Foreground => StyleSupport::Realized,
+    Background => StyleSupport::Realized,
+    BorderColor => StyleSupport::Realized,
+    BorderRadius => StyleSupport::Realized,
+    FontSize => StyleSupport::Realized,
+    FontWeight => StyleSupport::Realized,
+    FontFamily => StyleSupport::Approximated(
+        "the first family in the list is used; the generic families (`system-ui`, `sans-serif`, `serif`, \
+         `monospace`) resolve through fontconfig's own aliases"
+    ),
+    Shadow => StyleSupport::Realized,
+    Overflow => StyleSupport::Realized,
+    Opacity => StyleSupport::Realized,
+    Display => StyleSupport::Realized,
+]);
+
 table!(HEADLESS, "headless", [
     Foreground => StyleSupport::Realized,
     Background => StyleSupport::Realized,
@@ -184,6 +205,19 @@ pub const WINDOWS_UNITS: UnitMapping = UnitMapping {
     rounding: "half away from zero, once, where a length becomes whole pixels",
 };
 
+/// The Linux backend's unit mapping.
+pub const LINUX_UNITS: UnitMapping = UnitMapping {
+    backend: "Linux",
+    host_unit: "GTK application pixels",
+    pixel: "one logical pixel is one GTK application pixel; GTK and the compositor scale application pixels to \
+            device pixels by the surface's scale, which is per monitor and may be fractional, and a native \
+            surface reports that scale as its `scale_factor`",
+    rem: "16 logical pixels × the text-scale factor (`keys::TEXT_SCALE`, fed from the desktop's text-scaling \
+          factor through the Settings portal or GTK's Xft DPI) for lengths; fonts are realized at their specified \
+          size × the text scale, and Pango measures them at that size",
+    rounding: "half away from zero, once, where a length becomes whole application pixels",
+};
+
 /// The headless backend's unit mapping.
 pub const HEADLESS_UNITS: UnitMapping = UnitMapping {
     backend: "headless",
@@ -199,7 +233,7 @@ mod tests {
 
     #[test]
     fn every_shipped_table_answers_every_property() {
-        for table in [WINDOWS, HEADLESS, WEB] {
+        for table in [WINDOWS, LINUX, HEADLESS, WEB] {
             for property in StyleProperty::ALL {
                 assert!(
                     table.entries.iter().any(|(entry, _)| entry == property),

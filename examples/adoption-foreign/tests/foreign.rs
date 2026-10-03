@@ -3,6 +3,8 @@
 //! are laid out at their factories' sizes, removes both, and checks the
 //! calendar is destroyed and the picker handed back.
 
+#![cfg(windows)]
+
 #[test]
 fn a_rust_native_application_hosts_foreign_controls() {
     let output = std::process::Command::new(env!("CARGO_BIN_EXE_adoption-foreign"))

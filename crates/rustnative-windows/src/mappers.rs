@@ -84,6 +84,9 @@ struct Registration {
     target: MapperTarget,
     property: MappedProperty,
     mode: MapperMode,
+    // Read only by the Win32 renderer; on another OS a mapper can still be
+    // registered (the API is portable) but nothing runs it.
+    #[cfg_attr(not(windows), allow(dead_code, reason = "run only by the Win32 renderer"))]
     mapper: MapperFn,
 }
 
@@ -140,6 +143,7 @@ pub fn active_mappers() -> Vec<MapperInfo> {
     })
 }
 
+#[cfg_attr(not(windows), allow(dead_code, reason = "used only by the Win32 renderer"))]
 fn matching(node: &TreeNode, property: MappedProperty, mode: MapperMode) -> Vec<MapperFn> {
     let key = node.id.local_key();
     MAPPERS.with(|mappers| {

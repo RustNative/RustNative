@@ -1,0 +1,62 @@
+[package]
+name = "rustnative-linux"
+version = "0.1.0"
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+description = "The Linux backend for Rust Native: GTK 4 widgets, Pango text, AT-SPI2 accessibility, and the freedesktop services"
+repository.workspace = true
+homepage.workspace = true
+readme.workspace = true
+keywords = ["gui", "linux", "gtk", "native", "framework"]
+categories = ["gui", "os::linux-apis"]
+
+[lints]
+workspace = true
+
+[dependencies]
+rustnative-core.workspace = true
+# The style capability table and unit mapping this backend answers with.
+rustnative-style.workspace = true
+
+[target.'cfg(target_os = "linux")'.dependencies]
+# The service contracts are async (`async-trait`), and a service awaits its
+# GTK half on a Tokio channel.
+async-trait.workspace = true
+tokio.workspace = true
+# GTK 4 is the toolkit (`crate::gtk`). `v4_14` is the floor: Ubuntu 24.04
+# LTS ships 4.14, and 4.14 is where `gtk_accessible_announce` (live regions)
+# and the accessible-object interface (virtual elements) are complete.
+gtk = { package = "gtk4", version = "0.10", features = ["v4_14"] }
+# Display-server specifics GTK's portable API cannot give: a toplevel's X
+# window and Xlib display, or its `wl_surface` and `wl_display` — what a
+# native surface (Milestone 29's escape hatch) is created against.
+gdk4-x11 = { version = "0.10", features = ["v4_10", "xlib"] }
+gdk4-wayland = { version = "0.10", features = ["v4_12", "wayland_crate"] }
+x11 = { version = "2", features = ["xlib"] }
+wayland-client = "0.31"
+wayland-backend = { version = "0.3", features = ["client_system"] }
+# A native surface's handle in the form every Rust graphics library takes.
+raw-window-handle = "0.6"
+# The toolkit-independent half (`crate::desktop`) reaches the freedesktop
+# services over D-Bus through GIO's GDBus — the same GLib the toolkit runs
+# on, named directly so that half never names GTK. The versions are the
+# ones `gtk4` 0.10 itself uses.
+gio = { version = "0.21", features = ["v2_80"] }
+glib = { version = "0.21", features = ["v2_80"] }
+# The data layer's host contracts (`services::data`).
+rustnative-data.workspace = true
+# glibc's locale functions (`services::locale`) and termios
+# (`services::industrial`).
+libc = "0.2"
+# HTTP (`services::http`): libsoup 3, GNOME's HTTP stack — the system's
+# trust store and the desktop's proxy through GIO. 0.8 is the release on
+# `glib` 0.21 (0.9 needs Rust 1.92).
+soup = { package = "soup3", version = "0.8", features = ["v3_4"] }
+# Canvas text: Pango layouts drawn on cairo (`gtk::canvas`), the version
+# `gtk4` 0.10 uses.
+pangocairo = "0.21"
+
+[dev-dependencies]
+# The shared guarantee suites (Milestone 41), run here over the GTK harness.
+rustnative-conformance.workspace = true

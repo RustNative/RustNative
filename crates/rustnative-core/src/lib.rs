@@ -367,9 +367,9 @@ pub use accessibility::{
 };
 pub use affinity::{ThreadAffinity, UiThread};
 pub use animation::{
-    AnimatedProperty, AnimatedValue, Animation, AnimationId, AnimationOwner, Easing, Fill,
-    Finished, Frame, FrameClock, ManualFrameClock, MatchedGeometry, MotionPreference,
-    ReducedMotion, Repeat, TickOutput, Timeline, Transition, matched_geometry,
+    AnimatedOverrides, AnimatedProperty, AnimatedValue, Animation, AnimationId, AnimationOwner,
+    Easing, Fill, Finished, Frame, FrameClock, ManualFrameClock, MatchedGeometry, MotionPreference,
+    NodeOverrides, ReducedMotion, Repeat, TickOutput, Timeline, Transition, matched_geometry,
 };
 pub use application::Application;
 pub use capability::{Capability, PlatformCapabilities, SurfaceKind};

@@ -21,7 +21,6 @@ workspace = true
 [dependencies]
 rustnative-core.workspace = true
 rustnative-data.workspace = true
-rustnative-windows.workspace = true
 async-trait.workspace = true
 parking_lot.workspace = true
 serde = { version = "1", features = ["derive"] }
@@ -30,3 +29,9 @@ tokio.workspace = true
 
 [dev-dependencies]
 rustnative-headless.workspace = true
+
+[target.'cfg(target_os = "linux")'.dependencies]
+rustnative-linux.workspace = true
+
+[target.'cfg(not(target_os = "linux"))'.dependencies]
+rustnative-windows.workspace = true

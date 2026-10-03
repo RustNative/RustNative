@@ -1,7 +1,7 @@
 //! The notes client against the notes server (`PLAN.md` Milestone 49's
 //! "done when"): the client signs in, writes a note, and shows the server's
 //! answer and its server-rendered summary — in process on the headless
-//! backend, and over a real socket through Windows' own HTTP stack.
+//! backend, and over a real socket through the host's own HTTP stack.
 
 #![allow(
     clippy::unwrap_used,
@@ -76,12 +76,15 @@ fn the_client_signs_in_writes_and_shows_the_servers_answer() {
     assert_eq!(text(&app, "note-1"), "Water the plants", "indexed by the server's job");
 }
 
-/// Windows' own HTTP stack (`WinHttp`) calls the typed functions of a
-/// server listening on a real socket.
-#[cfg(windows)]
+/// The host's own HTTP stack (Windows' `WinHttp`, libsoup on Linux) calls
+/// the typed functions of a server listening on a real socket.
+#[cfg(any(windows, target_os = "linux"))]
 #[test]
-fn windows_http_calls_the_server_over_a_socket() {
-    use rustnative_windows::WinHttp;
+fn the_host_http_stack_calls_the_server_over_a_socket() {
+    #[cfg(target_os = "linux")]
+    use rustnative_linux::SoupHttp as Http;
+    #[cfg(windows)]
+    use rustnative_windows::WinHttp as Http;
 
     let runtime = tokio::runtime::Builder::new_multi_thread().enable_all().build().unwrap();
     let (service, _) = {
@@ -92,7 +95,7 @@ fn windows_http_calls_the_server_over_a_socket() {
     let base = format!("http://{}", listener.local_addr().unwrap());
     runtime.spawn(service.serve(listener, std::future::pending()));
 
-    let http = WinHttp::new();
+    let http = Http::new();
     let result = runtime.block_on(async {
         let token = call::<SignIn>(
             &http,
@@ -103,10 +106,10 @@ fn windows_http_calls_the_server_over_a_socket() {
         .await?;
         let bearer = format!("Bearer {token}");
         let auth = [("authorization", bearer.as_str())];
-        call::<CreateNote>(&http, &base, &NewNote { title: "From Windows".into() }, &auth).await?;
+        call::<CreateNote>(&http, &base, &NewNote { title: "From the host".into() }, &auth).await?;
         call::<ListNotes>(&http, &base, &(), &auth).await
     });
     let notes = result.unwrap();
     assert_eq!(notes.len(), 1);
-    assert_eq!(notes[0].title, "From Windows");
+    assert_eq!(notes[0].title, "From the host");
 }

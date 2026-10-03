@@ -1,8 +1,9 @@
-//! The library rung, end to end (`PLAN.md` Milestone 40): the DLL this
-//! crate builds is driven by a C program compiled with MSVC against the
-//! generated header, and by a C# program compiled with the .NET Framework
-//! compiler against the generated bindings. Each host exits 0 only when
-//! every expectation in it holds.
+//! The library rung, end to end (`PLAN.md` Milestone 40): the shared
+//! library this crate builds is driven by a C program compiled against the
+//! generated header (MSVC on Windows, the system C compiler on Linux), and
+//! on Windows by a C# program compiled with the .NET Framework compiler
+//! against the generated bindings. Each host exits 0 only when every
+//! expectation in it holds.
 
 #![allow(
     clippy::unwrap_used,
@@ -30,8 +31,11 @@ fn build_library() -> PathBuf {
         .status()
         .expect("cargo runs");
     assert!(status.success(), "the library builds");
-    let directory = workspace().join("target").join("debug");
-    assert!(directory.join("counter.dll").is_file(), "the DLL is at {}", directory.display());
+    let target = std::env::var_os("CARGO_TARGET_DIR")
+        .map_or_else(|| workspace().join("target"), PathBuf::from);
+    let directory = target.join("debug");
+    let library = if cfg!(windows) { "counter.dll" } else { "libcounter.so" };
+    assert!(directory.join(library).is_file(), "the library is at {}", directory.display());
     directory
 }
 
@@ -59,6 +63,7 @@ fn run(program: &Path) {
     assert_eq!(stdout.trim(), "ok");
 }
 
+#[cfg(windows)]
 #[test]
 fn a_c_program_drives_the_model_through_the_generated_header() {
     let library = build_library();
@@ -85,6 +90,35 @@ fn a_c_program_drives_the_model_through_the_generated_header() {
     run(&directory.join("host.exe"));
 }
 
+/// The same host on Linux, compiled warning-free by the system's C
+/// compiler and linked against the shared library.
+#[cfg(target_os = "linux")]
+#[test]
+fn a_c_program_drives_the_model_through_the_generated_header() {
+    let library = build_library();
+    let directory = scratch("c");
+    generate(&directory);
+    let host = Path::new(env!("CARGO_MANIFEST_DIR")).join("hosts").join("host.c");
+    let output = Command::new(std::env::var_os("CC").unwrap_or_else(|| "cc".into()))
+        .current_dir(&directory)
+        .args(["-Wall", "-Wextra", "-Werror", "-I."])
+        .arg(&host)
+        .args(["-o", "host"])
+        .arg(format!("-L{}", library.display()))
+        .arg("-lcounter")
+        .arg(format!("-Wl,-rpath,{}", library.display()))
+        .output()
+        .expect("the C compiler runs (build-essential)");
+    assert!(
+        output.status.success(),
+        "the generated header compiles warning-free:
+{}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    run(&directory.join("host"));
+}
+
+#[cfg(windows)]
 #[test]
 fn a_csharp_program_drives_the_model_through_the_generated_bindings() {
     let csc = Path::new(r"C:\Windows\Microsoft.NET\Framework64\v4.0.30319\csc.exe");

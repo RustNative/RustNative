@@ -13,7 +13,10 @@ use rustnative_core::{
     Transition, Vec2, VirtualListStyle, VirtualRange, Window, classes,
 };
 use rustnative_core::{ColorScheme, environment::keys};
-use rustnative_windows::{FileStateStore, WindowsPlatform};
+#[cfg(target_os = "linux")]
+use rustnative_linux::{FileStateStore, LinuxPlatform as HostPlatform};
+#[cfg(not(target_os = "linux"))]
+use rustnative_windows::{FileStateStore, WindowsPlatform as HostPlatform};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 enum AppMessage {
@@ -1121,7 +1124,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         None,
     );
 
-    WindowsPlatform::new().with_app_id(APP_ID).run(&mut application)?;
+    HostPlatform::new().with_app_id(APP_ID).run(&mut application)?;
 
     Ok(())
 }
