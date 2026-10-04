@@ -397,7 +397,10 @@ arbitrary.
 
 **Opportunities.** Milestone 36 already intends to share Objective-C interop and
 Core Text with Milestone 33 "wherever the two platforms genuinely agree", and
-the terminal and embedded backends share the draw-list path. Making the groups
+the terminal and embedded backends share the draw-list path. The Apple hosts
+are also the plan's one nested group: iOS and iPadOS (Milestones 36 and 70)
+share all of UIKit, macOS shares only the layer beneath it, so the Apple group
+holds a UIKit group inside it. Making the groups
 explicit crates — an Apple-shared crate, a draw-list-host crate — with trait
 contracts that each member implements is the Rust expression of this concept,
 and it is Tier 0 because it determines crate structure before the second

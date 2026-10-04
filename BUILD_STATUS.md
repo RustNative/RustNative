@@ -29,6 +29,27 @@ Projects created by `rustnative new` now depend on the `rustnative-*` crates.
 One markup expansion golden was re-blessed: the longer crate path moves one
 call past the pretty-printer's line width.
 
+**Plan: iPadOS as a target of its own (2026-10-04).** `PLAN.md` gains
+Milestone 70, the iPadOS backend, beside Milestone 36 in section 8, specified
+at the same depth as macOS and iOS; the implementation plan is
+`docs/superpowers/plans/2026-10-04-ipados-milestone-70.md`. **Nothing is
+built and no code changed**: this project has no Mac, iPhone, or iPad (2.13),
+so the entry records a plan, not a verification. What the plan decides: iPadOS
+has its own backend crate, capability and style tables, unit mapping,
+conformance column, and budgets; it shares UIKit with iOS only through a UIKit
+platform-group crate nested inside an Apple group (`docs/conformance/platform-groups.md`);
+a universal bundle links both and selects one at launch by the device's
+interface idiom, so nothing distinguishes the two by `cfg`; and Milestones 36
+and 70 are built together. Two portable widenings come with it and need no
+Apple hardware — pen tilt, roll, hover distance, and coalesced and predicted
+samples in `PointerEvent`, and `WindowMode::Overlay` — plus a candidate
+`Capability::PointerLock` and an anchor node on share and picker requests.
+New requirement ids `M-TB-1`–`M-TB-10` (`docs/ecosystem-analysis/mobile.md`).
+Cross-references updated in the README, the conformance checklist, the
+permission and update-rule tables, the styling reference (`ipados:`), the
+parity matrix, the gap plan, and the owed lists of the deploy, developer-loop,
+guarantees, adoption-ladder, and surfaces documents.
+
 <!-- milestone entries, newest first -->
 
 ### Milestone 34 — the Linux backend — complete
@@ -313,7 +334,8 @@ With this entry, every milestone and tier in `PLAN.md` as it stood on
 themselves. The following work is owed, and each milestone's own entry names
 the parts it owes:
 
-- Milestones 33–38: macOS, Linux, Android, iOS, embedded, and terminal.
+- Milestones 33–38: macOS, Linux, Android, iOS, embedded, and terminal; and
+  Milestone 70, iPadOS, added on 2026-10-04.
 - The Web track's milestones A–K.
 - **Milestones 59–66**, added to `PLAN.md` on 2026-09-27 as the ecosystem
   analysis was completed: 59 the toolchain and service layer, 60 the visual
@@ -501,7 +523,7 @@ the parts it owes:
   validation on the server comes with Store billing.
 - **The mobile reference application in the plan's done-when:** a widget,
   a share extension, push with actions, and a purchase. It is owed with
-  Milestones 35 and 36.
+  Milestones 35, 36, and 70.
 - **Hardware-backed and biometric-gated secure storage** (Windows Hello
   key credentials).
 
@@ -690,7 +712,7 @@ the parts it owes:
   - Adapters for static hosts, per-request functions, and edge/WASM, with
     their local emulators, and the web loading path (`C42`): Web
     milestones J and K.
-  - Mobile over-the-air updates and store asset packs: Milestones 35–36.
+  - Mobile over-the-air updates and store asset packs: Milestones 35, 36, and 70.
   - Firmware A/B updates and multi-image signing (`C81`): Milestone 37.
   - Embedded-Linux images.
 - **Remote build and signing.**
@@ -1300,7 +1322,7 @@ templates, with generated items, build and pass their tests.
 
 **Not verified / owed.**
 - The device loop, board quickstarts, and development builds on devices are
-  owed with Milestones 35–37. Only the Windows remote host is verified, over
+  owed with Milestones 35–37 and 70. Only the Windows remote host is verified, over
   loopback.
 - Dynamic-library reload (`--hot`) is not built. It would duplicate the
   framework's process-wide state across a `cdylib` boundary unless the
@@ -1550,7 +1572,7 @@ equivalence and compile-failure suites cover `<Foreign>`; `bindgen` CLI test.
 
 **Not verified / owed.** The web rung — a component exported as a web custom
 element (`C43`) — is owed by Web milestone B. Embedding into the other hosts
-(a view, a widget, a document node) is owed by Milestones 33–38. A foreign
+(a view, a widget, a document node) is owed by Milestones 33–38 and 70. A foreign
 object's keyboard traversal is the framework's only when its node declares
 itself focusable. The headless backend measures foreign nodes at zero unless
 their layout fixes a size.
@@ -1617,9 +1639,12 @@ style spellings.
 deferred by the plan; a `Literal::subspan` span inside the class string needs
 an unstable API, so errors point at the string and name the class. The
 deferred backends owe their own capability tables and unit mappings
-(Milestones 33–38, Web). The unavailable-property check keys to
+(Milestones 33–38 and 70, Web). The unavailable-property check keys to
 `target_os = "windows"`; a second backend on the same OS will need a
-backend-selecting cfg. The Windows unit mapping is recorded as it is, not as intended:
+backend-selecting cfg. (No cfg can separate iOS from iPadOS, which share
+`target_os = "ios"` and one universal binary: Phase 0 of the iPadOS plan,
+`docs/superpowers/plans/2026-10-04-ipados-milestone-70.md`, moves the check to
+the project's declared targets.) The Windows unit mapping is recorded as it is, not as intended:
 layout works in device pixels (one logical pixel is one device pixel), and
 scaling layout by `GetDpiForWindow / 96` is **owed** — `rem` does follow the
 text-scale setting. Where the rest is specified: the scaling is the first part
@@ -1733,7 +1758,7 @@ parts (reading traits, applying them, rendering) rather than by changing the
 machine's settings during a test. Hover and cursor were driven by sending
 the messages Windows sends, not by moving the physical pointer. Real safe
 areas, hinges, host gesture recognizers, and `NotAsked`/`Limited`/`Denied`
-permission states belong to the mobile and web backends (33, 35, 36, Web D/E).
+permission states belong to the mobile and web backends (33, 35, 36, 70, Web D/E).
 
 ### Milestone 45 — Test infrastructure — complete (Windows scope)
 
@@ -1783,7 +1808,7 @@ core with one test thread as the low-end profile.
 (the test posts the message the watcher posts). The visual golden holds on
 this machine class; another DPI or font set needs its own blessing. Owed by
 Milestone 37: the host-side device simulator and the hardware-in-the-loop
-runner; by Milestones 35–37: the device and emulator matrix. Preview goldens
+runner; by Milestones 35–37 and 70: the device and emulator matrix. Preview goldens
 (`C55-3`) arrive with previews in Milestone 43.
 
 ### Core work shared by the remaining targets — complete
@@ -1878,7 +1903,8 @@ The resource path was exercised with the SDK present; the "no SDK" branch
 Nothing outside Windows has been run at all, because nothing outside Windows
 has a backend yet. Two of the planned targets are also blocked on hardware
 rather than on work: this project has no macOS machine and no iOS device, so
-Milestones 33 and 36 cannot be built or verified here. They remain fully
+Milestones 33 and 36 cannot be built or verified here — nor Milestone 70,
+iPadOS, added to the plan on 2026-10-04, which needs an iPad of its own. They remain fully
 planned and fully specified (`PLAN.md`, 2.13 and section 8); the build order
 follows what can be verified, and neither milestone will be called complete
 on reasoning alone. The same rule covers every other target: a backend

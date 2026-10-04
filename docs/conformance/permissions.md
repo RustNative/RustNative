@@ -27,6 +27,9 @@ current state.
 
 ## Owed
 
-Android (35), iOS (36), macOS (33), and the Web (E) — the hosts where
-`NotAsked`, `Limited`, and `Denied` are real — document their mappings here
-when they land.
+Android (35), iOS (36), iPadOS (70), macOS (33), and the Web (E) — the hosts
+where `NotAsked`, `Limited`, and `Denied` are real — document their mappings
+here when they land. iPadOS reads the same host permission APIs as iOS
+through the shared UIKit group crate, so its section states only where an
+iPad answers differently — and a permission for hardware a given iPad lacks
+is answered as an absent capability, not as `Denied`.

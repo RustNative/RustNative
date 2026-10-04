@@ -11,7 +11,7 @@ Evidence is `PLAN.md` sections and milestones and `BUILD_STATUS.md` records.
 Current reality (2026-09-27): Milestones 1–32 and, on the Windows backend,
 Milestones 39–58 are built; `BUILD_STATUS.md` records what each pass verified
 and what it owes. Every other backend — macOS, Linux, Android, iOS, embedded,
-terminal — and the Web track's milestones A–K remain **Planned**, so most rows
+terminal, and iPadOS (added as its own target on 2026-10-04) — and the Web track's milestones A–K remain **Planned**, so most rows
 below read "Met (Windows), owed elsewhere". Scores are therefore given as
 *core contract* first and *coverage across targets* second, because those two
 numbers differ enormously and averaging them would hide the real position.
@@ -113,6 +113,7 @@ refreshed on 2026-09-27 for every concept that milestone set names as built.
 | Accessibility assertions in CI + screen-reader pass per backend | **Absent** | Verification described per backend, not automated | `X-L5-1` |
 | Advanced input, focus, IME | **Met** (Windows) / **Planned** (rest) | Milestones 11, 12, 25 | — |
 | Gesture arbitration with host recognizers | **Partial** | Stated for one mobile backend only | `X-L5-2` |
+| Tablet-class host obligations (arranged and resized windows, keyboard and pointer as primary input, precision pen, a moving keyboard, adaptive split navigation, a separate target in a universal bundle) | **Planned** | Milestone 70; the pen and window-mode widenings are portable and can land on the shipped backends first | `M-TB-1`…`M-TB-10` |
 | **Localization and internationalization** | **Absent** | **Not mentioned anywhere in `PLAN.md` or `README.md`** | `X-L5-3`, `X-L5-4` |
 | System settings honoured (contrast, reduced motion, text scale, colour scheme) | **Partial** | Reduced motion and appearance appear per backend; no portable contract or conformance | `D-FP-1`, `M-FP-1` |
 

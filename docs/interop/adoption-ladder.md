@@ -67,4 +67,4 @@ framework neither subclasses it nor changes its tab stop.
   is delivered: `rustnative_web::element::CustomElement`
   (`rustnative-web/tests/element.rs::a_custom_element_on_a_plain_page`).
 - The other backends' embedding (a view, a widget, a document node) is owed by
-  Milestones 33–38.
+  Milestones 33–38 and 70.

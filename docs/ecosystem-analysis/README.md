@@ -40,7 +40,7 @@ Read in this order:
    imposes on everything above it. **The most important document here.**
 3. The platform documents — concrete archetypes analysed as paths through those
    root choices: [`web.md`](web.md), [`desktop.md`](desktop.md),
-   [`mobile.md`](mobile.md), [`embedded.md`](embedded.md). Each archetype
+   [`mobile.md`](mobile.md) (phones and tablets), [`embedded.md`](embedded.md). Each archetype
    ends by naming the concepts it introduced.
 4. The concept catalogue — the ninety-odd *ideas* those archetypes introduced,
    analysed on their own merits, because a concept can outlive the archetype

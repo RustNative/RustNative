@@ -110,14 +110,17 @@ Node::column("card", children)
   `@supports`, so a guard means the same thing on every host. They are the
   default choice: they keep working when a backend gains a property.
 - **Target variants** — `windows:`, `linux:`, `macos:`, `android:`, `ios:`,
-  `web:`, `tui:`, `embedded:` — are for a deliberate difference that is not a
-  capability question: a host convention, or a brand decision made per
+  `ipados:`, `web:`, `tui:`, `embedded:` — are for a deliberate difference that
+  is not a capability question: a host convention, or a brand decision made per
   platform.
 - **Decided per backend, once.** A guard is evaluated against the table of the
   backend the tree is realized on, not against the operating system the code
   was compiled for — one binary can serve a page to a browser and open a native
-  window. The answer is a constant of the backend; nothing is evaluated per
-  frame.
+  window, and one universal bundle runs the iOS backend on an iPhone and the
+  iPadOS backend on an iPad from the same compiler target. The answer is a
+  constant of the backend; nothing is evaluated per frame. For the same reason
+  the build checks unguarded declarations against each declared target's table,
+  never by `cfg(target_os)`, which cannot tell `ios` from `ipados`.
 
 ## The headless reference
 

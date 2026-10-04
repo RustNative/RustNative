@@ -143,6 +143,6 @@ would not count as a verification.
   emulators (`serve static`, `serve lambda`, `serve wagi`), and provider
   descriptions (`deploy export sam`, `deploy export spin`):
   `docs/web/deploy.md`. A real provider account is not exercised. Mobile
-  store packs and firmware images are owed with Milestones 35–37.
+  store packs and firmware images are owed with Milestones 35–37 and 70.
 - **Web loading path** (`C42`): delivered with Web milestone J
   (`docs/web.md`, `budgets/web.toml`).

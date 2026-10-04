@@ -181,7 +181,8 @@ build tools yourself; `rustnative doctor` says where to get them.
 
 - **Device targets:** the loop on a phone or board, board quickstarts, and
   development builds that load the application crate onto a device without
-  reinstalling. These are owed with Milestones 35 to 37. The Windows remote
+  reinstalling. These are owed with Milestones 35 to 37 and 70 (the iPad,
+  through the same pairing as the iPhone). The Windows remote
   loop above is the same protocol those targets will use.
 - **Dynamic-library reload** (`--hot`) is not built.
   - Reloading the application crate as a separately loaded library would

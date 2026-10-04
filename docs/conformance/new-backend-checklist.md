@@ -41,9 +41,17 @@ Test paths are relative to the crate named; `native::…` tests live in
 | 24 | Guards decided against this backend's table at resolution: a capability or target variant applies exactly where the table says, and an unguarded property this backend cannot realize fails the build for every application that declares it as a target (Milestone 67) | — | — | — | — |
 | 25 | Decorate the box, never the control (`PLAN.md` 2.2): any extended-range answer realized on a box comes from the host's drawing or composition services, no native control is captured or owner-drawn to satisfy a style, and the limits of mixing the two are answered as capability | — | — | n/a (no host objects) | — |
 
-Owed by deferred backends (Milestones 33, 35–38): their own column in this
-table, and in particular real safe areas and hinges (35, 36), host gesture
-recognizers competing with ours (35, 36), and terminal restoration (38). Owed
+Owed by deferred backends (Milestones 33, 35–38, and 70): their own column in
+this table, and in particular real safe areas and hinges (35, 36, 70), host
+gesture recognizers competing with ours (35, 36, 70), and terminal restoration
+(38). iPadOS has its own column, not a share of iOS's: the two backends share
+a toolkit, but rows 1, 4, 6, 11, 12, 13, 19, 20, and 21 answer differently on
+an iPad — multiple windows the person arranges and resizes (rows 1, 4, 13), the
+host's multitasking edges as gesture conflicts (6), size classes and window
+modes that change while running (11, 13), hardware-keyboard commands and the
+main menu (12), pointer styles as an approximated cursor mapping (19), and the
+style table and unit mapping of a separate target (20, 21). Its rows are
+planned in `docs/superpowers/plans/2026-10-04-ipados-milestone-70.md`. Owed
 on the Web: the rows marked `—`, among them the browser's safe-area insets,
 gesture arbitration against the browser's own (`touch-action`), and runtime
 token switches without a reload. Owed by every backend once Milestone 67 lands:

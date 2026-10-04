@@ -5,7 +5,7 @@ named test, or it is not made. A backend is not called complete until it passes
 every row it can answer. The shipped backends are **Windows** and the
 **headless** reference backend, and the **Web** backend (Web milestones A–K),
 whose guarantees are in their own table below; the deferred native backends
-(Milestones 33–38) owe their own column.
+(Milestones 33–38 and 70) owe their own column.
 
 Suites written once and run on every backend live in
 `crates/rustnative-conformance`: `src/suites.rs` over the

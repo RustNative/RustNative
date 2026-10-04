@@ -11,6 +11,7 @@ The long-term target platforms are:
 - Linux
 - Android
 - iOS
+- iPadOS
 - Web (Rust on the server; HTML, CSS, and compile-time generated JavaScript
   in the browser, with WebAssembly for the subtrees that opt into it, over the
   browser DOM/Web APIs), in every deployment mode a web application is written
@@ -82,6 +83,7 @@ macOS     NSView + AppKit controls
 Linux     the chosen toolkit's native widgets
 Android   the android.view.View hierarchy
 iOS       UIView + UIKit controls
+iPadOS    UIView + UIKit controls, in windows the person arranges
 Web       semantic DOM elements
 Terminal  the terminal's own cell grid and input protocols
 Embedded  the display and input the device actually has
@@ -132,6 +134,7 @@ The framework must also explicitly account for each host's constraints, and desi
 - **browser**: the single-threaded main-thread model for DOM access, asynchronous Web APIs, browser lifecycle, URL/history/navigation, page visibility, storage quotas, user-gesture restrictions, attaching client code to server-rendered markup, and browser security boundaries;
 - **terminal**: cell-granular geometry, no overlapping native windows, text-only measurement, colour and capability differences between terminals, input that arrives as escape sequences, and accessibility that belongs to the terminal rather than to the application;
 - **mobile**: process lifecycle and reclaim, configuration changes, and permission prompts;
+- **tablet**: everything mobile owes, plus windows the person resizes and arranges while the application runs, a hardware keyboard, a trackpad, and a precision pen as ordinary input rather than accessories, and a software keyboard that moves;
 - **embedded**: constrained memory, fixed displays, and the absence of a general-purpose OS.
 
 ### 2.4 Platform-independent core, platform-specific adapters
@@ -223,7 +226,7 @@ Background work must never mutate component state directly from a worker. Result
 
 ### 2.13 Hardware availability changes the order, not the plan
 
-The project does not currently have a macOS machine or an iOS device, so Milestones 33 and 36 cannot be built and verified here yet. That is a scheduling fact, not a scope decision: macOS and iOS remain fully planned platforms, specified at the same depth as the rest, and the core contracts are designed against their documented APIs (AppKit/UIKit view hierarchies, Core Text measurement, `NSAccessibility`/`UIAccessibility`, the Apple toolchains) so that nothing in the portable layer has to be renegotiated when the hardware arrives.
+The project does not currently have a macOS machine, an iPhone, or an iPad, so Milestones 33, 36, and 70 cannot be built and verified here yet. That is a scheduling fact, not a scope decision: macOS, iOS, and iPadOS remain fully planned platforms, specified at the same depth as the rest, and the core contracts are designed against their documented APIs (AppKit/UIKit view hierarchies, UIKit scenes, Core Text measurement, `NSAccessibility`/`UIAccessibility`, the Apple toolchains) so that nothing in the portable layer has to be renegotiated when the hardware arrives. Where a platform's plan needs the portable layer widened — as iPadOS's pen and window-mode needs do — the widening is specified with the milestone and can be built and tested on the backends that exist before the hardware does, because a portable contract is verified on the hosts that fill it.
 
 Two rules keep that honest, and they apply to every platform the project cannot exercise on the machine in front of it:
 
@@ -750,8 +753,8 @@ Implemented:
   standards-audit pass remain, for MSAA-only clients.
 
 Planned platform targets not built here consume the same portable model when
-their backends exist: macOS, Linux, Android, and iOS through their own
-accessibility APIs (Milestones 33–36), and the Web through HTML/ARIA (Web
+their backends exist: macOS, Linux, Android, iOS, and iPadOS through their
+own accessibility APIs (Milestones 33–36 and 70), and the Web through HTML/ARIA (Web
 milestone D). The terminal is the exception the capability model exists for —
 accessibility there belongs to the terminal, and Milestone 38's backend says
 so rather than advertising a bridge it cannot provide.
@@ -944,8 +947,8 @@ rustnative doctor [--json]
   with `--json`, for a script.
 
 The toolchains it drives, and the ones it will: Windows uses Cargo with the
-MSVC build tools and the Windows SDK; macOS and iOS will use Xcode and the
-Apple SDKs, Linux the system compiler, Android Gradle with the SDK and NDK,
+MSVC build tools and the Windows SDK; macOS, iOS, and iPadOS will use Xcode
+and the Apple SDKs, Linux the system compiler, Android Gradle with the SDK and NDK,
 the Web Cargo for the server plus the framework's client JavaScript emitter and
 bundling (and, for its serverless mode, the target its host runtime expects),
 the terminal Cargo alone, and embedded targets their own toolchains through
@@ -958,7 +961,8 @@ Cargo.
 ## Milestone 32 — Packaging and deployment (Windows)
 
 Implemented for the platform that has a backend; the other formats
-(macOS bundles, Linux packages, APK/AAB, iOS bundles, Web bundles and their
+(macOS bundles, Linux packages, APK/AAB, iOS and iPadOS bundles — one
+universal bundle when a project declares both — Web bundles and their
 three deployment modes, plain terminal binaries, firmware images) belong to
 their backends' milestones.
 
@@ -1055,7 +1059,9 @@ onward, and they are part of this definition rather than separate work:
   host has a store, and updates gated by the native-input fingerprint — rather
   than a release process invented for that backend.
 
-Two of these — macOS and iOS — cannot be verified on the project's current hardware (2.13). They remain fully planned, and each is finished when it runs on an Apple machine, not before.
+Three of these — macOS, iOS, and iPadOS — cannot be verified on the project's current hardware (2.13). They remain fully planned, and each is finished when it runs on its own Apple hardware, not before: a Mac for macOS, an iPhone for iOS, an iPad for iPadOS. An iPad running the iOS backend does not verify iPadOS, and a Mac running an iPad application does not verify macOS.
+
+The three Apple targets share code only through platform-group crates (Milestone 39, `C65`), never by one backend depending on another: an **Apple** group (the Objective-C runtime bindings and the host's memory-management convention, Core Text measurement, accessibility role mapping, the Apple toolchain driver) for all three, and inside it a **UIKit** group (the view and control realization, scenes, `UITextInput`, `UIAccessibility`, the touch and gesture bridge) for iOS and iPadOS. Each backend keeps its own capability table, style table, unit mapping, conformance column, budgets, and verification. Milestones 36 and 70 share a toolkit and ship as one universal bundle, so they are planned to be built together, as one track with two targets; neither is finished by the other's tests. (Milestone 70 is numbered after the production-parity milestones because it was specified after them; it sits beside Milestone 36 because that is where it belongs.)
 
 ## Milestone 33 — macOS backend
 
@@ -1139,7 +1145,7 @@ Native UIKit interoperability, sharing the Objective-C interop and Core Text wor
 - Core Text measurement;
 - accessibility through `UIAccessibility`, with virtual elements as custom accessibility elements, verified with VoiceOver;
 - system services: the share sheet, document picker, notifications, clipboard, and URL schemes and universal links feeding the existing deep-link model;
-- multiple windows treated as an iPadOS capability, not an assumption — `Capability::MultipleWindows` answers it;
+- the iPad is not this milestone's host: iPadOS is a target of its own (Milestone 70), built on the same UIKit group crate. On an iPad, this backend runs only as an iPhone application in the host's compatibility mode, and says so through its capability answers rather than stretching an iPhone layout across a tablet; `Capability::MultipleWindows` is answered no here and realized in Milestone 70;
 - packaging: Xcode, `Info.plist` and entitlements from `rustnative.toml`, code signing, IPA output, and TestFlight distribution;
 - the runtime permission model expressed as the portable permission states of Milestone 39, including limited grants, with the host's own request flow behind them;
 - safe areas, display cutouts, split-screen and external displays, and dynamic type as layout-model properties (Milestone 39);
@@ -1148,7 +1154,40 @@ Native UIKit interoperability, sharing the Objective-C interop and Core Text wor
 - its release path — build profile, managed credential, store submission, update channel, generated launch assets, and device pairing — taken from Milestone 59 rather than invented here;
 - privacy manifests and data-use declarations generated from the build rather than hand-maintained (Milestone 51);
 - widgets, live activities, share and action extensions, remote push, store billing, and keychain-backed secure storage from the surface and product-service contracts (Milestone 57), each extension a separate target generated from `rustnative.toml` (Milestone 50);
-- verification requires Apple hardware and a developer account (2.13), and includes the lifecycle conformance suite of Milestone 45.
+- verification requires an iPhone and a developer account (2.13), and includes the lifecycle conformance suite of Milestone 45.
+
+## Milestone 70 — iPadOS backend
+
+The iPad runs the same UIKit as the iPhone, and that is exactly why it has a milestone of its own. Sharing a toolkit with iOS makes it easy to ship an iPhone application stretched across a larger screen, which is the failure 2.3 exists to refuse. iPadOS is a different host in every way an application can feel: the person arranges the application's windows and resizes them while it runs; a hardware keyboard and a trackpad are ordinary rather than accessories; a pencil is a precision instrument with tilt and hover rather than a finger; and the same application may occupy a third of the built-in display or a window on an external one. So iPadOS gets what every target gets — its own backend crate, capability table, style table and unit mapping, conformance column, budgets, and verification — built on the UIKit work it genuinely shares with Milestone 36 and never on Milestone 36's answers.
+
+Satisfies: `M-TB-1`–`M-TB-10`; with Milestone 36, `M-OB-1`–`M-OB-4`, `M-FP-1`, `M-AS-1`, `M-AS-2`, `M-BR-1`, and `M-BR-2`; the UIKit half of `C65-1`. The implementation plan is `docs/superpowers/plans/2026-10-04-ipados-milestone-70.md`.
+
+- **a target, and one binary**: `ipados` is a target in `rustnative build|run|package`, in the `ipados:` style variant, in `[style] targets`, and in the budgets. A universal application is still one bundle: when a project declares both `ios` and `ipados`, both backends are linked, and the launch selects one by the device's interface idiom before any tree is realized. The two share a compiler target (`target_os = "ios"`), so nothing about the choice may be a `cfg`: a guard is decided against the backend actually realizing the tree (Milestone 67), and the build checks unguarded declarations against each declared target's table rather than against the operating system being compiled for;
+- **what is not this target, stated so it is not assumed**: an iPhone-only application on an iPad is the iOS backend in the host's compatibility mode (Milestone 36); an iPad application running on an Apple-silicon Mac or another compatible host is this backend under that host's compatibility layer, answering only the capabilities the layer provides; and the host's own iPad-to-Mac port of UIKit is not the macOS backend, which is AppKit (Milestone 33, 2.2);
+- `UIWindowScene`/`UIWindow`/`UIViewController` roots, a `UIView` hierarchy, UIKit controls, and `UIScrollView` for scrolling, through the UIKit group crate — plus the controls whose iPad form is a different native control: Milestone 48's sidebar navigation style realized as `UISplitViewController` columns that collapse to a stack in compact width, popovers anchored to their source node, and context menus through `UIContextMenuInteraction`;
+- **windows the person arranges**: each scene is a portable window root (Milestone 24), and `MultipleWindows` is realized through scene sessions, opened and closed through the host's activation and destruction requests. Full screen, side-by-side split, the floating overlay window, and freely resized windows among others (the host's stage-style window management and its successors) arrive as `WindowMode` values in the typed environment, with size classes per axis that change while the application runs (Milestone 39). `WindowMode` gains an overlay mode for the floating window — a portable widening, since a desktop's always-on-top utility window is the same shape. `WindowPlacement` is answered no (the host places windows), `WindowManagement` approximated (a size request the host may refuse), `ServerSideDecorations` yes;
+- **continuous resizing as an ordinary event**: a live window resize relayouts on the same host objects with no lost state, no object churn, and the frame budget held (2.10); a window moving between the built-in display and an external one follows its new scale and appearance traits, as mixed-DPI sessions do on Linux;
+- **the scene lifecycle beside the process lifecycle**: each scene's foreground, background, and disconnection mapped onto the portable lifecycle separately from the process's. A disconnected scene is not a closed window: its state returns through the scene's restoration activity when the person reopens it. The collision cases — several scenes restored after process death, a deep link arriving at a scene that is mid-restoration, a scene the person discarded from the application switcher — are cases in Milestone 45's lifecycle conformance suite;
+- **input — the keyboard as primary input**: hardware-keyboard shortcuts as `UIKeyCommand`s generated from the command model (Milestone 39), so a command's shortcut is the one shown in the host's shortcut overlay and, on host versions that show the application's menus as a menu bar, the portable `MenuBar` built into the host's main menu (`GlobalMenuBar` answered per host version); full keyboard navigation through the host's focus system (Milestone 61's non-pointer navigation); `UITextInput` for IME, including composition from a hardware keyboard;
+- **input — the indirect pointer**: trackpad and mouse through `UIPointerInteraction` and hover recognition (`Hover` realized); per-node cursors approximated through the host's pointer styles with the mapping documented (`Cursors` approximated); native controls keeping the host's own pointer effects; a secondary click opening the context menu; wheel and two-finger scrolling delivered as `WheelDelta::Pixels` and to the framework's own pan recognizers through their allowed scroll types; trackpad pinch and rotation through the same recognizers as touch; and pointer lock answered as a capability;
+- **input — the precision pen**: pencil contacts as `PointerKind::Pen` with pressure and, through a portable widening of `PointerEvent` that Windows Ink, GDK, and the browser's pointer events can fill as well, tilt (altitude and azimuth), barrel roll where the pencil reports it, hover distance, and coalesced and predicted samples; the pencil's own gestures (double-tap, squeeze) delivered as commands; handwriting into text through the host's scribble interactions — native text fields receive it from the host, and the framework's custom text targets register for it; and the host's ink canvas offered as embedded host content (Milestone 40) rather than redrawn;
+- **drag and drop between applications**: `UIDragInteraction`/`UIDropInteraction`, multi-item drags, and spring-loaded navigation targets, mapped onto the portable drag model;
+- **gesture arbitration on a larger surface** (Milestone 39): the framework's recognizers against the host's system edges and multitasking gestures — the overlay-window edge, the window-management controls, the home indicator, the dock — with each conflict case enumerated;
+- **keyboard avoidance with a keyboard that moves**: docked, floating, and split software keyboards, and the shortcut bar alone when a hardware keyboard is attached, tracked through the host's keyboard layout guide and delivered as system insets (Milestone 61), never assumed docked at the bottom edge;
+- Core Text measurement through the Apple group crate, shared with Milestones 33 and 36;
+- accessibility through `UIAccessibility`, shared with Milestone 36 through the UIKit group and verified with VoiceOver on an iPad, plus the paths that matter more here: Full Keyboard Access, pointer accessibility, and Switch Control and Voice Control across several open windows;
+- **system services**: everything Milestone 36 realizes, in the iPad's form where it differs — the share sheet and pickers presented as popovers anchored to a node (an unanchored popover is a host-level failure on iPad, so the portable request carries its source node, and the headless backend asserts one is given); the document browser and the host's file provider with in-place opening and security-scoped access behind the portable document model (Milestone 48); printing (`Printing`); external displays; and picture-in-picture for host media content;
+- animation frames paced by `CADisplayLink` at the display's variable refresh rate, evaluated by the same portable `Timeline`;
+- **packaging**: Xcode, with `Info.plist` and entitlements generated from `rustnative.toml` — the device family, multiple-scene support and the scene manifest, all four orientations (which the host requires before it offers multitasking), and the document types — code signing, IPA output (universal with iOS when both are declared), and TestFlight distribution, with the store's iPad screenshots and icons among Milestone 59's generated launch assets;
+- safe areas on the iPad's own geometry — rounded display corners, the home indicator, a camera housing on the landscape edge of some models, and a resizable window's own insets — as layout-model properties (Milestone 39);
+- embedding in both directions against `UIView`, and the library-only mode, shared with Milestone 36 (Milestone 40);
+- over-the-air updates under the same host rule as iOS — no executable code, data and models only (Milestone 50) — fingerprint-gated (Milestone 59);
+- its release path — build profile, managed credential, store submission, update channel, generated launch assets, and device pairing for the developer loop on an iPad — taken from Milestone 59 rather than invented here;
+- privacy manifests and data-use declarations generated from the build (Milestone 51), shared with Milestone 36;
+- widgets in the iPad's sizes, including the extra-large family the iPhone does not have, live activities where the host version offers them on an iPad, share and action extensions, remote push, store billing, and keychain-backed secure storage from the surface and product-service contracts (Milestone 57) — each answered for iPadOS separately from iOS;
+- **budgets of its own** (Milestone 42): startup, memory under multitasking (the host grants less to an application sharing the display), frame time during a live window resize, and input latency for pencil and pointer, on a low-end iPad profile and a high-end one;
+- the style capability table and unit mapping (Milestone 58): one logical pixel is one UIKit point, `rem` follows the person's text size, and positions round to the display's pixel grid half away from zero; framework-owned boxes realize the extended range through their layers, native controls answer it per control (Milestone 67, 2.2);
+- verification requires iPad hardware and a developer account (2.13): at least one iPad that runs the host's resizable-window mode with an external display, a pencil that reports pressure, tilt, and hover, a keyboard with a trackpad, and a low-end iPad for the budgets. The simulator is a test host for most of the milestone, but pencil, trackpad, external-display, and on-device VoiceOver results are verified on hardware or recorded as unverified. Verification includes the lifecycle conformance suite of Milestone 45 with the scene cases above.
 
 ## Milestone 37 — Embedded backends
 
@@ -1180,7 +1219,7 @@ Capability-oriented design is critical here because embedded targets will not im
 
 ## Milestone 38 — Terminal (TUI) backend
 
-A `rustnative-tui` backend realizing the same application model onto a terminal. In scope: Windows, macOS, and Linux desktop terminals, and embedded Linux consoles — local, over SSH, or on a serial line. Deliberately out of scope: Android, iOS, and the browser. A terminal emulator running inside those is the emulator's application, not a platform target of this framework.
+A `rustnative-tui` backend realizing the same application model onto a terminal. In scope: Windows, macOS, and Linux desktop terminals, and embedded Linux consoles — local, over SSH, or on a serial line. Deliberately out of scope: Android, iOS, iPadOS, and the browser. A terminal emulator running inside those is the emulator's application, not a platform target of this framework.
 
 - **the terminal is the host**: the Windows console API in virtual-terminal mode, and `termios` plus VT sequences on Unix. Alternate screen, cursor control, the terminal's own colour depth (16/256/true colour, detected rather than assumed), text attributes, bracketed paste, focus reporting, and resize notification (`SIGWINCH` or console events);
 - **drawn, not native**: this is the one target where 2.2's native host object is the terminal's own cell grid. Drawing goes through the existing draw-list path quantized to cells, so the framework does not gain a second rendering runtime; a "control" is a drawn widget with the same portable semantics, identity, and events as everywhere else;
@@ -1700,11 +1739,11 @@ The intended final architecture is:
                            │
                     Native realization
                            │
-  ┌─────────┬─────────┬────┴────┬─────────┬─────────┐
-  ▼         ▼         ▼         ▼         ▼         ▼
-Windows   macOS     Linux    Android     iOS       Web
-  │         │         │         │         │         │
-  └─────────┴─────────┴─────────┴─────────┴─────────┘
+  ┌─────────┬─────────┬────┴────┬─────────┬─────────┬─────────┐
+  ▼         ▼         ▼         ▼         ▼         ▼         ▼
+Windows   macOS     Linux    Android     iOS       iPadOS    Web
+  │         │         │         │         │         │         │
+  └─────────┴─────────┴─────────┴─────────┴─────────┴─────────┘
                            │
               ┌────────────┴────────────┐
               ▼                         ▼
@@ -1739,7 +1778,7 @@ Tier 0 — the markup syntax, the style spellings, portable-surface
   everything that costs once now and once per backend afterwards
         ↓
 platform backends, each finished by section 8's definition
-  macOS · Linux · Android · iOS · Embedded · Terminal
+  macOS · Linux · Android · iOS · iPadOS · Embedded · Terminal
         ↓
 Web backend, milestones A–K
   client-side → server-rendered → serverless
@@ -2678,7 +2717,7 @@ Milestone 47 for what "preserved" means.
 - editor assistance in both syntaxes, with structural editing;
 - development resources, the error dialog, and `doctor --install`.
 
-Owed: device targets (Milestones 35–37) and dynamic-library reload. See
+Owed: device targets (Milestones 35–37 and 70) and dynamic-library reload. See
 `docs/developer-loop.md` and `BUILD_STATUS.md`.
 
 ## Milestone 44 — Inspection and diagnostics
@@ -2797,7 +2836,7 @@ hit-testing and host focus rules, the accessibility query API, goldens and
 Windows `PrintWindow` visual goldens, exhaustive mode, and the lifecycle
 collision suite — plus `Lifecycle::LowMemory`, realized on Windows. Owed by
 Milestone 37: the host-side device simulator and hardware-in-the-loop runner;
-by Milestones 35–37: the device and emulator matrix. See `BUILD_STATUS.md`.
+by Milestones 35–37 and 70: the device and emulator matrix. See `BUILD_STATUS.md`.
 
 **Depends on** nothing outside the core; it should start early because
 Milestones 41, 42, 46, 47, and 48 all consume it.
@@ -3440,10 +3479,13 @@ continued.
   capability table's, never the browser's `@supports`, so a guard means the same
   thing on every host;
 - **target variants**: `windows:`, `linux:`, `macos:`, `android:`, `ios:`,
-  `web:`, `tui:`, and `embedded:`, for a deliberate difference that is not a
-  capability question — a host convention, or a brand decision made per
-  platform. Capability variants are preferred wherever either would do, because
-  they keep working when a backend gains a property;
+  `ipados:`, `web:`, `tui:`, and `embedded:`, for a deliberate difference that
+  is not a capability question — a host convention, or a brand decision made
+  per platform. Capability variants are preferred wherever either would do,
+  because they keep working when a backend gains a property. `ios:` and
+  `ipados:` are distinct targets compiled into one universal binary, which is
+  the clearest case for deciding a guard per backend rather than per compiler
+  target (below);
 - **both spellings**: a guard is a field of the same `Condition` every other
   variant lowers to, so the typed spelling states it as directly as the class
   does (a conditional style on `Condition::supports(StyleProperty::Shadow)`),
@@ -3451,8 +3493,10 @@ continued.
 - **decided per backend, once**: a guard is evaluated against the capability
   table of the backend the tree is being realized on — not against the
   operating system being compiled for, because one binary can render a page for
-  the browser and drive a native window — at resolution, as a constant of that
-  backend. Nothing about it is evaluated per frame;
+  the browser and drive a native window, and one bundle can run on an iPhone
+  through the iOS backend and on an iPad through the iPadOS one — at
+  resolution, as a constant of that backend. Nothing about it is evaluated per
+  frame;
 - **declared targets**: `rustnative.toml` lists them (`[style] targets =
   ["windows", "linux", "web"]`), defaulting to every backend the project
   depends on. The build checks each unguarded declaration against every
@@ -3524,7 +3568,7 @@ The extended range shows unevenly, and the plan says where. The Windows backend
 realizes the tree as GDI-styled child windows and never owner-draws a control
 (2.2), so most of the transform and effect rows answer unavailable there; in
 practice the range shows in the browser, on Linux, in the headless backend, and
-on the layer-backed hosts still to come (macOS, iOS, Android), while Windows
+on the layer-backed hosts still to come (macOS, iOS, iPadOS, Android), while Windows
 shows each guard's fallback. The guards make that difference honest; they do
 not make it equal. Milestone 69 is what can move Windows' answers, and this
 milestone neither waits for it nor depends on it.
@@ -3820,7 +3864,7 @@ This covers:
 
 Static-host, per-request-function, and edge adapters are owed with Web
 milestones J and K. Mobile and firmware updates are owed with Milestones
-35–37. See `docs/deploy.md` and `BUILD_STATUS.md`.
+35–37 and 70. See `docs/deploy.md` and `BUILD_STATUS.md`.
 
 **Web (2026-09-28): delivered** with the Web track — static, function, and edge deployment targets with their emulators, preview, promotion, and rollback, and `deploy export sam|spin`.
 
@@ -4150,7 +4194,8 @@ Milestone 49 (receipt validation and push sending).
 - honest `Unavailable` answers for push and Store billing, which need
   package identity.
 
-The mobile reference application is owed with Milestones 35 and 36. See
+The mobile reference application is owed with Milestones 35, 36, and 70 —
+on iPadOS in its own layout across resizable windows, not the phone's. See
 `docs/surfaces.md` and `BUILD_STATUS.md`.
 
 ## Milestone 64 — Product operations

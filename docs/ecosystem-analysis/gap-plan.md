@@ -362,7 +362,7 @@ or abandoned, and it is the one competitive surface where none of our
 root-layer advantages help — the archetype's mechanisms are independent of its
 substrate. Milestones 43, 50, and 52 already built a large part of this layer
 on Windows; this milestone completes it and, critically, defines the contracts
-*before* the device backends arrive, so Milestones 35–37 inherit a release
+*before* the device backends arrive, so Milestones 35–37 and 70 inherit a release
 process instead of each inventing one.
 
 **Covers.** `C93-1`–`C93-4`, `C94-1`, `C94-2`, `C95-1`–`C95-3`, `C96-1`,
@@ -1229,6 +1229,16 @@ milestone H; typed peripherals in framework drivers (`C74-1`), asynchronous
 display region transfer (`C91-1`), and the direct-to-display embedded Linux
 profile (`C83-1`) in Milestone 37. The designer non-goal (`C56-2`) is kept with
 the rejected concepts in Milestone 52.
+
+The tablet-class requirements (`M-TB-1`–`M-TB-10`, `mobile.md`) are backend
+work too, and `PLAN.md` carries them in Milestone 70, the iPadOS backend,
+beside Milestone 36. Two of them reach the portable layer and follow this
+document's sequencing rule rather than the backend's hardware: the pen
+widening of the pointer model (`M-TB-5`) and the overlay window mode
+(`M-TB-1`) are per-backend obligations, so they land with Phase 0 of the
+iPadOS plan and are filled by the shipped backends before any iPad exists.
+The Apple and UIKit platform groups (`C65-1`) are decided in
+`docs/conformance/platform-groups.md`.
 
 `E-K-1`, `E-K-2`, `X-L1-3`, and `X-L1-5` (the `no_std` core profile, the
 non-`Send` executor, and the host clock) are already in `PLAN.md`'s long-range

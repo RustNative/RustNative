@@ -69,4 +69,4 @@ application, a token in secure storage, and a feature switched on
 remotely. It uses no native code of its own.
 
 The mobile reference application in the plan (a widget, a share
-extension, push, and purchases) is owed with Milestones 35 and 36.
+extension, push, and purchases) is owed with Milestones 35, 36, and 70.

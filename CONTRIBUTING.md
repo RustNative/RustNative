@@ -21,6 +21,12 @@ or update an executable integration test where practical.
 ## Design rules
 
 - Preserve the core/platform dependency boundary.
+- Share code between backends only through a platform-group crate
+  (`docs/conformance/platform-groups.md`); a backend never depends on another
+  backend. Never tell two targets apart by `cfg` when they share a compiler
+  target — iOS and iPadOS share `target_os = "ios"` and one universal binary,
+  so the choice between them is made once at launch and everything downstream
+  asks the backend it was handed (`PLAN.md` Milestone 70).
 - Keep the two authoring syntaxes equal (`PLAN.md` 2.9). A new node kind or
   `with_*` modifier lands with its builder form, its markup element or
   attribute, and an equivalence case asserting that both produce equal `Node`

@@ -1,10 +1,13 @@
-# Mobile archetypes — Android and iOS
+# Mobile archetypes — Android, iOS, and iPadOS
 
 Read [`foundations.md`](foundations.md) first. Bottom-up analysis, root choices
 to ecosystem, per [`method-and-stack.md`](method-and-stack.md).
 
-RustNative's mobile targets are `PLAN.md` Milestones 35 (Android) and 36
-(iOS). Mobile differs from desktop at the root in three ways that shape every
+RustNative's mobile targets are `PLAN.md` Milestones 35 (Android), 36
+(iOS), and 70 (iPadOS). The tablet is analysed as a host of its own at the end
+of this document ([the tablet-class obligations](#the-tablet-class-obligations)),
+because the archetypes below are judged on phones first and fail on tablets in
+ways a phone never shows. Mobile differs from desktop at the root in three ways that shape every
 archetype below: **the host owns the process lifecycle** and may destroy it at
 any time; **capabilities are permission-gated at runtime**; and **distribution
 is gated by a review process with its own rules about code loading, size, and
@@ -533,6 +536,97 @@ obligation as much as a design one.
 
 ---
 
+## The tablet-class obligations
+
+A tablet runs the same toolkit as the phone beside it, and that is the trap
+every archetype above falls into somewhere. The cheapest path for a
+cross-platform framework is to treat the tablet as a large phone: one layout
+scaled up, one window, touch only. Applications built that way are the ones
+reviewers and users single out — letterboxed, unable to share the screen,
+deaf to the keyboard on the desk and the pointer under the hand. The
+first-party stacks (M1, M2) avoid it because their toolkits were extended for
+the tablet; the bridged and engine-based archetypes (M3, M7) inherit whatever
+the host gives a view for free and miss what it does not; hybrid containers
+(M5) inherit the browser's pointer and keyboard model and nothing of the
+host's windowing. The tablet is where the difference between *running on* a
+host and *belonging to* it is most visible, which is why `PLAN.md` gives
+iPadOS a backend of its own (Milestone 70) rather than a branch of iOS's.
+
+These are host facts of the tablet class, not competitive choices:
+
+**Windows the person arranges.** Full screen, side-by-side, a floating overlay
+window, freely resized windows among others, and windows on an external
+display — chosen by the person, changed while the application runs, and
+restored per window. Each window has its own lifecycle beside the process's.
+
+**The keyboard and the pointer as primary input.** A hardware keyboard and a
+trackpad are ordinary. Shortcuts must be discoverable the way the host lists
+them, menus may be shown as a menu bar, keyboard navigation must reach
+everything, and the pointer brings hover, pointer styles, secondary click,
+precise scrolling, and pointer lock.
+
+**A precision pen.** Pressure, tilt, roll, hover above the glass, and samples
+at a higher rate than the display, plus the pen's own gestures and
+handwriting into any text field. A pen treated as a finger loses everything
+that makes it a pen.
+
+**A software keyboard that moves.** Docked, floating, or split — or absent
+behind a hardware keyboard with only a shortcut bar — so keyboard avoidance
+cannot assume a bottom edge.
+
+**Drag and drop between applications**, with several items, as an ordinary
+interaction when two applications share the screen.
+
+**Navigation that adapts.** A sidebar in a regular-width window becomes a
+stack in a narrow one and back, in the host's own split control, without
+losing the person's place.
+
+**A separate store presence.** Its own screenshots, its own review
+expectations for multitasking support, and — for a universal application — one
+bundle with two targets, which a framework must keep distinct at runtime
+because they share a compiler target.
+
+- `M-TB-1` `[M]` Window modes (full, split with its fraction, overlay, freely
+  resized, external display) and per-axis size classes delivered as
+  environment values that change while the application runs, with relayout on
+  the same host objects and no lost state.
+- `M-TB-2` `[M]` Several windows per application, each with its own lifecycle
+  and restoration separate from the process's, and the collision cases (several
+  windows restored after process death, a deep link into a window being
+  restored, a window discarded while the process is not running) in the
+  lifecycle conformance suite.
+- `M-TB-3` `[M]` The hardware keyboard as primary input: command shortcuts that
+  are the ones the host lists, the application's menus in the host's menu
+  structure (a menu bar where the host shows one), and full keyboard navigation
+  through the host's focus system.
+- `M-TB-4` `[M]` The indirect pointer: hover, per-node pointer styles with a
+  documented mapping, secondary-click context menus, wheel and trackpad
+  scrolling and gestures through the same recognizers as touch, and pointer
+  lock as a capability.
+- `M-TB-5` `[X]` The precision pen as a portable input: pressure, tilt, roll,
+  hover distance, coalesced and predicted samples, and pen gestures as
+  commands, filled on every host that reports them; handwriting into text
+  through the host's own facility.
+- `M-TB-6` `[M]` Cross-application drag and drop with multiple items and
+  spring-loaded targets.
+- `M-TB-7` `[M]` Keyboard avoidance for a software keyboard that docks,
+  floats, or splits, and for a hardware keyboard's shortcut bar, as system
+  insets.
+- `M-TB-8` `[M]` Display and scale changes while running — a window moving to
+  or from an external display — restyling and remeasuring on the same host
+  objects.
+- `M-TB-9` `[M]` Adaptive navigation realized in the host's own split control,
+  collapsing and expanding with the window's size class without losing the
+  route.
+- `M-TB-10` `[M]` The tablet as a separate target — capability table, style
+  table, conformance column, budgets, and store assets of its own — selected
+  at launch inside a universal bundle rather than by compile-time
+  configuration, with compatibility modes (a phone application on a tablet, a
+  tablet application on a desktop host) answered honestly rather than claimed
+  as support.
+
+---
+
 ## Summary: the mobile opening, ranked
 
 1. **The bridged archetype's substrate tax (`M-BR-2`, `M-BR-3`).** Same
@@ -550,3 +644,7 @@ obligation as much as a design one.
    partly specified.
 5. **Fidelity against web containers and engines.** Real, but it only converts
    when the first hour is as easy as theirs (`M-BR-4`).
+6. **The tablet as a host of its own (`M-TB-*`).** Not a differentiator against
+   the first-party stacks, which already have it, but a clear one against every
+   cross-platform archetype, all of which reach the tablet as a larger phone.
+   Ours to lose by building iPadOS as a branch of iOS.

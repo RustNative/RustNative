@@ -23,9 +23,9 @@ The working backends are Windows/Win32, Linux (GTK 4 on Wayland and X11; see
 [`docs/linux.md`](docs/linux.md)), and the Web (semantic HTML and CSS,
 in the browser, on a server, as a function, or on an edge host; see
 [`docs/web.md`](docs/web.md)), with the headless reference backend for
-tests. The framework core is designed to remain platform-independent so macOS, Android, iOS, terminal, and embedded targets are added as separate adapters, each planned to the same depth: native host objects, native measurement, native input, native accessibility, its own toolchain and packaging.
+tests. The framework core is designed to remain platform-independent so macOS, Android, iOS, iPadOS, terminal, and embedded targets are added as separate adapters, each planned to the same depth: native host objects, native measurement, native input, native accessibility, its own toolchain and packaging.
 
-Two notes on what "planned" means here. macOS and iOS are fully planned platforms that this project has no hardware to build or verify on yet, so their milestones are specified and designed for but not started — order follows hardware, not priority. And a backend advertises a capability only once it genuinely realizes it, so "planned" never reaches an application as a claim of support.
+Two notes on what "planned" means here. macOS, iOS, and iPadOS are fully planned platforms that this project has no hardware to build or verify on yet, so their milestones are specified and designed for but not started — order follows hardware, not priority. And a backend advertises a capability only once it genuinely realizes it, so "planned" never reaches an application as a claim of support.
 
 Milestones 39–58 are built on the Windows backend (every milestone and
 tier except the other backends, which come later and are recorded as owed in
@@ -686,13 +686,13 @@ the same depth. The full specifications are in [`PLAN.md`](PLAN.md), section 8.
 ```text
                     rustnative-core
                           │
-  ┌─────────┬─────────┬───┴─────┬─────────┬─────────┬─────────┐
-  ▼         ▼         ▼         ▼         ▼         ▼         ▼
-windows    macos     linux    android    ios       web       tui
- Win32     AppKit    toolkit   View     UIKit    DOM/CSS    cells
-                                                             │
-                                                        embedded
-                                                     display drivers
+  ┌─────────┬─────────┬───┴─────┬─────────┬─────────┬─────────┬─────────┐
+  ▼         ▼         ▼         ▼         ▼         ▼         ▼         ▼
+windows    macos     linux    android    ios      ipados     web       tui
+ Win32     AppKit    toolkit   View     UIKit    UIKit    DOM/CSS    cells
+                                                                       │
+                                                                  embedded
+                                                               display drivers
 ```
 
 **macOS** (Milestone 33) — `NSWindow`/`NSView` and AppKit controls, Core Text
@@ -711,6 +711,19 @@ and restoration contracts, `AccessibilityNodeInfo`, and Gradle/AAB packaging.
 
 **iOS** (Milestone 36) — `UIView`/UIKit, the scene lifecycle, `UIAccessibility`,
 universal links into the existing deep-link model, and Xcode packaging.
+
+**iPadOS** (Milestone 70) — a target of its own rather than iOS on a larger
+screen: windows the person arranges and resizes while the application runs
+(full screen, split, the overlay window, freely resized windows, external
+displays) as environment values and per-window lifecycles; the hardware
+keyboard, trackpad, and pencil as ordinary input (commands in the host's
+shortcut overlay and menus, hover and pointer styles, tilt, hover, and
+handwriting); a software keyboard that floats or splits; the sidebar as the
+host's split control. It shares the UIKit realization with iOS through a
+platform-group crate, ships in the same universal bundle, and is selected at
+launch by the device — with its own capability table, conformance column,
+budgets, and verification on an iPad. Plan:
+[`docs/superpowers/plans/2026-10-04-ipados-milestone-70.md`](docs/superpowers/plans/2026-10-04-ipados-milestone-70.md).
 
 **Web** (Web milestones A–K, **built**: [`docs/web.md`](docs/web.md)) — a
 `rustnative-web` adapter using semantic DOM elements rather than a canvas, in
@@ -750,7 +763,7 @@ tree onto a terminal's cell grid: the Windows console in virtual-terminal
 mode, `termios` and VT sequences elsewhere, Unicode-width text measurement,
 key and mouse protocols, damage-tracked redraw, and terminal state restored
 even on panic. Desktop terminals and embedded Linux consoles, local or over
-SSH — not Android, iOS, or the browser.
+SSH — not Android, iOS, iPadOS, or the browser.
 
 **Embedded** (Milestone 37) — embedded Linux, RTOS, and selected bare-metal
 profiles, realized through the draw-list path rather than native controls,
@@ -1447,7 +1460,7 @@ The complete master roadmap—including completed milestones, architectural inva
 
 Milestones 25–32 and 34 are complete, and so is the Web track (Web milestones A–K).
 What remains is the rest of the platform matrix — macOS, Android, iOS,
-embedded, and terminal — plus the
+iPadOS, embedded, and terminal — plus the
 core work those targets share: a `no_std`-capable core subset, an executor
 seam for single-threaded hosts, and time from the host clock rather than
 `std::time::Instant`. The markup syntax and the style spellings are core work of
@@ -1455,9 +1468,13 @@ the same kind and are scheduled with them, in Tier 0 below.
 
 **Milestone 33 — the macOS backend** is next in numbering, but it needs a
 macOS machine to build and verify on and this project has none yet, so the
-order follows hardware availability rather than the numbers. macOS and iOS
-stay fully planned regardless; nothing in the portable layer is designed as
-though they were optional.
+order follows hardware availability rather than the numbers. macOS, iOS, and
+iPadOS stay fully planned regardless; nothing in the portable layer is
+designed as though they were optional. **Milestone 70 — the iPadOS backend** is
+planned to be built together with Milestone 36, since the two share UIKit and
+one universal bundle; its portable widenings (pen tilt, hover, and coalesced
+samples in the pointer model, and an overlay window mode) need no Apple
+hardware and can land on the shipped backends first.
 
 Interleaved with the backends, `PLAN.md` section 11 carries the
 production-parity milestones (39–69) in four tiers and an optional band:

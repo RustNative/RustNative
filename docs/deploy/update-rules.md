@@ -12,6 +12,7 @@ before anyone relies on it.
 | Server (long-lived) | Not applicable: the operator deploys | `rustnative deploy`: immutable revisions, percentage traffic, rollback |
 | Web, static and edge | Not applicable | Owed with Web milestones J and K |
 | iOS | **Forbidden**: executable code arrives only through the App Store (App Store Review Guideline 2.5.2) | Data and models only (`PayloadKind::Model`); owed with Milestone 36 |
+| iPadOS | **Forbidden**, under the same rule as iOS: an iPad application is distributed through the same store, often in the same universal bundle | Data and models only (`PayloadKind::Model`), one manifest for both targets of a universal bundle; owed with Milestone 70 |
 | Android | Google Play forbids self-update outside Play; sideloaded builds may use the package installer | Owed with Milestone 35 |
 | Embedded firmware | Permitted with an A/B or bootloader-verified scheme | Owed with Milestone 37 (`C81`) |
 
