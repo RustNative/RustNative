@@ -885,10 +885,12 @@ than adding new ones.
 What the framework takes from that vocabulary is the declaration half: property
 names, values, units, colour functions, and token references. What it
 deliberately does not take is the cascade — no selectors, no specificity, no
-descendant rules — because a style that is decided by where a node sits cannot
-be resolved deterministically, and a second styling engine competing with the
-framework's own resolution is the thing every native-realization framework has
-regretted.
+descendant rules — because a style decided by matching rules against the tree
+cannot be resolved deterministically, and a second styling engine competing
+with the framework's own resolution is the thing every native-realization
+framework has regretted. Where a style genuinely depends on the tree — a row's
+position, a parent styling its children — it names that relationship as a typed
+condition the core resolves, with no matching step.
 
 Styles are capability-checked per host, like everything else here. Each backend
 answers, per property, whether it realizes, approximates, or cannot express it
@@ -898,6 +900,33 @@ opacity; approximates a container's border (a one-pixel frame) and corner
 radius (a window region) while native controls keep their system shape; and
 cannot draw shadows. The headless backend, being a model, realizes everything.
 `BUILD_STATUS.md` records the tables.
+
+The vocabulary is not cut down to what every host shares, because that would
+style the browser, a GTK desktop, and every host to come no further than the
+narrowest backend goes. Its range grows past the portable one (Milestone 67,
+planned): border widths and styles, gradients, transforms, filters, motion on
+the framework's own animation timelines, text detail, and control parts. Every
+backend answers each of them — once for a native control, once for a box the
+framework owns, since a host may decorate a container but never redraws a
+control — and the application writes down where its targets may differ:
+
+```text
+rounded-lg supports-[box-shadow]:shadow-lg not-supports-[box-shadow]:border
+web:backdrop-blur-sm        odd:bg-gray-50        *:px-4
+```
+
+A guard asks the capability table of the backend the tree is realized on, not
+the browser's `@supports`, and exists in the typed spelling too. The targets an
+application declares (`[style] targets` in `rustnative.toml`) are all checked at
+build time, so an unguarded property one of them cannot realize still fails the
+build, naming that target. Structural variants such as `odd:` and `*:` are
+resolved by the core from the reconciler's own child lists. Relationships on
+another node's state (`group-hover:`, `peer-checked:`), container queries, and
+raw host styling are specified as typed relationships and a single-host escape
+hatch (Milestone 68) and are optional: a component already passes its state to
+its children. `docs/styling.md` is the reference, including what the range
+looks like on each host and what bounds it on Windows (Milestone 69: scaling
+first, then composition for the boxes the framework owns).
 
 ## Advanced input
 
@@ -1431,7 +1460,7 @@ stay fully planned regardless; nothing in the portable layer is designed as
 though they were optional.
 
 Interleaved with the backends, `PLAN.md` section 11 carries the
-production-parity milestones (39–58) in four tiers:
+production-parity milestones (39–69) in four tiers and an optional band:
 
 - **Tier 0 (53, 58, 39, 40), before the second backend exists** — the markup
   syntax, so that every later example, template, guide, doc test, and
@@ -1480,7 +1509,12 @@ production-parity milestones (39–58) in four tiers:
   sessions, camera and screen capture, privacy-preserving pickers, background
   transfer); and Milestone 63, trust (account deletion and revocation,
   attestation, a consent contract the data layer enforces, backup
-  classification and data export).
+  classification and data export). Two more complete it: Milestone 67, the
+  extended style range (guards, declared targets, gradients, transforms,
+  effects, motion, text, control parts, and structural variants, each answered
+  by every backend); and Milestone 69, Windows scale and composition
+  (per-monitor scaling first, then host composition for the boxes the
+  framework owns, and the control-set decision named with its criteria).
 - **Tier 3 (49–52, 55–57), with and after the Web track** — the server
   application model, deployment and post-ship updates, observability and
   compliance, the stability policy, ecosystem contract, and documentation that
@@ -1492,6 +1526,11 @@ production-parity milestones (39–58) in four tiers:
   analytics, privacy-safe diagnostics); and reach (managed fleets, desktop
   shell integration, delta updates over metered networks, and the field set for
   devices — time and calibration, support bundles, provisioning).
+- **Optional (68), on demand** — relational styling on another node's state,
+  container queries, generated content, and single-host style passthrough.
+  Each is specified as a typed relationship or an explicit escape hatch, and
+  each is something the framework already covers another way, so it is built
+  when applications ask for it; the framework is complete without it.
 
 They come out of the standing analysis in
 [`docs/ecosystem-analysis/`](docs/ecosystem-analysis/), which examines the

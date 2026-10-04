@@ -77,6 +77,21 @@ written per node, because in flexbox a size means something different on the
 main and the cross axis and a display must restore the node's own (flex for a
 container, the element's default otherwise).
 
+## The extended range (planned, Milestone 67)
+
+The browser is the host where the extended range shows most, because nearly
+every property in it is a CSS property of the same name. How each part will
+reach the page:
+
+| Part | How |
+|---|---|
+| Extended properties (border widths and styles, gradients, transforms, filters, text detail, control parts) | the CSS property, in the node's declaration class, from the resolved value |
+| Guards (`supports-[…]:`, `not-supports-[…]:`, `web:`, …) | decided by the framework against `rustnative_style::WEB` at resolution and emitted only when they hold — never compiled into an `@supports` query, so a guard means here what it means on every host |
+| Motion (`transition-*`, `animate-*`) | `transition` and `@keyframes` generated from the same `Transition` and `Animation` values the native backends run on Milestone 27's timeline; a spring becomes a `linear()` easing, an approximation named here |
+| Structural variants (`first:`, `odd:`, `nth-[n]:`, `*:`) | the structural pseudo-class counted over the framework's own elements only (`:nth-child(… of S)`, with `S` matching the elements the framework realizes for nodes), so virtual-list spacers and host-only elements never shift a position; held against the core's resolution by the equivalence suite |
+| Relationships on another node and container queries (optional, Milestone 68) | the rule generated from the typed relationship (`.group:hover` and its descendant; `@container` over `container-type: inline-size`), held against the core's resolution |
+| Host passthrough (optional, Milestone 68) | only behind a `web:[…]` marker, carried uninterpreted into the generated stylesheet — never inline, so the content security policy is unchanged — and reported as unverified |
+
 ## Approximations
 
 Named here rather than discovered:

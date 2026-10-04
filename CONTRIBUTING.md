@@ -31,8 +31,19 @@ or update an executable integration test where practical.
   lands with its typed form, its declaration name, its utility spelling or a
   documented note that it has none, an equivalence case asserting both spellings
   resolve to the same value, and each backend's answer for it — realized,
-  approximated, or unavailable. A style a backend cannot realize is a
+  approximated, or unavailable, given separately for a native control and for
+  a box the framework owns. A style a backend cannot realize is a
   diagnostic, never a silent no-op.
+- Do not narrow the style vocabulary to what every host shares, and do not
+  widen it past what the headless backend can record. A property lands only
+  with its headless realization, and properties land by family
+  (`docs/styling.md`). A backend may decorate a box the framework owns through
+  its host's drawing and composition services; it never captures, redraws, or
+  owner-draws a native control to satisfy a style (`PLAN.md` 2.2).
+- A style that depends on another node is a typed relationship the core
+  resolves by a bounded lookup (`PLAN.md` 2.14, fifth rule), never a selector or
+  a matching step. A new variant that would need one is refused, and host
+  passthrough stays confined to one host and outside the equivalence suite.
 - Keep the markup grammar identical in `.rsx` files and in `rsx!`. The
   `.rsx` compiler only wraps markup in `rsx!`; it never parses or lowers
   markup on its own, and never accepts anything the macro would reject.

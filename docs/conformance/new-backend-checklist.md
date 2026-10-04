@@ -37,10 +37,16 @@ Test paths are relative to the crate named; `native::…` tests live in
 | 20 | A style capability table: every property realized, approximated (how), or unavailable (why); unavailable is a build error for the target (Milestone 58) | `rustnative_style::WINDOWS`; `native::style_integration::the_windows_capability_table_is_what_the_backend_applies` (fonts, colours, border, region read back); compile-fail `rustnative-conformance/tests/style_ui_windows` | `rustnative_style::LINUX` (every property realized; a family approximated through fontconfig); `gtk::style_integration::the_linux_capability_table_is_what_gtk_paints`; nothing is unavailable, so no compile-fail cases | `rustnative_style::HEADLESS`; `tests/portable_surface.rs::the_headless_style_table_realizes_everything` | `rustnative_style::WEB` (every property a CSS property, from the generated style sheet); under a strict policy in a browser: `rustnative-web/tests/browser_dom.rs` |
 | 21 | A unit mapping: host unit, `rem` following the text setting, one rounding rule | `rustnative_style::WINDOWS_UNITS`; core `style::resolve::tests::a_rem_follows_the_text_scale_and_rounds_half_away_from_zero` | `rustnative_style::LINUX_UNITS`; `gtk::rendering::styling::tests::fonts_scale_once_and_round_half_away_from_zero` | `rustnative_style::HEADLESS_UNITS` | `rustnative_style::WEB_UNITS` (CSS pixels; `rem` follows the browser's text size) |
 | 22 | Runtime token resolution: theme, scheme, and text-scale changes restyle existing native objects | `native::style_integration` (same HWNDs across a scheme and a token switch) | `gtk::style_integration::the_desktops_scheme_and_text_scale_reach_the_environment_and_follow_changes` (same widgets across a scheme and text-scale change) | core `tests/style_equivalence.rs::environment_variants_follow_the_environment_without_re_rendering` | — |
+| 23 | The extended range answered: every property of Milestone 67 realized, approximated, or unavailable, separately for a native control and a framework-owned box, read back from the native objects; the headless backend realizes all of it | — | — | — | — |
+| 24 | Guards decided against this backend's table at resolution: a capability or target variant applies exactly where the table says, and an unguarded property this backend cannot realize fails the build for every application that declares it as a target (Milestone 67) | — | — | — | — |
+| 25 | Decorate the box, never the control (`PLAN.md` 2.2): any extended-range answer realized on a box comes from the host's drawing or composition services, no native control is captured or owner-drawn to satisfy a style, and the limits of mixing the two are answered as capability | — | — | n/a (no host objects) | — |
 
 Owed by deferred backends (Milestones 33, 35–38): their own column in this
 table, and in particular real safe areas and hinges (35, 36), host gesture
 recognizers competing with ours (35, 36), and terminal restoration (38). Owed
 on the Web: the rows marked `—`, among them the browser's safe-area insets,
 gesture arbitration against the browser's own (`touch-action`), and runtime
-token switches without a reload.
+token switches without a reload. Owed by every backend once Milestone 67 lands:
+rows 23–25, which no backend satisfies yet; on Windows, row 25 is where
+Milestone 69's composition prototype is recorded, and row 21's unit mapping
+gains its per-monitor scaling there too.

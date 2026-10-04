@@ -80,6 +80,14 @@ looks like every other GTK application on that desktop (Adwaita, Breeze,
 Yaru). The style capability table is `rustnative_style::LINUX`: every
 property realized; a font family is approximated through fontconfig.
 
+GTK's own style language is what makes this host rich: it already paints
+borders of any width and style, gradients, and shadows on the widgets it
+draws, so most of the extended style range (`PLAN.md` Milestone 67,
+planned) is expected to be answered as realized here, through the same
+display-wide style sheet. Each property is answered when its family lands,
+from what GTK actually paints and read back by `gtk::style_integration`
+rather than assumed — see `docs/styling.md`.
+
 ## Input
 
 Keyboard, pointer, touch, and pen come from GTK's event controllers;

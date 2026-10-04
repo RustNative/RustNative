@@ -56,6 +56,9 @@ refreshed on 2026-09-27 for every concept that milestone set names as built.
 | Published fidelity/accessibility comparison methodology | **Absent** | — | `X-L2-2` |
 | Host-window/view embedding (both directions) | **Absent** | Not specified for any backend | `D-LG-1`, `D-LG-2`, `M-AS-1`, `M-AS-2` |
 | Host rendering-surface handoff | **Absent** | Milestone 29 accepts our draw list only | `D-GX-1`, `M-EN-1` |
+| Per-monitor scaling of layout, live (Windows) | **Partial** | Manifest declares per-monitor awareness (Milestone 32); layout is not scaled (`BUILD_STATUS.md`, Milestone 58); Milestone 69 | `D-WIN-1` |
+| Framework-owned boxes decorated through the host compositor (Windows) | **Planned** | 2.2's decorate-the-box rule; Milestone 69, prototype first | `D-WIN-2` |
+| Control-set decision recorded with criteria (Windows) | **Planned** | Milestone 69 | `D-WIN-3` |
 
 ## L3 — Semantic UI
 
@@ -78,6 +81,12 @@ refreshed on 2026-09-27 for every concept that milestone set names as built.
 | Tokens resolved at resolution time (runtime theme switch, no rebuild) | **Partial** | Theme resolution exists; declarations and token references do not | `X-L3-14` |
 | Per-backend style capability table | **Planned** | Milestone 58; Windows silently ignores border colour and radius today (`BUILD_STATUS.md`) | `X-L3-15` |
 | Documented unit mapping per host, with rounding | **Partial** | 2.11 states the conversion boundary; no table, no conformance case | `X-L3-16` |
+| Style range not cut to the common set; reference backend realizes all of it | **Planned** | 2.14 (fourth rule, three ranges); Milestone 67 | `X-L3-17` |
+| Capability and target guards, declared targets checked at build | **Planned** | 2.14; Milestone 67 | `X-L3-18` |
+| Style motion on the framework's own timelines | **Partial** | Timelines exist (Milestone 27); the style vocabulary does not reach them | `X-L3-19` |
+| Structural conditions from the reconciler's child lists | **Planned** | 2.14 (fifth rule); Milestone 67 | `X-L3-20` |
+| State- and size-dependent relationships without a matcher | **Planned** (optional) | Milestone 68; props and the environment cover the cases today | `X-L3-21` |
+| Host style passthrough, single-host and unverified | **Planned** (optional) | Milestone 68 | `X-L3-22` |
 | Builder authoring surface | **Met** | Every node kind and modifier since Milestone 1; 2.9 | — |
 | Markup authoring surface at equal capability, in `.rsx` files and `rsx!` | **Planned** | 2.9; Milestone 53 | `X-L3-8` |
 | Markup diagnostics at compiler quality, through both carriers | **Planned** | Milestone 53 compile-failure suite | `X-L3-9` |
@@ -454,6 +463,18 @@ examples, templates, and components is small, and both get steadily more
 expensive afterwards, which is why they are scheduled in Tier 0 rather than with
 the application layer they superficially resemble.
 
-Those fourteen, the two missing spellings, and the conformance suites that turn
-our root-layer advantages from claims into tested guarantees are what
-[`gap-plan.md`](gap-plan.md) schedules.
+**Where the range was narrower than the hosts.** One mechanism scores **Met**
+and still under-delivers on the richer hosts: the style vocabulary's range was
+the portable one, so a browser, a GTK desktop, and the layer-backed hosts to
+come were styled no further than the narrowest backend could go
+(`X-L3-17`–`X-L3-20`, Milestone 67). The fix is not a wider vocabulary alone
+but a wider vocabulary with guards, because the alternative to cutting the
+range is not pretending every host realizes it. Two neighbours sit beside it:
+the Windows backend's own limits — scale first, then composition for the boxes
+it owns (`D-WIN-1`–`D-WIN-3`, Milestone 69) — and the relational styling that
+the component model already covers another way, kept optional
+(`X-L3-21`, `X-L3-22`, Milestone 68).
+
+Those fourteen, the two missing spellings, the narrower range, and the
+conformance suites that turn our root-layer advantages from claims into tested
+guarantees are what [`gap-plan.md`](gap-plan.md) schedules.

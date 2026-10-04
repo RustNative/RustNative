@@ -32,10 +32,14 @@ Tier 3  with and after the web track   — the server, deployment, ecosystem,
                                          reconciliation beyond the screen,
                                          durable execution, surfaces,
                                          product operations, and reach
+Optional on demand                     — capabilities the existing mechanisms
+                                         already cover another way; the
+                                         framework is complete without them
 ```
 
 Tiers are not strict phases: Tier 1 runs continuously the way `PLAN.md`
-section 9 does. Milestone numbers below are identities, not an order —
+section 9 does. The optional band is not a tier at all: nothing depends on it,
+and each item in it names the trigger that would make it worth building. Milestone numbers below are identities, not an order —
 `PLAN.md` section 8 already establishes that convention.
 
 ---
@@ -129,8 +133,9 @@ resolution half of `X-L3-7`; concept `C22-4`.
   stated with its rounding rule rather than chosen in one backend's source.
 - `C22-4` State, colour-scheme, and size-class variants bound to mechanisms that
   already exist — Milestone 21's state variants and Milestone 39's size classes
-  — with container-relative and relational variants deferred explicitly rather
-  than implied.
+  — with the structural variants taken up as typed relationships in Milestone
+  67, and container-relative and relational variants specified the same way in
+  the optional Milestone 68, rather than implied.
 - Both style spellings in every document, example, template, and component
   entry, on the same terms as the two syntaxes.
 
@@ -766,6 +771,61 @@ restore-onto-a-different-device test, plus export and deletion operations.
 analytics without consent, carries generated privacy labels, and survives a
 restore onto a different device with credentials excluded and data intact.
 
+## Milestone 67 — The extended style range
+
+**Why.** `foundations.md` F3.4, the ceiling on the other side: a vocabulary cut
+to what the narrowest host realizes styles every richer host below what it
+offers, and fails on the classes a developer writes first. The capability table
+Milestone 58 introduced already answers per property and per host; used in both
+directions, with guards in the application, it lets the range grow without any
+host pretending. It is Tier 2 because it is part of what the application layer
+looks like to a team choosing a framework, and because the guards are cheaper to
+introduce before applications grow habits around the portable range.
+
+**Covers.** `X-L3-17`, `X-L3-18`, `X-L3-19`, `X-L3-20`.
+
+**Scope.** Capability, complement, exact, and target variants in both
+spellings, decided per realizing backend; declared targets in `rustnative.toml`
+checked at build time; approximations reported and refusable; the headless
+backend realizing every property as the reference; the property families —
+borders, backgrounds and gradients, transforms, effects, motion on Milestone
+27's timelines, text, aspect and stacking, interaction, and control parts —
+each answered by every backend for native controls and framework-owned boxes;
+and the structural variants resolved from the reconciler's child lists. The
+plan states where the range will show unevenly — chiefly on Windows — and that
+the guards make the difference honest rather than equal.
+
+**Done when** every family exists in both spellings with equivalence cases,
+every shipped backend answers every new property and the native answers are
+read back, guards resolve per backend inside one binary, an unguarded property
+fails the build for each declared target that cannot realize it, a
+class-spelled transition runs on the framework's timeline and as generated CSS,
+and structural variants agree between the core and the browser.
+
+## Milestone 69 — Windows: scale and composition
+
+**Why.** `desktop.md`: per-monitor scaling is the first item on the Windows
+list (`D-WIN-1`), and the backend's unit mapping still equates a logical pixel
+with a device pixel. And the Windows backend is where the extended range shows
+least, because a GDI child window cannot shadow, blend, or anti-alias; the
+host's own compositor can decorate the boxes the framework owns without
+touching a control (`D-WIN-2`). Behind both stands a control-set decision that
+should be made on evidence rather than drift (`D-WIN-3`).
+
+**Covers.** `D-WIN-1`, `D-WIN-2`, `D-WIN-3`; concept `C106` with Milestone 60.
+
+**Scope.** Layout, fonts, regions, and surfaces scaled per window, with live
+monitor changes on the same native windows and an updated unit mapping, before
+anything else; then a time-boxed prototype of host composition for
+framework-owned containers, with the airspace limits stated as capability
+answers, measured against the Windows budgets, and adopted or not on the record;
+and the criteria for the control-set decision written down, with the decision
+itself left to the evidence.
+
+**Done when** a window crossing monitors of different scale keeps its native
+windows at the correct size under a conformance case, the prototype's
+measurements and decision are recorded, and the control-set criteria exist.
+
 # Tier 3 — With and after the web track
 
 ## Milestone 49 — The server application model
@@ -1085,6 +1145,33 @@ rebuild, a double-clicked document opens in the running instance, an update
 completes over a metered link as a delta, and a field device is diagnosed and
 reset without a site visit.
 
+# Optional — On demand
+
+## Milestone 68 — Relational styling, container queries, and host passthrough
+
+**Why.** `foundations.md` F3.4, the ceiling of the relational half: what
+selectors are used for is mostly relationships between named nodes, which a
+framework that owns the tree can resolve without a matcher. The positional ones
+are in Milestone 67. The state- and size-dependent ones need a dependency index
+— a permanent cost — and a component model with typed state already expresses
+each of them through props or the environment, and container-relative decisions
+through Milestone 39's size classes. That is the case for specifying them fully
+and building them only on demand.
+
+**Covers.** `X-L3-21`, `X-L3-22`.
+
+**Scope.** Group, peer, and direct-children relationships on interaction and
+form state, through a dependency index that keeps invalidation bounded and
+transient; container-relative variants under the containment rule, settling in
+one relayout; decorative generated content as reconciler-inserted nodes hidden
+from accessibility; and host passthrough, confined to one host that speaks a
+styling language, uninterpreted, outside the equivalence suite, and reported as
+unverified. Each part has a recorded trigger and is taken up on its own.
+
+**Done when**, per part taken up, both spellings exist with equivalence cases,
+the core and every shipped backend agree, invalidation is held by the
+over-invalidation suite, and passthrough is reported as unverified wherever it
+appears.
 
 # Dependency order
 
@@ -1123,6 +1210,12 @@ M48 components and tokens  ──┘        ↓             ├─→ M56 durabl
                               M52 the project
                                      ↓
                               M64 product operations · M66 reach
+
+M58 style spellings ─┬─→ M67 extended style range ──→ M68 relational styling
+M27 timelines ───────┤                                 (optional, on demand)
+M45 headless ────────┘          ↑
+M69 Windows scale ──────────────┘ (its Windows half)
+M69 Windows composition ←── M60 compositing vocabulary, M42 budgets
 ```
 
 Three web concepts — offline strategies and worker choreography (`C136`),

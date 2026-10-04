@@ -8,7 +8,7 @@ spellings. `crates/rustnative-conformance/tests/doc_parity.rs` holds that.
 | Task | Guide | Runnable example |
 |---|---|---|
 | Build a first application | `docs/guides/first-app.md` | `rustnative new`, then `examples/hello-label` |
-| Lay out and style a screen | README ("Layout", "Style"), `docs/tokens.md` | `examples/gallery` |
+| Lay out and style a screen | README ("Layout", "Style"), `docs/tokens.md`, `docs/styling.md` | `examples/gallery` |
 | Use the component library | `docs/components.md` | `examples/gallery` |
 | Keep state, forms, and lists | `docs/data.md` | `examples/data-demo`, `examples/filter-demo` |
 | Translate it | `docs/i18n.md` | `examples/i18n-demo` |

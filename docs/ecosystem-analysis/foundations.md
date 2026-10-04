@@ -604,6 +604,33 @@ per-property capability answer is the only honest resolution, and it must be a
 build-time answer, because a style that silently disappears at run time is
 indistinguishable from a layout bug.
 
+**The ceiling on the other side.** The obvious response to a host that cannot
+realize a property is to leave the property out of the vocabulary, so that
+every host looks the same. That is the lowest-common-denominator trade at the
+styling layer: the narrowest host sets the range for all of them, the richer
+hosts are styled below what they offer, and the vocabulary a developer arrives
+with fails on its most ordinary classes. The capability answer resolves this
+too, provided it is used in both directions — every host answers every
+property, and an application states where a difference between its targets is
+acceptable. The archetype's own conditional-support variant is the right
+spelling for that statement, if what it asks is the framework's capability table
+rather than a browser's feature query. One condition makes the arrangement
+testable: a reference backend that realizes the whole range, so the equivalence
+suite can reach every property whichever hosts realize it.
+
+**The ceiling of the relational half.** Some of what selectors are used for is
+not about the cascade at all — position among siblings, a parent styling its
+children, a hovered container restyling its contents, a component responding to
+its container's size. Each is a relationship between named nodes, and each can
+be resolved by a bounded lookup in a framework that owns the tree, without a
+matcher. Positional relationships need only the child lists a reconciler
+already holds. State- and size-dependent ones need a dependency index that
+keeps invalidation bounded, which is a permanent cost, and in a component model
+with typed state they mostly repeat what a prop already expresses. An arbitrary
+selector, finally, is a search over the tree and cannot be made a lookup; the
+only honest place for it is an explicit escape hatch on the one host that
+speaks it.
+
 **RustNative's position.** A theme system exists (Milestone 21) and resolves
 per node, which is the right substrate; a token pipeline, a declaration
 vocabulary, a utility spelling, a documented semantic-versus-absolute boundary,
@@ -634,6 +661,31 @@ and per-backend style capability answers do not exist.
   a root-relative unit follows the host's text setting, and the rounding rule —
   with a conformance case per backend, including the cell-quantized one where
   the mapping is coarsest.
+- `X-L3-17` `[X]` A style range not cut to the common set: a property enters
+  the vocabulary when a host can realize it, every backend answers it —
+  separately for a native control and for a box the framework owns — and the
+  reference backend realizes all of it, so no property is untestable.
+- `X-L3-18` `[X]` Explicit enhancement: capability and target conditions in
+  both spellings, decided against the realizing backend's capability table at
+  resolution rather than by a feature query; the application's declared targets
+  checked at build time, so an unguarded property a declared target cannot
+  realize fails the build; approximations reported and refusable.
+- `X-L3-19` `[X]` Style motion lowered onto the framework's own timelines, so a
+  class-spelled transition is interrupted, cancelled, and skipped under reduced
+  motion by the same rules as a typed one, on every host that runs frames.
+- `X-L3-20` `[X]` Structural conditions — position among siblings, children
+  styled by their parent — resolved from the reconciler's child lists, counted
+  over logical items in virtualized collections, and invalidated by a child
+  list change alone.
+- `X-L3-21` `[X]` State- and size-dependent relationships — ancestor groups,
+  earlier siblings, children's state, container size — as typed relationships
+  resolved by bounded lookup through a dependency index, never by a matcher,
+  with invalidation held by the over-invalidation suite. Optional: the
+  component model already expresses each through props or the environment.
+- `X-L3-22` `[X]` Host style passthrough confined to one host that speaks a
+  styling language of its own, carried uninterpreted, outside the equivalence
+  suite, and reported as unverified wherever it appears. Optional: the escape
+  hatch for style, not a styling channel.
 
 ## F3.5 — The authoring surface
 

@@ -1622,7 +1622,11 @@ deferred backends owe their own capability tables and unit mappings
 backend-selecting cfg. The Windows unit mapping is recorded as it is, not as intended:
 layout works in device pixels (one logical pixel is one device pixel), and
 scaling layout by `GetDpiForWindow / 96` is **owed** — `rem` does follow the
-text-scale setting.
+text-scale setting. Where the rest is specified: the scaling is the first part
+of Milestone 69, ahead of host composition for framework-owned containers; the
+guards, declared targets, extended range, and structural variants are
+Milestone 67; container queries, relational variants, and host passthrough are
+the optional Milestone 68. None of the three is started.
 
 ### Milestone 53 — The markup syntax — complete
 

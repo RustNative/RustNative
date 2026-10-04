@@ -570,6 +570,15 @@ conformance and a scaling story for mixed-DPI multi-monitor sessions.
 
 - `D-WIN-1` `[D]` Per-monitor DPI change handled live, verified on a mixed-DPI
   multi-monitor session.
+- `D-WIN-2` `[D]` Framework-owned boxes decorated through the host's own
+  compositor — shadows, anti-aliased corners, gradients, fades — without
+  capturing or owner-drawing a native control, and with the limits of mixing
+  composed content and native child windows (the airspace problem) answered as
+  capability rather than discovered.
+- `D-WIN-3` `[D]` A recorded decision, with written criteria, on whether the
+  backend realizes the host's newer control set (whose composition has no
+  airspace limit) alongside or instead of the classic one — taken as a
+  control-set decision under `D-FP-2`, not as a styling one.
 - `D-MAC-1` `[D]` Sandbox and entitlement requirements expressed as
   capabilities, with window and state restoration implemented.
 - `D-LIN-1` `[D]` Desktop-environment conformance matrix and mixed-DPI
