@@ -636,7 +636,7 @@ mod tests {
         start_linear(&mut timeline, 10, 0);
         timeline.forget(node());
         assert!(!timeline.is_active());
-        assert!(timeline.tick(ms(50)).frames.is_empty());
+        assert_eq!(timeline.tick(ms(50)).frames, []);
     }
 
     #[test]

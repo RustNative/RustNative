@@ -292,7 +292,7 @@ mod tests {
     fn axis_noise_below_epsilon_is_ignored_but_returning_to_rest_is_not() {
         let a = GamepadState::new().with_axis(GamepadAxis::RightY, 0.004);
         let b = GamepadState::new().with_axis(GamepadAxis::RightY, 0.009);
-        assert!(GamepadState::diff(Some(&a), Some(&b), 0.01).is_empty());
+        assert_eq!(GamepadState::diff(Some(&a), Some(&b), 0.01), []);
         let rest = GamepadState::new();
         assert_eq!(
             GamepadState::diff(Some(&b), Some(&rest), 0.01),
@@ -313,7 +313,7 @@ mod tests {
     #[test]
     fn the_poller_reports_each_change_once_per_slot() {
         let mut poller = GamepadPoller::new(Fake { slots: vec![None, None] });
-        assert!(poller.poll().is_empty());
+        assert_eq!(poller.poll(), []);
         assert!(!poller.any_connected());
 
         poller.source_mut().slots[1] = Some(GamepadState::new().with_button(GamepadButton::Start));

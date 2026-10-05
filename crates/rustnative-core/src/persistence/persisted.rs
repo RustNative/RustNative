@@ -262,7 +262,7 @@ mod tests {
         value.clear();
         assert_eq!(value.get(), 0);
         value.cache.borrow_mut().flush().unwrap();
-        assert!(store.keys().is_empty());
+        assert_eq!(store.keys(), [] as [&str; 0]);
     }
 
     #[test]

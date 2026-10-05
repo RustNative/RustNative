@@ -256,7 +256,6 @@ impl EventRunner {
 /// message id. The invocation's scope ends with the batch.
 ///
 /// Pass it to [`rustnative_server::serverless::lambda::run`].
-#[must_use]
 pub fn sqs_batch(
     handler: Arc<dyn EventHandler>,
 ) -> rustnative_server::serverless::lambda::EventHook {

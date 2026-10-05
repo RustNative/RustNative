@@ -61,16 +61,21 @@ impl TaskId {
     /// could act on a `Result` here"
     )]
     fn next(counter: &AtomicU64) -> Self {
-        Self(
-            counter
-                .fetch_update(Ordering::Relaxed, Ordering::Relaxed, |current| {
-                    current.checked_add(1)
-                })
-                .expect(
-                    "framework task identity space exhausted (more than u64::MAX tasks were \
-                          spawned by one Scheduler over its lifetime)",
-                ),
-        )
+        // A compare-exchange loop rather than `fetch_update`, which Rust 1.99
+        // deprecates in favour of `try_update` — a name the 1.85 floor does
+        // not have.
+        let mut current = counter.load(Ordering::Relaxed);
+        loop {
+            let next = current.checked_add(1).expect(
+                "framework task identity space exhausted (more than u64::MAX tasks were \
+                      spawned by one Scheduler over its lifetime)",
+            );
+            match counter.compare_exchange_weak(current, next, Ordering::Relaxed, Ordering::Relaxed)
+            {
+                Ok(previous) => return Self(previous),
+                Err(actual) => current = actual,
+            }
+        }
     }
 }
 
@@ -550,7 +555,6 @@ impl Scheduler {
     /// delay. A `Scheduler` built with [`Self::with_executor`] using
     /// [`ManualExecutor`] instead resolves this future only when the test
     /// explicitly advances that executor's virtual clock.
-    #[must_use]
     pub fn sleep(&self, duration: Duration) -> SleepFuture {
         self.inner.executor.sleep(duration)
     }

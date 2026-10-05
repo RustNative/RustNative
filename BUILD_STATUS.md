@@ -29,6 +29,18 @@ Projects created by `rustnative new` now depend on the `rustnative-*` crates.
 One markup expansion golden was re-blessed: the longer crate path moves one
 call past the pretty-printer's line width.
 
+**Rust 1.99 (2026-10-05).** CI had been red since stable moved to 1.99 on
+2026-10-01, while the local gates still ran 1.98. Under `-D warnings`, 1.99
+rejected `AtomicU64::fetch_update` (deprecated for `try_update`, which the 1.85
+floor lacks, so both uses are now `compare_exchange_weak` loops),
+`#[must_use]` on functions whose return type is already must-use
+(`clippy::double_must_use`: the four `sleep`s and `sqs_batch`), and
+`assert!(x.is_empty())` in tests (`clippy::assert_is_empty`, now
+`assert_eq!(x, [])` so a failure shows the value). Separately,
+`tools/linux-session.sh` was committed without its execute bit, so every
+Linux backend job in CI stopped at "Permission denied". Verified: clippy 1.99
+clean on Windows and Ubuntu, the MSRV check, and the touched crates' tests.
+
 **Plan: iPadOS as a target of its own (2026-10-04).** `PLAN.md` gains
 Milestone 70, the iPadOS backend, beside Milestone 36 in section 8, specified
 at the same depth as macOS and iOS; the implementation plan is

@@ -279,7 +279,7 @@ fn a_hidden_screen_does_no_periodic_work_and_resumes_when_shown() {
     assert!(!CANCELLED_RAN.with(Cell::get), "the cancel-rule task was cancelled");
 
     tree.dispatch(Event::Click { target: NodeId::from_key("toggle") });
-    assert!(tree.suspended_components().is_empty());
+    assert_eq!(tree.suspended_components(), [] as [&str; 0]);
     let at_show = TICKS.with(Cell::get);
     tick(&mut tree, 3);
     assert!(TICKS.with(Cell::get) >= at_show + 2, "resumed");
@@ -292,7 +292,7 @@ fn a_backgrounded_window_suspends_every_component() {
     tree.set_backgrounded(true);
     assert_eq!(tree.suspended_components().len(), 2, "the root and the clock");
     tree.set_backgrounded(false);
-    assert!(tree.suspended_components().is_empty());
+    assert_eq!(tree.suspended_components(), [] as [&str; 0]);
 }
 
 // ---------------------------------------------------------------------

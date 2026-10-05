@@ -47,7 +47,7 @@ fn migrations_apply_roll_back_and_dry_run() {
     let pending: Vec<_> =
         all.pending(&connection).unwrap().into_iter().map(|m| m.name.clone()).collect();
     assert_eq!(pending, ["0001_users", "0002_notes"], "the dry run lists, and applies nothing");
-    assert!(Migrations::applied(&connection).unwrap().is_empty());
+    assert_eq!(Migrations::applied(&connection).unwrap(), [] as [&str; 0]);
     assert_eq!(all.apply(&mut connection).unwrap().len(), 2);
     assert!(all.apply(&mut connection).unwrap().is_empty(), "applying twice is nothing");
     assert_eq!(all.rollback(&mut connection, Some("0001_users")).unwrap(), ["0002_notes"]);
@@ -172,11 +172,9 @@ fn row_policies_hold_for_queries_and_single_rows() {
     assert_eq!(titles(&Reader { id: 3, admin: true }).len(), 3);
     assert!(!policies.may_read(&connection, &Reader { id: 1, admin: false }, "notes", 2).unwrap());
     assert!(policies.may_read(&connection, &Reader { id: 2, admin: false }, "notes", 2).unwrap());
-    assert!(
-        policies
-            .visible(&connection, &Reader { id: 1, admin: true }, "users", "name")
-            .unwrap()
-            .is_empty()
+    assert_eq!(
+        policies.visible(&connection, &Reader { id: 1, admin: true }, "users", "name").unwrap(),
+        []
     );
 }
 

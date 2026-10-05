@@ -93,6 +93,9 @@ fn every_performance_claim_cites_a_budget() {
 #[test]
 fn the_check_finds_a_claim_and_accepts_a_cited_one() {
     assert_eq!(unsupported_claims("Intro.\n\nIt is blazing fast.\n"), ["It is blazing fast."]);
-    assert!(unsupported_claims("Cold start is faster: `budgets/windows.toml`.").is_empty());
-    assert!(unsupported_claims("The transient fast path renders nothing.").is_empty());
+    assert_eq!(
+        unsupported_claims("Cold start is faster: `budgets/windows.toml`."),
+        [] as [&str; 0]
+    );
+    assert_eq!(unsupported_claims("The transient fast path renders nothing."), [] as [&str; 0]);
 }

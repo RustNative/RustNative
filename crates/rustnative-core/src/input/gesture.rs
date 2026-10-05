@@ -417,13 +417,13 @@ mod tests {
         let mut r = GestureRecognizer::default();
         r.handle(PointerPhase::Down, &sample(0, 5, 5, 0));
         assert_eq!(r.next_deadline(), Some(Duration::from_millis(500)));
-        assert!(r.tick(Duration::from_millis(499)).is_empty());
+        assert_eq!(r.tick(Duration::from_millis(499)), []);
         assert_eq!(
             r.tick(Duration::from_millis(500)),
             vec![Gesture::LongPress { position: Point::new(5, 5) }]
         );
         assert_eq!(r.next_deadline(), None, "a long press fires once");
-        assert!(r.handle(PointerPhase::Up, &sample(0, 5, 5, 900)).is_empty());
+        assert_eq!(r.handle(PointerPhase::Up, &sample(0, 5, 5, 900)), []);
     }
 
     #[test]
@@ -474,7 +474,7 @@ mod tests {
             r.handle(PointerPhase::Move, &sample(1, 400, 400, 40)).is_empty(),
             "the remaining finger must not start a pan"
         );
-        assert!(r.handle(PointerPhase::Up, &sample(1, 400, 400, 50)).is_empty());
+        assert_eq!(r.handle(PointerPhase::Up, &sample(1, 400, 400, 50)), []);
         assert!(!r.is_active());
     }
 
@@ -497,7 +497,7 @@ mod tests {
     fn cancelling_reports_cancelled_and_never_a_tap() {
         let mut r = GestureRecognizer::default();
         r.handle(PointerPhase::Down, &sample(0, 0, 0, 0));
-        assert!(r.handle(PointerPhase::Cancel, &sample(0, 0, 0, 10)).is_empty());
+        assert_eq!(r.handle(PointerPhase::Cancel, &sample(0, 0, 0, 10)), []);
         r.handle(PointerPhase::Down, &sample(0, 0, 0, 20));
         r.handle(PointerPhase::Move, &sample(0, 50, 0, 30));
         let out = r.handle(PointerPhase::Cancel, &sample(0, 50, 0, 40));
@@ -507,8 +507,8 @@ mod tests {
     #[test]
     fn hover_movement_and_stray_releases_are_ignored() {
         let mut r = GestureRecognizer::default();
-        assert!(r.handle(PointerPhase::Move, &sample(0, 10, 10, 0)).is_empty());
-        assert!(r.handle(PointerPhase::Up, &sample(0, 10, 10, 0)).is_empty());
+        assert_eq!(r.handle(PointerPhase::Move, &sample(0, 10, 10, 0)), []);
+        assert_eq!(r.handle(PointerPhase::Up, &sample(0, 10, 10, 0)), []);
         assert!(!r.is_active());
     }
 }

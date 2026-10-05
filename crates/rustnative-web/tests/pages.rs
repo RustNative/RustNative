@@ -118,7 +118,7 @@ impl Component for Static {
 fn a_page_with_no_island_ships_no_javascript() {
     let rendered = render(Page::new::<Static>(head(), ()), &cx("/"));
     assert!(!rendered.html.contains("<script"), "{}", rendered.html);
-    assert!(rendered.modules.is_empty());
+    assert_eq!(rendered.modules, [] as [&rustnative_web::ClientModule; 0]);
     assert!(rendered.html.contains("<style nonce=\"n0nce\">"));
 }
 

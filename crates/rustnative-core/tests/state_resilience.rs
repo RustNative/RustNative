@@ -164,7 +164,7 @@ fn a_store_update_re_renders_only_the_components_whose_slice_changed() {
     // An update that leaves every slice equal renders nothing.
     store().update(|profile| profile.name = "Ada".into());
     tree.pump_tasks();
-    assert!(tree.last_render_log().is_empty());
+    assert_eq!(tree.last_render_log(), []);
 }
 
 #[test]

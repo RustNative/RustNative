@@ -194,7 +194,7 @@ mod tests {
         assert!(!diff.invalidates_layout(), "a canvas is as big as layout makes it");
 
         let same = TreeSnapshot::from_node(&scene(Color::rgb(255, 0, 0))).unwrap();
-        assert!(TreeDiff::between(&previous, &same).operations().is_empty());
+        assert_eq!(TreeDiff::between(&previous, &same).operations(), []);
     }
 
     #[test]

@@ -323,7 +323,7 @@ fn offline_mutations_are_queued_durably_and_sent_in_order_on_reconnect() {
     client.set_online(true);
     app.settle();
     assert_eq!(*sent.lock(), ["eggs", "bread"], "in order");
-    assert!(client.queued_mutations().is_empty());
+    assert_eq!(client.queued_mutations(), []);
     assert_eq!(app.states(), ["ok: milk,eggs,bread"]);
 }
 

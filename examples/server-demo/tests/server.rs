@@ -60,11 +60,9 @@ async fn a_signed_in_client_writes_notes_that_jobs_index() {
 
     // Another person sees none of them.
     let ada = format!("Bearer {}", token(&http, "ada", "analytical engine").await.unwrap());
-    assert!(
-        call::<ListNotes>(&http, BASE, &(), &[("authorization", ada.as_str())])
-            .await
-            .unwrap()
-            .is_empty()
+    assert_eq!(
+        call::<ListNotes>(&http, BASE, &(), &[("authorization", ada.as_str())]).await.unwrap(),
+        []
     );
 
     // The server-only component, merged as an ordinary tree.

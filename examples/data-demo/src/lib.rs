@@ -434,11 +434,18 @@ impl Component for Weather {
         self.server = server;
     }
     fn view(&self) -> Node {
-        let failing = self
-            .server
-            .flaky_renders
-            .fetch_update(Ordering::SeqCst, Ordering::SeqCst, |left| left.checked_sub(1))
-            .is_ok();
+        // Take one failure off the budget, if any is left (a compare-exchange
+        // loop: Rust 1.99 deprecates `fetch_update`, and its replacement is
+        // newer than the 1.85 floor).
+        let budget = &self.server.flaky_renders;
+        let mut left = budget.load(Ordering::SeqCst);
+        let failing = loop {
+            let Some(next) = left.checked_sub(1) else { break false };
+            match budget.compare_exchange_weak(left, next, Ordering::SeqCst, Ordering::SeqCst) {
+                Ok(_) => break true,
+                Err(actual) => left = actual,
+            }
+        };
         assert!(!failing, "the forecast service sent garbage");
         Node::row(
             "weather",

@@ -40,7 +40,6 @@ impl EffectContext {
 
     /// Returns a future that completes after `duration` (see
     /// [`crate::scheduler::Scheduler::sleep`]).
-    #[must_use]
     pub fn sleep(&self, duration: Duration) -> SleepFuture {
         self.task_scope.scheduler().sleep(duration)
     }

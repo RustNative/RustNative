@@ -147,7 +147,7 @@ async fn the_api_schema_comes_from_the_types() {
     );
 
     // The contract check: compatible with itself, broken by a new required field.
-    assert!(breaking_changes(&document, &document).is_empty());
+    assert_eq!(breaking_changes(&document, &document), [] as [&str; 0]);
     let mut changed = document.clone();
     changed["paths"]["/_fn/math/sum"]["post"]["requestBody"]["content"]["application/json"]["schema"]
         ["required"] = serde_json::json!(["a", "b", "c"]);

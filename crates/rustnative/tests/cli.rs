@@ -203,7 +203,7 @@ fn doctor_reports_this_machine_as_json() {
     // SDK are here; `doctor` must agree, and say where they are.
     for name in ["visual studio (c++ build tools)", "windows sdk", "rc", "mt"] {
         assert_eq!(named(name)["ok"], serde_json::Value::Bool(true), "{name}: {}", named(name));
-        assert!(!named(name)["detail"].as_str().unwrap_or_default().is_empty());
+        assert_ne!(named(name)["detail"].as_str().unwrap_or_default(), "");
     }
 
     let platforms = report["platforms"].as_array().expect("platforms");

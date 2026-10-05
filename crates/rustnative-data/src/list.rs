@@ -241,6 +241,6 @@ mod tests {
                 ListChange::Insert { index: 3 },
             ]
         );
-        assert!(diff_keys(&[1, 2, 3], &[1, 2, 3]).is_empty());
+        assert_eq!(diff_keys(&[1, 2, 3], &[1, 2, 3]), []);
     }
 }

@@ -584,7 +584,6 @@ impl<M: Send + 'static> ComponentContext<'_, M> {
     /// Returns a future that completes after `duration`, driven by the
     /// scheduler rather than a real-time OS sleep (see
     /// [`crate::scheduler::Scheduler::sleep`]).
-    #[must_use]
     pub fn sleep(&self, duration: Duration) -> SleepFuture {
         self.task_scope.scheduler().sleep(duration)
     }
