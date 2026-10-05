@@ -51,6 +51,9 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
+        with:
+          # The serverless and web tests build these.
+          targets: wasm32-unknown-unknown, wasm32-wasip1
       - uses: Swatinem/rust-cache@v2
       - name: GTK 4 and libsoup 3 (the Linux backend's libraries)
         run: sudo apt-get update && sudo apt-get install -y libgtk-4-dev libsoup-3.0-dev
@@ -94,7 +97,7 @@ jobs:
           - distro: fedora
             image: fedora:latest
             setup: |
-              dnf -y install gcc pkgconf-pkg-config git curl gtk4-devel libsoup3-devel xorg-x11-server-Xvfb xdotool dbus-daemon dbus-tools at-spi2-core gnome-keyring mesa-dri-drivers dejavu-sans-fonts google-noto-sans-fonts glibc-langpack-en glibc-langpack-de glibc-langpack-fr glibc-langpack-tr rpm
+              dnf -y install gcc pkgconf-pkg-config git curl gtk4-devel libsoup3-devel xorg-x11-server-Xvfb xdotool dbus-daemon dbus-tools at-spi2-core gnome-keyring mesa-dri-drivers mesa-libEGL libglvnd-gles dejavu-sans-fonts google-noto-sans-fonts glibc-langpack-en glibc-langpack-de glibc-langpack-fr glibc-langpack-tr rpm
           - distro: arch
             image: archlinux:latest
             setup: |
@@ -166,7 +169,7 @@ jobs:
       matrix:
         include:
           - os: windows-latest
-            bench: cargo run --release -p rustnative-cli -- bench --target windows --check --build-times
+            bench: cargo run --release -p rustnative-cli -- bench --target windows --check --build-times --unpaced-display
           - os: ubuntu-latest
             bench: taskset -c 0 cargo run --release -p rustnative-cli -- bench --target headless --check --low-end
     runs-on: ${{ matrix.os }}
@@ -174,6 +177,9 @@ jobs:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
+      - name: GTK 4 and libsoup 3 (the workspace builds the Linux backend)
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y libgtk-4-dev libsoup-3.0-dev
       - name: rustnative bench --check
         run: ${{ matrix.bench }}
       - uses: actions/upload-artifact@v4
@@ -240,6 +246,8 @@ jobs:
       - uses: dtolnay/rust-toolchain@stable
         with:
           components: clippy
+          # The serverless and web tests build these.
+          targets: wasm32-unknown-unknown, wasm32-wasip1
       - uses: Swatinem/rust-cache@v2
       - name: cargo check (native backend included)
         run: cargo check --workspace --all-targets

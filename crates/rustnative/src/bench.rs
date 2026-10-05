@@ -93,6 +93,12 @@ pub struct Budget {
     /// Whether it is measured only on request (build times).
     #[serde(default)]
     pub optional: bool,
+    /// Whether it times frames a display paces (frame intervals): a
+    /// measurement only a machine with a real display can make. A hosted CI
+    /// runner's virtual display paces nothing, so there it is reported but
+    /// not enforced (`--unpaced-display`).
+    #[serde(default)]
+    pub display_paced: bool,
 }
 
 /// A budget file.
@@ -115,6 +121,9 @@ pub struct Verdict {
     pub limit: f64,
     /// Whether it is within the limit.
     pub within: bool,
+    /// Whether it is reported but not enforced: a display-paced key on a
+    /// machine whose display paces nothing.
+    pub advisory: bool,
 }
 
 /// What a bench run found.
@@ -124,6 +133,9 @@ pub struct Report {
     pub target: String,
     /// Whether the low-end profile was used.
     pub low_end: bool,
+    /// Whether the machine was declared to have no display that paces
+    /// frames, so display-paced keys were advisory.
+    pub unpaced_display: bool,
     /// Each budgeted key's verdict.
     pub verdicts: BTreeMap<String, Verdict>,
     /// Measurements the budget file does not declare.
@@ -136,15 +148,21 @@ impl Report {
     /// Whether everything is within budget and accounted for.
     #[must_use]
     pub fn passes(&self) -> bool {
-        self.verdicts.values().all(|verdict| verdict.within)
+        self.verdicts.values().all(|verdict| verdict.within || verdict.advisory)
             && self.unbudgeted.is_empty()
             && self.unmeasured.is_empty()
     }
 }
 
-/// Compares `measured` with `budgets`.
+/// Compares `measured` with `budgets`; with `unpaced_display`, a
+/// display-paced key is reported but not enforced.
 #[must_use]
-pub fn judge(budgets: &BudgetFile, measured: &BTreeMap<String, f64>, low_end: bool) -> Report {
+pub fn judge(
+    budgets: &BudgetFile,
+    measured: &BTreeMap<String, f64>,
+    low_end: bool,
+    unpaced_display: bool,
+) -> Report {
     let mut verdicts = BTreeMap::new();
     let mut unbudgeted = Vec::new();
     for (key, value) in measured {
@@ -153,7 +171,13 @@ pub fn judge(budgets: &BudgetFile, measured: &BTreeMap<String, f64>, low_end: bo
                 let limit = budget.max * (1.0 + budget.tolerance);
                 verdicts.insert(
                     key.clone(),
-                    Verdict { measured: *value, max: budget.max, limit, within: *value <= limit },
+                    Verdict {
+                        measured: *value,
+                        max: budget.max,
+                        limit,
+                        within: *value <= limit,
+                        advisory: unpaced_display && budget.display_paced,
+                    },
                 );
             }
             None => unbudgeted.push(key.clone()),
@@ -165,7 +189,14 @@ pub fn judge(budgets: &BudgetFile, measured: &BTreeMap<String, f64>, low_end: bo
         .filter(|(key, budget)| !budget.optional && !measured.contains_key(*key))
         .map(|(key, _)| key.clone())
         .collect();
-    Report { target: budgets.target.clone(), low_end, verdicts, unbudgeted, unmeasured }
+    Report {
+        target: budgets.target.clone(),
+        low_end,
+        unpaced_display,
+        verdicts,
+        unbudgeted,
+        unmeasured,
+    }
 }
 
 /// The repository root: the nearest ancestor holding `budgets/`.
@@ -304,14 +335,23 @@ const fn host_platform() -> &'static str {
     if cfg!(target_os = "linux") { "linux" } else { "windows" }
 }
 
+/// How a run measures and judges.
+#[derive(Debug, Clone, Copy, Default)]
+#[allow(clippy::struct_excessive_bools, reason = "independent command-line switches")]
+pub struct Options {
+    /// Fail on a measurement over budget or unaccounted for.
+    pub check: bool,
+    /// Pin the scenarios to one core: the low-end reference profile.
+    pub low_end: bool,
+    /// No display paces frames here: display-paced keys are advisory.
+    pub unpaced_display: bool,
+    /// Also time builds, the development loop, and the first run.
+    pub build: bool,
+}
+
 /// Runs the harness.
-pub fn run(
-    here: &Path,
-    target: BenchTarget,
-    check: bool,
-    low_end: bool,
-    build: bool,
-) -> Result<()> {
+pub fn run(here: &Path, target: BenchTarget, options: Options) -> Result<()> {
+    let Options { check, low_end, unpaced_display, build } = options;
     let root = root(here)?;
     let budget_path = root.join("budgets").join(format!("{}.toml", target.name()));
     let text = std::fs::read_to_string(&budget_path)
@@ -321,7 +361,7 @@ pub fn run(
 
     if target == BenchTarget::Serverless {
         let measured = serverless(&root)?;
-        return finish(&root, &budgets, &budget_path, &measured, low_end, check);
+        return finish(&root, &budgets, &budget_path, &measured, (low_end, unpaced_display), check);
     }
 
     println!("bench: building the scenarios (release)");
@@ -374,7 +414,7 @@ pub fn run(
         measured.extend(build_times(&root)?);
     }
 
-    finish(&root, &budgets, &budget_path, &measured, low_end, check)
+    finish(&root, &budgets, &budget_path, &measured, (low_end, unpaced_display), check)
 }
 
 /// Judges `measured`, writes the report, and prints the verdicts.
@@ -383,21 +423,28 @@ fn finish(
     budgets: &BudgetFile,
     budget_path: &Path,
     measured: &BTreeMap<String, f64>,
-    low_end: bool,
+    (low_end, unpaced_display): (bool, bool),
     check: bool,
 ) -> Result<()> {
-    let report = judge(budgets, measured, low_end);
+    let report = judge(budgets, measured, low_end, unpaced_display);
     let report_path = root.join("target/budget-report.json");
     std::fs::write(&report_path, serde_json::to_vec_pretty(&report).unwrap_or_default())
         .map_err(io(format!("write {}", report_path.display())))?;
     for (key, verdict) in &report.verdicts {
         println!(
             "{} {key:<28} {:>10.3}  (budget {}, limit {:.3})",
-            if verdict.within { "ok  " } else { "OVER" },
+            match (verdict.within, verdict.advisory) {
+                (true, _) => "ok  ",
+                (false, true) => "INFO",
+                (false, false) => "OVER",
+            },
             verdict.measured,
             verdict.max,
             verdict.limit
         );
+    }
+    if report.unpaced_display {
+        println!("bench: --unpaced-display: display-paced keys are reported, not enforced (INFO)");
     }
     for key in &report.unbudgeted {
         println!("NEW  {key:<28} {:>10.3}  (not in {})", measured[key], budget_path.display());
@@ -595,11 +642,11 @@ mod tests {
                 ("inp_ms".to_owned(), 30.0),
             ])
         };
-        assert!(judge(&budgets, &measured(122.7, 0.0), false).passes());
+        assert!(judge(&budgets, &measured(122.7, 0.0), false, false).passes());
         // A module inflated past the route's budget fails the build.
-        assert!(!judge(&budgets, &measured(200.0, 0.0), false).passes());
+        assert!(!judge(&budgets, &measured(200.0, 0.0), false, false).passes());
         // So does a route that grows because others were added.
-        assert!(!judge(&budgets, &measured(122.7, 0.5), false).passes());
+        assert!(!judge(&budgets, &measured(122.7, 0.5), false, false).passes());
     }
 
     #[test]
@@ -612,8 +659,8 @@ mod tests {
             measured.insert("edge_fuel_sign_in_mfuel".to_owned(), fuel);
             measured
         };
-        assert!(judge(&budgets, &measured(11.7), false).passes());
-        assert!(!judge(&budgets, &measured(20.0), false).passes());
+        assert!(judge(&budgets, &measured(11.7), false, false).passes());
+        assert!(!judge(&budgets, &measured(20.0), false, false).passes());
     }
 
     fn budgets() -> BudgetFile {
@@ -637,10 +684,38 @@ mod tests {
                 ("layout_us_1k_nodes".to_owned(), 400.0),
             ])
         };
-        assert!(judge(&budgets(), &measured(119.0), false).passes());
-        let over = judge(&budgets(), &measured(121.0), false);
+        assert!(judge(&budgets(), &measured(119.0), false, false).passes());
+        let over = judge(&budgets(), &measured(121.0), false, false);
         assert!(!over.passes());
         assert!(!over.verdicts["cold_start_ms"].within);
+    }
+
+    #[test]
+    fn a_display_paced_key_is_advisory_only_without_a_pacing_display() {
+        let budgets: BudgetFile = toml::from_str(
+            r#"
+            target = "test"
+            [budget]
+            frame_time_p50_ms = { max = 17.5, display_paced = true }
+            cold_start_ms = { max = 100 }
+            "#,
+        )
+        .unwrap();
+        let measured = |frame: f64, cold: f64| {
+            BTreeMap::from([
+                ("frame_time_p50_ms".to_owned(), frame),
+                ("cold_start_ms".to_owned(), cold),
+            ])
+        };
+        // On a machine with a real display, a slow frame fails.
+        assert!(!judge(&budgets, &measured(65.0, 50.0), false, false).passes());
+        // Without one it is reported, not enforced...
+        let unpaced = judge(&budgets, &measured(65.0, 50.0), false, true);
+        assert!(unpaced.passes());
+        assert!(unpaced.verdicts["frame_time_p50_ms"].advisory);
+        assert!(!unpaced.verdicts["frame_time_p50_ms"].within);
+        // ...and every other key still is.
+        assert!(!judge(&budgets, &measured(65.0, 500.0), false, true).passes());
     }
 
     #[test]
@@ -650,9 +725,9 @@ mod tests {
             ("layout_us_1k_nodes".to_owned(), 1.0),
             ("new_metric".to_owned(), 1.0),
         ]);
-        assert_eq!(judge(&budgets(), &measured, false).unbudgeted, ["new_metric"]);
+        assert_eq!(judge(&budgets(), &measured, false, false).unbudgeted, ["new_metric"]);
         let missing = BTreeMap::from([("cold_start_ms".to_owned(), 50.0)]);
         // The optional build time is not required; the layout key is.
-        assert_eq!(judge(&budgets(), &missing, false).unmeasured, ["layout_us_1k_nodes"]);
+        assert_eq!(judge(&budgets(), &missing, false, false).unmeasured, ["layout_us_1k_nodes"]);
     }
 }

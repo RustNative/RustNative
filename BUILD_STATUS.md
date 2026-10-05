@@ -33,13 +33,24 @@ call past the pretty-printer's line width.
 2026-10-01, while the local gates still ran 1.98. Under `-D warnings`, 1.99
 rejected `AtomicU64::fetch_update` (deprecated for `try_update`, which the 1.85
 floor lacks, so both uses are now `compare_exchange_weak` loops),
-`#[must_use]` on functions whose return type is already must-use
-(`clippy::double_must_use`: the four `sleep`s and `sqs_batch`), and
+a bare `#[must_use]` on functions whose return type is already must-use
+(`clippy::double_must_use`: the four `sleep`s and `sqs_batch` now give a
+reason, which 1.98's `must_use_candidate` also accepts), and
 `assert!(x.is_empty())` in tests (`clippy::assert_is_empty`, now
 `assert_eq!(x, [])` so a failure shows the value). Separately,
 `tools/linux-session.sh` was committed without its execute bit, so every
-Linux backend job in CI stopped at "Permission denied". Verified: clippy 1.99
-clean on Windows and Ubuntu, the MSRV check, and the touched crates' tests.
+Linux backend job in CI stopped at "Permission denied". The rest of the red
+was CI setup: the test jobs lacked the `wasm32-wasip1` and
+`wasm32-unknown-unknown` targets the serverless tests build; the Ubuntu
+budgets leg lacked GTK; the Fedora container lacked `libGLESv2`
+(`libglvnd-gles`). And the Windows budgets leg has failed on every run since
+it was added: a hosted runner's virtual display paces nothing, so it measured
+frame intervals of 65 ms to 1 s against a 17.5 ms budget. Budget keys now
+carry `display_paced`, and `rustnative bench --unpaced-display` (which CI's
+Windows leg passes) reports them as `INFO` instead of enforcing them; every
+other key is still enforced, and the reference machine enforces them all
+(`budgets/SCHEMA.md`). Verified: clippy 1.99 and 1.98 clean, the MSRV check,
+and the touched crates' tests.
 
 **Plan: iPadOS as a target of its own (2026-10-04).** `PLAN.md` gains
 Milestone 70, the iPadOS backend, beside Milestone 36 in section 8, specified

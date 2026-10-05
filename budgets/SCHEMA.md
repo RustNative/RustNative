@@ -26,6 +26,12 @@ Each key has these fields:
 - `max`: the budget.
 - `tolerance`: the declared noise of that measurement, as a fraction of `max`.
 - `optional`: `true` marks a key that is measured only on request.
+- `display_paced`: `true` marks a key that times frames a display paces (the
+  `frame_time_*` keys). Only a machine with a real display can measure it: a
+  hosted CI runner's virtual display paces nothing (its Windows runners report
+  frame intervals of 65 ms to 1 s). On such a machine, `--unpaced-display`
+  reports these keys as `INFO` instead of enforcing them, while every other key
+  is still enforced. The reference machine enforces them.
 
 A measurement fails when it is above `max × (1 + tolerance)`.
 

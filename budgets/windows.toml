@@ -20,9 +20,9 @@ resident_memory_mb = { max = 24, tolerance = 0.1 }        # 17.4–18.3
 artifact_size_kb = { max = 3500, tolerance = 0.05 }       # 3060
 
 # Frame times of a running size transition.
-frame_time_p50_ms = { max = 17.5, tolerance = 0.1 }       # 16.7
-frame_time_p99_ms = { max = 34, tolerance = 0.5 }         # 19–35
-frame_time_max_ms = { max = 60, tolerance = 1.0 }         # 32–104
+frame_time_p50_ms = { max = 17.5, tolerance = 0.1, display_paced = true }       # 16.7
+frame_time_p99_ms = { max = 34, tolerance = 0.5, display_paced = true }         # 19–35
+frame_time_max_ms = { max = 60, tolerance = 1.0, display_paced = true }         # 32–104
 
 # A click posted to the real button window, to the change realized
 # (median of 3 runs of 31 clicks).

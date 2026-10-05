@@ -24,9 +24,9 @@ resident_memory_mb = { max = 220, tolerance = 0.1 }       # 204–207
 artifact_size_kb = { max = 6500, tolerance = 0.05 }       # 5960–5990
 
 # Frame times of a running size transition (GTK's frame clock).
-frame_time_p50_ms = { max = 17.5, tolerance = 0.1 }       # 16.5
-frame_time_p99_ms = { max = 34, tolerance = 0.5 }         # 20
-frame_time_max_ms = { max = 60, tolerance = 1.0 }         # 20–38
+frame_time_p50_ms = { max = 17.5, tolerance = 0.1, display_paced = true }       # 16.5
+frame_time_p99_ms = { max = 34, tolerance = 0.5, display_paced = true }         # 20
+frame_time_max_ms = { max = 60, tolerance = 1.0, display_paced = true }         # 20–38
 
 # A click delivered to the real button, to the change realized (median of
 # 3 runs of 31 clicks).

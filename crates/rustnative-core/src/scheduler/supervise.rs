@@ -398,6 +398,7 @@ impl Background {
 
     /// A delay on the scheduler's clock (virtual under
     /// [`crate::ManualExecutor`]).
+    #[must_use = "a future does nothing unless it is awaited"]
     pub fn sleep(&self, duration: Duration) -> super::SleepFuture {
         self.scheduler.sleep(duration)
     }

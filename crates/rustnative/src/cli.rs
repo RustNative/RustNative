@@ -183,6 +183,10 @@ enum Command {
         /// Pin the scenarios to one core: the low-end reference profile.
         #[arg(long)]
         low_end: bool,
+        /// This machine has no display that paces frames (a hosted CI
+        /// runner): report the display-paced keys, but do not enforce them.
+        #[arg(long)]
+        unpaced_display: bool,
         /// Also time a clean and an incremental build.
         #[arg(long)]
         build_times: bool,
@@ -584,8 +588,10 @@ impl Cli {
                     Err(Error::ToolFailed { tool: "cargo", code: status.code() })
                 }
             }
-            Command::Bench { target, check, low_end, build_times } => {
-                crate::bench::run(&here, target, check, low_end, build_times)
+            Command::Bench { target, check, low_end, unpaced_display, build_times } => {
+                let options =
+                    crate::bench::Options { check, low_end, unpaced_display, build: build_times };
+                crate::bench::run(&here, target, options)
             }
             Command::Expand { file, classes, styles } => {
                 let text = match (file, classes, styles) {

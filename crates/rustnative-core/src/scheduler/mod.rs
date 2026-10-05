@@ -555,6 +555,7 @@ impl Scheduler {
     /// delay. A `Scheduler` built with [`Self::with_executor`] using
     /// [`ManualExecutor`] instead resolves this future only when the test
     /// explicitly advances that executor's virtual clock.
+    #[must_use = "a future does nothing unless it is awaited"]
     pub fn sleep(&self, duration: Duration) -> SleepFuture {
         self.inner.executor.sleep(duration)
     }
