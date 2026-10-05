@@ -49,7 +49,21 @@ frame intervals of 65 ms to 1 s against a 17.5 ms budget. Budget keys now
 carry `display_paced`, and `rustnative bench --unpaced-display` (which CI's
 Windows leg passes) reports them as `INFO` instead of enforcing them; every
 other key is still enforced, and the reference machine enforces them all
-(`budgets/SCHEMA.md`). Verified: clippy 1.99 and 1.98 clean, the MSRV check,
+(`budgets/SCHEMA.md`). Two more surfaced once those were fixed. A project
+made by `rustnative new` resolves dependencies for Rust 1.85, which picks
+`generic-array` 0.14.9; that release deprecates `GenericArray::from_slice`,
+so `rustnative-server` failed to build there under `-D warnings` while the
+workspace, whose lock held 0.14.7, did not. The nonces are now built with
+`Nonce::from([u8; 12])`, and the lock follows the same resolution
+(`crypto-common` 0.1.6, `generic-array` 0.14.9) so the gates build what a new
+project builds. And `artifact_size_kb` had been over its budget since at
+least 2026-09-28 (3686–3693 KiB against a 3675 limit; 3690 locally): the
+budget was set at 3060 when Milestone 42 measured the bench harness, and later
+milestones linked their scenarios' machinery into that harness (the markup
+compiler and proc-macro2, the headless backend, filter-demo). It is
+re-baselined at 4000 with the breakdown recorded in `budgets/windows.toml`.
+**Owed:** measure the artifact size on a shipping-shaped application, not the
+harness. Verified: clippy 1.99 and 1.98 clean, the MSRV check, `cargo deny`,
 and the touched crates' tests.
 
 **Plan: iPadOS as a target of its own (2026-10-04).** `PLAN.md` gains

@@ -99,11 +99,8 @@ impl Sessions {
     /// expired.
     fn open(&self, sealed: &str) -> Option<Data> {
         let bytes = base64::engine::general_purpose::URL_SAFE_NO_PAD.decode(sealed).ok()?;
-        if bytes.len() < 12 {
-            return None;
-        }
-        let (nonce, ciphertext) = bytes.split_at(12);
-        let plain = self.cipher.decrypt(Nonce::from_slice(nonce), ciphertext).ok()?;
+        let (nonce, ciphertext) = bytes.split_first_chunk::<12>()?;
+        let plain = self.cipher.decrypt(&Nonce::from(*nonce), ciphertext).ok()?;
         let data: Data = serde_json::from_slice(&plain).ok()?;
         (data.expires > Self::now()).then_some(data)
     }
@@ -113,7 +110,7 @@ impl Sessions {
         getrandom::getrandom(&mut nonce).ok()?;
         let plain = serde_json::to_vec(data).ok()?;
         let mut sealed = nonce.to_vec();
-        sealed.extend(self.cipher.encrypt(Nonce::from_slice(&nonce), plain.as_slice()).ok()?);
+        sealed.extend(self.cipher.encrypt(&Nonce::from(nonce), plain.as_slice()).ok()?);
         Some(base64::engine::general_purpose::URL_SAFE_NO_PAD.encode(sealed))
     }
 

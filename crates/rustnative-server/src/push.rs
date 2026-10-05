@@ -100,9 +100,8 @@ pub fn encrypt_with(
     let mut plain = payload.to_vec();
     plain.push(0x02); // The last (and only) record's delimiter.
     let cipher = Aes128Gcm::new(&key.into());
-    let sealed = cipher
-        .encrypt(Nonce::from_slice(&nonce), plain.as_slice())
-        .map_err(|_| error("encryption"))?;
+    let sealed =
+        cipher.encrypt(&Nonce::from(nonce), plain.as_slice()).map_err(|_| error("encryption"))?;
 
     let mut body = salt.to_vec();
     body.extend_from_slice(&4096u32.to_be_bytes());

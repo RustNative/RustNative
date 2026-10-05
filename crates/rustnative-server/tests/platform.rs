@@ -206,7 +206,7 @@ fn web_push_encrypts_for_the_subscriber_and_signs_with_vapid() {
     prk.expand(b"Content-Encoding: aes128gcm\0", &mut key).unwrap();
     prk.expand(b"Content-Encoding: nonce\0", &mut nonce).unwrap();
     let plain = aes_gcm::Aes128Gcm::new(&key.into())
-        .decrypt(aes_gcm::Nonce::from_slice(&nonce), &body[86..])
+        .decrypt(&aes_gcm::Nonce::from(nonce), &body[86..])
         .unwrap();
     assert_eq!(plain, b"hello\x02");
 

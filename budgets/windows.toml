@@ -17,7 +17,13 @@ first_content_ms = { max = 400, tolerance = 0.75 }        # 300–400
 interactive_ms = { max = 450, tolerance = 0.75 }          # 340–430
 cold_start_ms = { max = 450, tolerance = 0.75 }           # 340–430
 resident_memory_mb = { max = 24, tolerance = 0.1 }        # 17.4–18.3
-artifact_size_kb = { max = 3500, tolerance = 0.05 }       # 3060
+# The bench harness's own size. 3060 when first budgeted (Milestone 42);
+# 3690 on 2026-10-06 (locally on Rust 1.98; 3693 on CI's runner on 1.99):
+# later milestones linked their scenarios' machinery into bench-app itself
+# (the markup compiler and proc-macro2, ~113 KiB; the headless backend,
+# ~140 KiB; filter-demo, ~41 KiB) besides the core's own growth. Owed: measure
+# a shipping-shaped application instead of the harness.
+artifact_size_kb = { max = 4000, tolerance = 0.05 }       # 3690
 
 # Frame times of a running size transition.
 frame_time_p50_ms = { max = 17.5, tolerance = 0.1, display_paced = true }       # 16.7
