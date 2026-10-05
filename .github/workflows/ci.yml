@@ -80,6 +80,41 @@ jobs:
       - name: cargo test -p rustnative-linux -p adoption-gtk (Xvfb)
         run: tools/linux-session.sh xvfb cargo test -p rustnative-linux -p adoption-gtk
 
+  linux-backend-distros:
+    # The same tests on the other two package families: Fedora (RPM) and
+    # Arch Linux (pacman), each in its own container with its own GTK. The
+    # packaging tests run here too, so the real `rpm` and `pacman` read the
+    # packages `rustnative package linux` writes.
+    name: Linux backend (${{ matrix.distro }}, GTK 4 on Xvfb)
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - distro: fedora
+            image: fedora:latest
+            setup: |
+              dnf -y install gcc pkgconf-pkg-config git curl gtk4-devel libsoup3-devel xorg-x11-server-Xvfb xdotool dbus-daemon dbus-tools at-spi2-core gnome-keyring mesa-dri-drivers dejavu-sans-fonts google-noto-sans-fonts glibc-langpack-en glibc-langpack-de glibc-langpack-fr glibc-langpack-tr rpm
+          - distro: arch
+            image: archlinux:latest
+            setup: |
+              pacman -Syu --noconfirm --needed base-devel git curl gtk4 libsoup3 xorg-server-xvfb xdotool dbus at-spi2-core gnome-keyring mesa ttf-dejavu noto-fonts
+              sed -i 's/^#\(en_US\|en_NZ\|de_DE\|fr_FR\|tr_TR\)\.UTF-8/\1.UTF-8/' /etc/locale.gen
+              locale-gen
+    container: ${{ matrix.image }}
+    steps:
+      - name: GTK, libsoup, and the session's services
+        run: ${{ matrix.setup }}
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: ${{ matrix.distro }}
+      - name: cargo test -p rustnative-linux -p adoption-gtk (Xvfb)
+        run: tools/linux-session.sh xvfb cargo test -p rustnative-linux -p adoption-gtk
+      - name: the Linux packages, read back by the distribution's own tools
+        run: cargo test -p rustnative-cli --bin rustnative -- package::linux toolchain::linux_distro doctor
+
   msrv:
     name: MSRV (1.85)
     runs-on: ubuntu-latest

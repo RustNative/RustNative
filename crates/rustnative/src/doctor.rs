@@ -227,11 +227,15 @@ pub fn install(dry_run: bool) -> crate::error::Result<()> {
 
 /// Whether this machine builds the Linux backend: a Linux host with GTK
 /// 4.14 or newer and libsoup 3's development files, as `pkg-config` finds
-/// them, and whether it can make an AppImage.
+/// them, and which packages it can make. What is missing is named in the
+/// distribution's own package manager (`toolchain::linux_distro`).
 fn linux_readiness() -> (bool, String) {
+    use crate::toolchain::linux_distro::{Distribution, Library};
+
     if !cfg!(target_os = "linux") {
         return (false, "build on Linux (from Windows: inside WSL)".to_owned());
     }
+    let distribution = Distribution::detect().unwrap_or_else(|| Distribution::parse(""));
     let version = |library: &str| {
         std::process::Command::new("pkg-config")
             .args(["--modversion", library])
@@ -241,7 +245,7 @@ fn linux_readiness() -> (bool, String) {
             .map(|output| String::from_utf8_lossy(&output.stdout).trim().to_owned())
     };
     let Some(gtk) = version("gtk4") else {
-        return (false, "GTK 4 development files missing (apt install libgtk-4-dev)".to_owned());
+        return (false, format!("GTK 4 development files missing ({})", distribution.setup_hint()));
     };
     let recent =
         gtk.split('.').take(2).map(|part| part.parse::<u32>().unwrap_or(0)).collect::<Vec<_>>()
@@ -250,17 +254,24 @@ fn linux_readiness() -> (bool, String) {
         return (false, format!("GTK {gtk} is older than 4.14"));
     }
     if version("libsoup-3.0").is_none() {
-        return (
-            false,
-            "libsoup 3 development files missing (apt install libsoup-3.0-dev)".to_owned(),
-        );
+        let hint = distribution.install_hint(Library::Soup);
+        return (false, format!("libsoup 3 development files missing ({hint})"));
     }
+    let native = distribution
+        .family
+        .map_or_else(String::new, |family| format!("{} native; ", family.native_format()));
     let appimage = if crate::package::linux::which("appimagetool").is_some() {
         "AppImage tool present"
     } else {
-        "deb and tar (appimagetool missing for AppImages)"
+        "appimagetool missing for AppImages"
     };
-    (true, format!("ready — GTK {gtk}; packages: {appimage}"))
+    (
+        true,
+        format!(
+            "ready — GTK {gtk} on {}; packages: {native}deb, rpm, pacman, tar; {appimage}",
+            distribution.name
+        ),
+    )
 }
 
 #[cfg(test)]

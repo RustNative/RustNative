@@ -33,8 +33,12 @@ pub enum Format {
     Zip,
     /// An installable, optionally signed MSIX package.
     Msix,
-    /// A Debian package (Linux).
+    /// A Debian package (Linux: Debian, Ubuntu, Kali, Mint).
     Deb,
+    /// An RPM package (Linux: Fedora, RHEL, openSUSE).
+    Rpm,
+    /// A pacman package (Linux: Arch, Manjaro, EndeavourOS).
+    Pacman,
     /// A tarball of the installed files (Linux).
     Tar,
     /// A self-contained AppImage (Linux; needs `appimagetool`).
@@ -60,11 +64,14 @@ impl Format {
         matches!(self, Self::Zip | Self::Msix | Self::All)
     }
 
-    /// Whether this format is one of Linux's (`deb`, `tar`, `appimage`, or
-    /// `all`).
+    /// Whether this format is one of Linux's (`deb`, `rpm`, `pacman`,
+    /// `tar`, `appimage`, or `all`).
     #[must_use]
     pub const fn is_linux(self) -> bool {
-        matches!(self, Self::Deb | Self::Tar | Self::AppImage | Self::All)
+        matches!(
+            self,
+            Self::Deb | Self::Rpm | Self::Pacman | Self::Tar | Self::AppImage | Self::All
+        )
     }
 }
 
@@ -94,6 +101,12 @@ pub fn package_linux(root: &Path, config: &Config, format: Format) -> Result<Vec
     let mut produced = Vec::new();
     if matches!(format, Format::Deb | Format::All) {
         produced.push(linux::build_deb(&output, &executable, icon, config)?);
+    }
+    if matches!(format, Format::Rpm | Format::All) {
+        produced.push(linux::build_rpm(&output, &executable, icon, config)?);
+    }
+    if matches!(format, Format::Pacman | Format::All) {
+        produced.push(linux::build_pacman(&output, &executable, icon, config)?);
     }
     if matches!(format, Format::Tar | Format::All) {
         produced.push(linux::build_tar(&output, &executable, icon, config)?);
@@ -239,6 +252,10 @@ mod tests {
         assert!(Format::Zip.wants_zip() && !Format::Zip.wants_msix());
         assert!(Format::Msix.wants_msix() && !Format::Msix.wants_zip());
         assert!(Format::All.wants_zip() && Format::All.wants_msix());
+        for linux in [Format::Deb, Format::Rpm, Format::Pacman, Format::Tar, Format::AppImage] {
+            assert!(linux.is_linux() && !linux.is_windows(), "{linux:?}");
+        }
+        assert!(Format::All.is_linux() && Format::All.is_windows());
     }
 
     #[test]

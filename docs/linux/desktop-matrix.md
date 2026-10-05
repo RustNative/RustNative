@@ -39,8 +39,15 @@ The cells are what each desktop offers as shipped by its usual distribution.
 | LXQt | X11 or Wayland | the window manager; GTK draws on Wayland | yes | no | `xdg-desktop-portal-lxqt` | — |
 | Budgie | X11 | the window manager | yes | no | `xdg-desktop-portal-gtk` | — |
 | Sway, Hyprland | Wayland | GTK draws | with a bar that hosts one (waybar) | no | `xdg-desktop-portal-wlr` / `-hyprland` | — |
-| WSLg | Wayland, with Xwayland | GTK draws (Wayland); Weston's X window manager (X11) | none | no | none: GTK's own dialogs, GIO's handlers | Wayland and X11 sessions: every test, on Ubuntu 24.04 (GTK 4.14) and Kali Rolling (GTK 4.22) |
-| No desktop (Xvfb, CI) | X11 | none | none | no | none | every test (with XTest input injection), on Ubuntu 24.04 and Kali Rolling |
+| WSLg | Wayland, with Xwayland | GTK draws (Wayland); Weston's X window manager (X11) | none | no | none: GTK's own dialogs, GIO's handlers | Wayland and X11 sessions: every test, on Ubuntu 24.04 (GTK 4.14), Kali Rolling (GTK 4.22), Fedora 44 (GTK 4.22), and Arch Linux (GTK 4.22) |
+| No desktop (Xvfb, CI) | X11 | none | none | no | none | every test (with XTest input injection), on Ubuntu 24.04, Kali Rolling, Fedora 44, and Arch Linux; CI on Ubuntu, Fedora, and Arch |
+
+The distribution changes none of these answers: they come from the session,
+and the four distributions above — three package families, GTK 4.14 to 4.22,
+the AT-SPI2 bus run by dbus-daemon (Debian, Arch) or dbus-broker (Fedora) — gave the same answers to the same
+tests. What does change per distribution is the package names and format,
+which `rustnative doctor` and `rustnative package linux` answer from
+`/etc/os-release` (`docs/linux.md`).
 
 A desktop not in the table is still answered: every row's question is asked
 of the session itself. `DesktopEnvironment::Other` carries the name the

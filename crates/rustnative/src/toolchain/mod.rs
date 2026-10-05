@@ -4,7 +4,7 @@
 //! |---|---|---|
 //! | Windows | Cargo + MSVC build tools + Windows SDK | driven here |
 //! | macOS, iOS | Xcode and the Apple SDKs | Milestones 33, 36 |
-//! | Linux | the system compiler and the chosen backend | Milestone 34 |
+//! | Linux | the system compiler, GTK 4, and libsoup 3, named per distribution | Milestone 34 |
 //! | Android | Gradle, the Android SDK and NDK | Milestone 35 |
 //! | Embedded | per-target toolchains through Cargo | Milestone 37 |
 //!
@@ -12,6 +12,7 @@
 //! honestly when it is not there.
 
 pub mod cargo;
+pub mod linux_distro;
 pub mod windows_sdk;
 
 /// The minimum Rust version this workspace supports, which `rustnative doctor`

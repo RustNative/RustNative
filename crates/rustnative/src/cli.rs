@@ -643,7 +643,7 @@ impl Cli {
             Command::Package { platform: Platform::Linux, format, .. } => {
                 if !format.is_linux() {
                     return Err(Error::Usage(
-                        "Linux packages are deb, tar, appimage, or all".to_owned(),
+                        "Linux packages are deb, rpm, pacman, tar, appimage, or all".to_owned(),
                     ));
                 }
                 linux_host(Platform::Linux)?;

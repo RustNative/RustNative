@@ -9,14 +9,27 @@ tree (what Orca reads), and the desktop's services are the freedesktop ones
 | | |
 |---|---|
 | Crate | `rustnative-linux` (`LinuxPlatform`) |
-| Toolkit | GTK 4.14 or newer (Ubuntu 24.04 LTS, Debian 13, Fedora 40, Kali) |
+| Toolkit | GTK 4.14 or newer (Ubuntu 24.04 LTS, Debian 13, Kali, Fedora 40+, Arch Linux) |
+| Distributions | the Debian, Fedora, and Arch families tested (Ubuntu, Kali, Fedora, Arch); openSUSE expected |
 | Display servers | Wayland and X11 (Xwayland included), answered per session |
 | Desktops | any; GNOME, Plasma, xfce, and WSLg tested |
 
 ## Start
 
+Install a C compiler, `pkg-config`, and GTK 4's and libsoup 3's
+development files with the distribution's package manager:
+
 ```sh
-sudo apt install build-essential libgtk-4-dev libsoup-3.0-dev
+sudo apt install build-essential pkg-config libgtk-4-dev libsoup-3.0-dev   # Debian, Ubuntu, Kali, Mint
+sudo dnf install gcc pkgconf-pkg-config gtk4-devel libsoup3-devel          # Fedora, RHEL, CentOS Stream
+sudo pacman -S --needed base-devel gtk4 libsoup3                           # Arch, Manjaro, EndeavourOS
+sudo zypper install gcc pkgconf gtk4-devel libsoup-devel                   # openSUSE (untested)
+```
+
+`rustnative doctor` reads `/etc/os-release` and names whatever is missing
+in the distribution's own terms. Then:
+
+```sh
 rustnative new hello
 cd hello
 rustnative run linux
@@ -173,9 +186,19 @@ moves nothing re-measures nothing.
 ## Packaging
 
 ```sh
-rustnative package linux                 # .deb, tarball, and an AppImage if appimagetool is installed
-rustnative package linux --format deb
+rustnative package linux                  # every format below; the AppImage if appimagetool is installed
+rustnative package linux --format deb     # Debian, Ubuntu, Kali, Mint:     sudo apt install ./notes_1.0.0_amd64.deb
+rustnative package linux --format rpm     # Fedora, RHEL, openSUSE:         sudo dnf install ./notes-1.0.0-1.x86_64.rpm
+rustnative package linux --format pacman  # Arch, Manjaro, EndeavourOS:     sudo pacman -U notes-1.0.0-1-x86_64.pkg.tar
+rustnative package linux --format tar     # anywhere: unpack and run
 ```
+
+Each distribution's package names its dependencies in that distribution's
+terms (`libgtk-4-1 (>= 4.14)`, `gtk4 >= 4.14`, `gtk4>=4.14`), so its own
+package manager installs them. All are written by `rustnative` itself —
+no `dpkg-deb`, `rpmbuild`, or `makepkg` needed — so any one Linux host
+builds every distribution's package. The packages are unsigned: sign an `.rpm` with `rpmsign` and a
+pacman package with `gpg --detach-sign`, as a repository requires.
 
 Every package carries the desktop entry (`Exec=<name> %u`, the URL schemes
 it handles, `StartupWMClass=<app id>`), the AppStream metadata software
@@ -198,7 +221,7 @@ The `adoption-gtk` example does all three.
 ## Testing
 
 The integration tests run against real GTK on a private D-Bus session
-(CI runs them on Xvfb in the `linux-backend` job):
+(CI runs them on Xvfb on Ubuntu, Fedora, and Arch Linux):
 
 ```sh
 tools/linux-session.sh wayland cargo test -p rustnative-linux
@@ -208,3 +231,19 @@ tools/linux-session.sh xvfb    cargo test -p rustnative-linux   # XTest input in
 
 The shared guarantee suites (`rustnative-conformance`) run over the GTK
 harness as they do over the Windows one.
+
+Besides GTK and libsoup, the tests need the session's pieces: an X server
+for Xvfb runs, `xdotool`, the D-Bus daemon and `dbus-run-session`, the
+AT-SPI2 bus, `gnome-keyring`, fonts, and the `en_NZ`, `de_DE`, `fr_FR`,
+and `tr_TR` UTF-8 locales the locale tests read back:
+
+| Family | Packages | Locales |
+|---|---|---|
+| Debian | `xvfb xdotool dbus dbus-x11 at-spi2-core gnome-keyring locales` | `sudo locale-gen en_NZ.UTF-8 de_DE.UTF-8 fr_FR.UTF-8 tr_TR.UTF-8` |
+| Fedora | `xorg-x11-server-Xvfb xdotool dbus-daemon dbus-tools at-spi2-core gnome-keyring mesa-dri-drivers dejavu-sans-fonts` | `glibc-langpack-{en,de,fr,tr}` |
+| Arch | `xorg-server-xvfb xdotool dbus at-spi2-core gnome-keyring mesa ttf-dejavu` | uncomment them in `/etc/locale.gen`, then `sudo locale-gen` |
+
+Under WSL, GTK 4.16 and newer (Fedora, Arch, Kali) first try a Vulkan
+renderer and print `Vulkan: … Failed to enumerate drm devices` once per
+process before falling back to OpenGL. It is harmless; `GSK_RENDERER=ngl`
+skips the attempt.

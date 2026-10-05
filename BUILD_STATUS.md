@@ -52,6 +52,61 @@ guarantees, adoption-ladder, and surfaces documents.
 
 <!-- milestone entries, newest first -->
 
+### Milestone 34 — the Linux backend on Fedora and Arch Linux — complete
+
+**Built.** Plan: `docs/superpowers/plans/2026-10-04-linux-fedora-arch.md`.
+The backend was verified on the Debian family only (Ubuntu, Kali); it is now
+verified on all three big package families, and its tooling speaks each
+one's language:
+
+- **`rustnative doctor`** reads `/etc/os-release` (`toolchain::linux_distro`)
+  and names what is missing in the distribution's own package manager — apt,
+  dnf, pacman, or zypper — recognising derivatives by `ID_LIKE` (Mint, Rocky,
+  Manjaro); its Linux row names the distribution and its native package.
+- **`rustnative package linux`** gains `--format rpm` (Fedora, RHEL,
+  openSUSE) and `--format pacman` (Arch, Manjaro, EndeavourOS), written in
+  Rust like the `.deb`: an RPM v4 package (lead, signature header with the
+  header's SHA-256 and the sizes, main header with every file's digest,
+  owner, and mode and the payload's digest, both with immutable regions, and
+  a gzip'd `newc` cpio) and a pacman `.pkg.tar` (`.PKGINFO`, a gzip'd
+  `.MTREE` with every file's SHA-256). Gzip streams use stored blocks, so
+  both are reproducible to the byte; dependencies are named in each family's
+  terms (`gtk4 >= 4.14`, `gtk4>=4.14`). `all` produces every format.
+- **Found and fixed on the way:** the AppStream metadata every package
+  carries failed `appstreamcli validate` (no `<description>`, no release
+  date) — the check GNOME Software and Discover apply before listing an
+  application. It now has both (the date from `SOURCE_DATE_EPOCH`, so still
+  reproducible).
+- **CI:** a `linux-backend-distros` job runs the backend's tests on Xvfb in
+  `fedora:latest` and `archlinux:latest` containers, plus the packaging tests
+  that hand the packages to the real `rpm` and `pacman`.
+- `docs/linux.md` gives the three families' setup, test packages, and
+  packaging; the desktop matrix records the new verified sessions.
+
+**Verified.** The whole Linux gate (fmt, clippy, the portable tests, the
+backend's tests under Wayland, Xwayland, and Xvfb, doc, MSRV, deny) on
+**Fedora 44** (GTK 4.22.5, libsoup 3.6, dbus-broker) and **Arch Linux** (GTK
+4.22.5, run as root, the image's only user), and again on Ubuntu 24.04 and
+the Windows gate. Run with `--nocapture`, no backend test skipped on either
+except the XTest input test outside the private X server, by design. The
+real tools read the packages: `rpm -qp`/`-qlp`/`--checksig` ("digests OK"),
+`pacman -Qip`/`-Qlp`, `dpkg-deb -I`/`-c`, `gzip -d`, `desktop-file-validate`,
+`appstreamcli validate`. End to end on each new distribution: `rustnative new`
+→ `rustnative package linux` → `dnf install ./hello-0.1.0-1.x86_64.rpm` on
+Fedora and `pacman -U hello-0.1.0-1-x86_64.pkg.tar` on Arch (where `pacman
+-Qkk` checked every installed file against the package's `.MTREE`: 0
+altered) → the installed `hello` runs on WSLg under Wayland and X11, its X11
+window carrying the app id as its class (what the desktop entry's
+`StartupWMClass` matches) → removed cleanly. No backend code needed to
+change: the distributions gave the same answers to the same tests.
+
+**Owed.** openSUSE is served by the doctor's zypper row and the RPM format
+but is not installed here, so it is untested. The packages are unsigned
+(`rpmsign`, `gpg --detach-sign` are the publisher's step). A physical GNOME
+or Plasma session stays owed as in the entry below. Under WSL, GTK 4.16+
+prints a harmless Vulkan probe warning before using OpenGL
+(`docs/linux.md`).
+
 ### Milestone 34 — the Linux backend — complete
 
 **Built.** Plan: `docs/superpowers/plans/2026-09-29-linux-milestone-34.md`,

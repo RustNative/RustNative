@@ -702,8 +702,9 @@ measurement, the responder chain, `NSAccessibility`, the macOS menu bar, and
 **Linux** (Milestone 34, **built**: [`docs/linux.md`](docs/linux.md)) — GTK 4
 behind a toolkit seam, Pango measurement, AT-SPI2 accessibility, desktop
 portals and the freedesktop services, both Wayland and X11 sessions with
-their differences reported as capabilities, and `.deb`, tarball, and
-AppImage packaging.
+their differences reported as capabilities, verified on the Debian, Fedora,
+and Arch families, and `.deb`, `.rpm`, pacman, tarball, and AppImage
+packaging.
 
 **Android** (Milestone 35) — a native `View` hierarchy over a disciplined JNI
 boundary, the activity/process lifecycle mapped onto the existing lifecycle
