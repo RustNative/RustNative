@@ -156,7 +156,10 @@ impl Fixture {
     }
 
     /// Attaches the harness with this fixture's clock installed, so no
-    /// frame depends on how long anything really took.
+    /// frame depends on how long anything really took, and with full
+    /// motion, so no test depends on the machine's setting: Windows Server
+    /// (CI's runners) turns client-area animations off, which the backend
+    /// rightly reads as reduced motion.
     fn attach(&self, application: &mut rustnative_core::Application) -> NativeHarness {
         // SAFETY: every caller declares `application` before the harness,
         // so it outlives it — the same obligation as `NativeHarness::attach`.
@@ -164,6 +167,7 @@ impl Fixture {
         let clock = self.clock.clone();
         harness.with_runtime_mut(WindowId::PRIMARY, move |runtime| {
             runtime.animation.set_clock(Box::new(clock));
+            runtime.animation.set_motion_preference(MotionPreference::Full);
         });
         harness
     }

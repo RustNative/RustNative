@@ -63,7 +63,12 @@ milestones linked their scenarios' machinery into that harness (the markup
 compiler and proc-macro2, the headless backend, filter-demo). It is
 re-baselined at 4000 with the breakdown recorded in `budgets/windows.toml`.
 **Owed:** measure the artifact size on a shipping-shaped application, not the
-harness. Verified: clippy 1.99 and 1.98 clean, the MSRV check, `cargo deny`,
+harness. Last, the Windows backend's tests, hidden until now behind earlier
+failures: six animation tests assumed the machine's motion setting, and
+Windows Server (the runners) turns client-area animations off, which the
+backend correctly reads as reduced motion, so their fixture now pins full
+motion. And the drop test expected `%TEMP%`'s 8.3 spelling (`RUNNER~1`) where
+the shell hands back long names, so it now starts from the long form. Verified: clippy 1.99 and 1.98 clean, the MSRV check, `cargo deny`,
 and the touched crates' tests.
 
 **Plan: iPadOS as a target of its own (2026-10-04).** `PLAN.md` gains

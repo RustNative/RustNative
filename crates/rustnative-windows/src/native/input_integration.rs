@@ -581,7 +581,15 @@ fn native_drop_target_negotiates_and_delivers_files() {
         .expect("every window registers a drop target");
     fixture.take();
 
-    let dir = std::env::temp_dir().join(format!("rustnative-m25-drop-{}", std::process::id()));
+    // The shell hands dropped files back by their long names, and `%TEMP%`
+    // may be an 8.3 short one (CI's runners: `RUNNER~1`), so the expected
+    // paths start from its long form, without `canonicalize`'s `\\?\`.
+    let temp = std::fs::canonicalize(std::env::temp_dir()).unwrap();
+    let temp = temp
+        .to_str()
+        .and_then(|path| path.strip_prefix(r"\\?\"))
+        .map_or(temp.clone(), PathBuf::from);
+    let dir = temp.join(format!("rustnative-m25-drop-{}", std::process::id()));
     std::fs::create_dir_all(&dir).unwrap();
     let files: Vec<PathBuf> = ["first.txt", "second.txt"].iter().map(|f| dir.join(f)).collect();
     let mut pidls: Vec<*mut ITEMIDLIST> = Vec::new();
