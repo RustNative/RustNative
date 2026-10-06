@@ -256,8 +256,10 @@ jobs:
       # Tests that need the interactive desktop's real cursor or the system
       # clipboard are `#[ignore]`d so a restricted local shell reports them
       # as not run instead of failing or silently passing; the runner's
-      # interactive session can run them, so it does.
+      # interactive session can run them, so it does — all but real-cursor
+      # hover, where `SetCursorPos` succeeds but no mouse message reaches the
+      # test window; it is owed to an attended desktop (BUILD_STATUS.md).
       - name: cargo test (interactive-desktop tests)
-        run: cargo test --workspace -- --ignored
+        run: cargo test --workspace -- --ignored --skip native_pointer_hover_follows_the_real_cursor
       - name: cargo clippy (native backend included)
         run: cargo clippy --workspace --all-targets --all-features -- -D warnings

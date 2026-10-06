@@ -68,7 +68,12 @@ failures: six animation tests assumed the machine's motion setting, and
 Windows Server (the runners) turns client-area animations off, which the
 backend correctly reads as reduced motion, so their fixture now pins full
 motion. And the drop test expected `%TEMP%`'s 8.3 spelling (`RUNNER~1`) where
-the shell hands back long names, so it now starts from the long form. Verified: clippy 1.99 and 1.98 clean, the MSRV check, `cargo deny`,
+the shell hands back long names, so it now starts from the long form. CI's
+interactive-desktop step skips one test, real-cursor hover: `SetCursorPos`
+succeeds but no mouse message reaches the test window, on the hosted runner
+and in the development session used for this fix alike, even when pumped for
+a second. **Owed:** find why, on a desktop session a person is at, and
+restore it to CI. Verified: clippy 1.99 and 1.98 clean, the MSRV check, `cargo deny`,
 and the touched crates' tests.
 
 **Plan: iPadOS as a target of its own (2026-10-04).** `PLAN.md` gains
