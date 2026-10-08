@@ -189,6 +189,7 @@ pub(crate) fn create(
         tag,
         style: None,
         drop: false,
+        cursor: None,
     };
     update(&object, node)?;
     Ok(object)

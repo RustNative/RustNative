@@ -390,6 +390,17 @@ impl Renderer {
         })?;
         controls::set_enabled(&view, !node.disabled)?;
         self.apply_opacity(node.id)?;
+        if let Some(object) = self.registry.get_mut(node.id) {
+            if object.cursor != node.cursor {
+                object.cursor = node.cursor;
+                call_static(
+                    Class::Views,
+                    "setCursor",
+                    "(Landroid/view/View;I)V",
+                    &[Arg::Obj(&view), Arg::Int(node.cursor.map_or(0, crate::input::pointer_icon))],
+                )?;
+            }
+        }
         let wants_drop = node.input.wants_drop();
         if let Some(object) = self.registry.get_mut(node.id) {
             if object.drop != wants_drop {

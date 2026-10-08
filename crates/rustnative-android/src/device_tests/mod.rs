@@ -13,6 +13,7 @@
 #![allow(clippy::expect_used, clippy::unwrap_used, reason = "tests assert by panicking")]
 
 mod accessibility;
+mod conformance;
 mod graphics;
 pub(crate) mod harness;
 mod input;
@@ -165,6 +166,18 @@ const TESTS: &[(&str, Test)] = &[
     (
         "surfaces::a_constrained_job_runs_through_job_scheduler",
         surfaces::a_constrained_job_runs_through_job_scheduler,
+    ),
+    (
+        "conformance::a_node_s_cursor_is_its_view_s_pointer_icon",
+        conformance::a_node_s_cursor_is_its_view_s_pointer_icon,
+    ),
+    (
+        "conformance::mappers_extend_and_replace_what_the_backend_applies",
+        conformance::mappers_extend_and_replace_what_the_backend_applies,
+    ),
+    (
+        "conformance::a_panicking_handler_ends_the_application_not_the_process",
+        conformance::a_panicking_handler_ends_the_application_not_the_process,
     ),
 ];
 

@@ -22,5 +22,8 @@ rustnative-core.workspace = true
 [target.'cfg(target_os = "linux")'.dependencies]
 rustnative-linux.workspace = true
 
-[target.'cfg(not(target_os = "linux"))'.dependencies]
+[target.'cfg(target_os = "android")'.dependencies]
+rustnative-android.workspace = true
+
+[target.'cfg(not(any(target_os = "linux", target_os = "android")))'.dependencies]
 rustnative-windows.workspace = true

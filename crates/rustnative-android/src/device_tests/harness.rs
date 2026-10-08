@@ -132,6 +132,11 @@ impl Harness {
         }
     }
 
+    /// Whether the application has ended, and the failure that ended it.
+    pub(crate) fn ended(&self) -> (bool, Option<String>) {
+        (self.backend.is_finished(), self.backend.take_error().map(|error| error.to_string()))
+    }
+
     /// Runs `f` against the backend's state.
     pub(crate) fn with_registry<R>(&self, f: impl FnOnce(&mut WindowRegistry) -> R) -> R {
         self.backend.enter(f)

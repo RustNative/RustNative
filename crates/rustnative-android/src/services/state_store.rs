@@ -57,6 +57,18 @@ impl FileStateStore {
         Self::in_directory(files.join("rustnative").join("state"))
     }
 
+    /// [`Self::for_application`], under the name the desktop backends'
+    /// stores take: an Android application's files are its own, so the id
+    /// is not needed to tell them apart.
+    ///
+    /// # Errors
+    ///
+    /// As [`Self::for_application`].
+    #[cfg(target_os = "android")]
+    pub fn for_app(_app_id: &str) -> Result<Self, ServiceError> {
+        Self::for_application()
+    }
+
     /// A store in `directory`, created if it does not exist; any temporary
     /// file a crashed write left there is deleted.
     ///

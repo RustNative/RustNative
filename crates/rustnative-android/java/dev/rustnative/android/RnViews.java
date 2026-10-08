@@ -435,6 +435,20 @@ final class RnViews {
      * 3 leave, 4 drop, the position packed in {@code b}, and the data as
      * text then URIs, separated by U+0001.
      */
+    /** The pointer icon a hovering mouse or stylus shows (0: the view's own). */
+    static void setCursor(View view, int type) {
+        if (android.os.Build.VERSION.SDK_INT >= 24) {
+            view.setPointerIcon(type == 0 ? null
+                : android.view.PointerIcon.getSystemIcon(view.getContext(), type));
+        }
+    }
+
+    /** Whether the view shows system pointer icon {@code type} (tests read it). */
+    static boolean showsCursor(View view, int type) {
+        return android.os.Build.VERSION.SDK_INT >= 24 && view.getPointerIcon() != null
+            && view.getPointerIcon().equals(android.view.PointerIcon.getSystemIcon(view.getContext(), type));
+    }
+
     static void setDropTarget(final View view, boolean on) {
         final Tag tag = tagOf(view);
         if (!on || tag == null) {
@@ -676,6 +690,17 @@ final class RnViews {
     }
 
     /** A view's text, for tests. */
+    /** Sets a view's tooltip (a mapper's example; API 26+). */
+    static void setTooltip(View view, String text) {
+        view.setTooltipText(text);
+    }
+
+    /** A view's tooltip (tests read it). */
+    static String tooltip(View view) {
+        CharSequence text = view.getTooltipText();
+        return text == null ? null : text.toString();
+    }
+
     static String text(View view) {
         return view instanceof TextView ? ((TextView) view).getText().toString() : null;
     }

@@ -460,7 +460,15 @@ pub fn adb(toolchain: &AndroidToolchain, arguments: &[&str]) -> Result<String> {
 /// As [`build`], and a failed install or launch.
 pub fn run(root: &Path, config: &Config, release: bool) -> Result<()> {
     let toolchain = toolchain()?;
-    let apk = build(root, config, &Options { release, ..Options::default() })?;
+    // Only the device's own ABI: a debug library per ABI is large, and the
+    // device runs one.
+    let abis = adb(&toolchain, &["shell", "getprop", "ro.product.cpu.abi"])
+        .map(|abi| abi.trim().to_owned())
+        .ok()
+        .filter(|abi| crate::toolchain::android::target_for_abi(abi).is_some())
+        .into_iter()
+        .collect();
+    let apk = build(root, config, &Options { release, abis, ..Options::default() })?;
     install(&toolchain, &apk)?;
     let component = format!("{}/dev.rustnative.android.RnActivity", application_id(config));
     let output = adb(&toolchain, &["shell", "am", "start", "-W", "-n", &component])?;

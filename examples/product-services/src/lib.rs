@@ -138,3 +138,29 @@ impl Component for Product {
         }
     }
 }
+
+/// The Android entry: Keystore-backed secure storage, and push and billing
+/// answering why they are unavailable here.
+#[cfg(target_os = "android")]
+mod android {
+    use std::sync::Arc;
+
+    use rustnative_core::product::Flags;
+    use rustnative_core::{Application, Component, Platform, Services, Size, Window};
+
+    fn main() -> Result<(), rustnative_android::Error> {
+        let services = Services::default()
+            .with_flags(Flags::new())
+            .with_secure_storage(Arc::new(rustnative_android::AndroidSecureStorage))
+            .with_push(Arc::new(rustnative_android::AndroidPush))
+            .with_commerce(Arc::new(rustnative_android::AndroidStore));
+        let mut application = Application::with_services(
+            super::Product::new(()),
+            Window::new("Product services", Size::new(480, 320)),
+            services,
+        );
+        rustnative_android::AndroidPlatform::new().run(&mut application)
+    }
+
+    rustnative_android::export_main!(main);
+}

@@ -3,6 +3,23 @@
 //! on the navigation model (`back`), and the soft keyboard.
 
 pub(crate) mod gamepad;
+
+/// The `PointerIcon` type for a cursor (a mouse or stylus hovering).
+pub(crate) const fn pointer_icon(cursor: rustnative_core::Cursor) -> i32 {
+    use rustnative_core::Cursor;
+    match cursor {
+        Cursor::Pointer => 1002,                 // TYPE_HAND
+        Cursor::Text => 1008,                    // TYPE_TEXT
+        Cursor::Crosshair => 1007,               // TYPE_CROSSHAIR
+        Cursor::Move => 1013,                    // TYPE_ALL_SCROLL
+        Cursor::NotAllowed => 1012,              // TYPE_NO_DROP
+        Cursor::ResizeVertical => 1015,          // TYPE_VERTICAL_DOUBLE_ARROW
+        Cursor::ResizeHorizontal => 1014,        // TYPE_HORIZONTAL_DOUBLE_ARROW
+        Cursor::Wait | Cursor::Progress => 1004, // TYPE_WAIT
+        Cursor::Help => 1003,                    // TYPE_HELP
+        Cursor::Default => 1000,                 // TYPE_ARROW
+    }
+}
 pub(crate) mod keys;
 pub(crate) mod phases;
 pub(crate) mod pointer;

@@ -83,6 +83,7 @@ mod protocol;
 mod styling;
 mod surface;
 mod units;
+pub mod update;
 
 #[cfg(target_os = "android")]
 mod animation;
@@ -153,6 +154,15 @@ pub fn java_vm() -> *mut std::ffi::c_void {
 /// library. The launcher activity runs `main` on the main thread when it is
 /// created; its `AndroidPlatform::run` adopts the application.
 ///
+/// `main` returns `()` or a `Result` whose error is `Display`; an error is
+/// written to the log (`adb logcat -s RustNative`), as a desktop `main`'s
+/// is printed.
+///
+/// `export_main!(main, work = register)` also runs `register` whenever the
+/// library loads — in every process, including one `JobScheduler` starts
+/// for background work with no activity — so background jobs registered
+/// there (`AndroidWork::register`) are known.
+///
 /// `export_main!()` with no `main` is library-only mode (Milestone 40): the
 /// application model and services are linked into an existing Android
 /// application, which embeds views with `RustNativeView` or uses no
@@ -168,7 +178,12 @@ macro_rules! export_main {
         ) -> i32 {
             // SAFETY: `vm` is the runtime's own VM pointer, passed to
             // `JNI_OnLoad` for exactly this.
-            unsafe { $crate::__private::on_load(vm, ::core::option::Option::Some($main)) }
+            {
+                fn entry() {
+                    $crate::__private::MainResult::report($main());
+                }
+                unsafe { $crate::__private::on_load(vm, ::core::option::Option::Some(entry)) }
+            }
         }
     };
     ($main:path, work = $work:path) => {
@@ -182,7 +197,12 @@ macro_rules! export_main {
             // one `JobScheduler` starts with no activity.
             $work();
             // SAFETY: as above.
-            unsafe { $crate::__private::on_load(vm, ::core::option::Option::Some($main)) }
+            {
+                fn entry() {
+                    $crate::__private::MainResult::report($main());
+                }
+                unsafe { $crate::__private::on_load(vm, ::core::option::Option::Some(entry)) }
+            }
         }
     };
     () => {
@@ -201,6 +221,27 @@ macro_rules! export_main {
 /// What `export_main!` expands to; not public API.
 #[doc(hidden)]
 pub mod __private {
+    /// What an exported `main` may return.
+    pub trait MainResult {
+        /// Logs a failure.
+        fn report(self);
+    }
+
+    impl MainResult for () {
+        fn report(self) {}
+    }
+
+    impl<E: std::fmt::Display> MainResult for Result<(), E> {
+        fn report(self) {
+            if let Err(error) = self {
+                #[cfg(target_os = "android")]
+                crate::log::error(&format!("the application's main failed: {error}"));
+                #[cfg(not(target_os = "android"))]
+                let _ = error;
+            }
+        }
+    }
+
     /// `JNI_OnLoad`'s body.
     ///
     /// # Safety

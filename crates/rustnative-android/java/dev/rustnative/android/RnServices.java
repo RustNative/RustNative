@@ -278,6 +278,49 @@ final class RnServices {
         return labels.toArray(new String[0]);
     }
 
+    // ---- Updates (sideloaded installations only; `update.rs`). ----
+
+    /** The package that installed this application (null: adb or unknown). */
+    static String installer() {
+        try {
+            if (Build.VERSION.SDK_INT >= 30) {
+                return context.getPackageManager()
+                    .getInstallSourceInfo(context.getPackageName()).getInstallingPackageName();
+            }
+            return context.getPackageManager().getInstallerPackageName(context.getPackageName());
+        } catch (Exception e) {
+            return null;
+        }
+    }
+
+    /**
+     * Hands an APK to the system package installer, which asks the person
+     * to confirm; an error message, or null once the session is committed.
+     */
+    static String installPackage(byte[] apk) {
+        try {
+            android.content.pm.PackageInstaller installer = context.getPackageManager().getPackageInstaller();
+            android.content.pm.PackageInstaller.SessionParams params =
+                new android.content.pm.PackageInstaller.SessionParams(
+                    android.content.pm.PackageInstaller.SessionParams.MODE_FULL_INSTALL);
+            params.setAppPackageName(context.getPackageName());
+            int id = installer.createSession(params);
+            try (android.content.pm.PackageInstaller.Session session = installer.openSession(id)) {
+                try (OutputStream out = session.openWrite("update.apk", 0, apk.length)) {
+                    out.write(apk);
+                    session.fsync(out);
+                }
+                Intent status = new Intent(context, RnActivity.class)
+                    .setAction("dev.rustnative.UPDATE_STATUS");
+                session.commit(PendingIntent.getActivity(context, id, status,
+                    PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_MUTABLE).getIntentSender());
+            }
+            return null;
+        } catch (Exception e) {
+            return e.toString();
+        }
+    }
+
     // ---- Widgets and tiles (their components keep what Rust sends). ----
 
     static boolean updateWidget(String id, String title, String[] lines, String[] actions) {

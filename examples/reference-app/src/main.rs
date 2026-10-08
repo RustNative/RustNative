@@ -8,7 +8,7 @@ use rustnative_conformance::reference::{ReferenceScreen, Variant};
 use rustnative_core::{Application, Component, Platform, Size, Window};
 #[cfg(target_os = "linux")]
 use rustnative_linux::LinuxPlatform as HostPlatform;
-#[cfg(not(target_os = "linux"))]
+#[cfg(not(any(target_os = "linux", target_os = "android")))]
 use rustnative_windows::WindowsPlatform as HostPlatform;
 
 fn main() {

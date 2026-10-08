@@ -123,6 +123,7 @@ impl Report {
                     }
                 }
                 _ if platform == Platform::Linux => linux_readiness(),
+                _ if platform == Platform::Android => android_readiness(),
                 Some(milestone) => (false, format!("no backend yet — Milestone {milestone}")),
                 None => (false, "no backend yet — see PLAN.md's web roadmap".to_owned()),
             };
@@ -229,6 +230,39 @@ pub fn install(dry_run: bool) -> crate::error::Result<()> {
 /// 4.14 or newer and libsoup 3's development files, as `pkg-config` finds
 /// them, and which packages it can make. What is missing is named in the
 /// distribution's own package manager (`toolchain::linux_distro`).
+/// What building for Android needs: the SDK (with a platform), the NDK, a
+/// JDK, and the Rust targets.
+fn android_readiness() -> (bool, String) {
+    let toolchain = crate::toolchain::android::AndroidToolchain::detect();
+    let mut missing = Vec::new();
+    if toolchain.sdk.is_none() {
+        missing.push("the Android SDK (set ANDROID_HOME)");
+    } else if toolchain.platform.is_none() {
+        missing.push("an SDK platform (sdkmanager \"platforms;android-35\")");
+    }
+    if toolchain.ndk.is_none() {
+        missing.push("the NDK (sdkmanager \"ndk;<version>\", or set ANDROID_NDK_HOME)");
+    }
+    if toolchain.java_home.is_none() {
+        missing.push("a JDK 17+ (set JAVA_HOME; Android Studio's jbr will do)");
+    }
+    let installed = std::process::Command::new("rustup")
+        .args(["target", "list", "--installed"])
+        .output()
+        .map(|output| String::from_utf8_lossy(&output.stdout).into_owned())
+        .unwrap_or_default();
+    if !installed.contains("-linux-android") {
+        missing.push("the Rust targets (rustup target add aarch64-linux-android …)");
+    }
+    if missing.is_empty() {
+        let devices =
+            if toolchain.adb.is_some() { "adb present" } else { "adb missing: nothing to run on" };
+        (true, format!("ready — API {}, {devices}", toolchain.platform.unwrap_or_default()))
+    } else {
+        (false, format!("missing {}", missing.join("; ")))
+    }
+}
+
 fn linux_readiness() -> (bool, String) {
     use crate::toolchain::linux_distro::{Distribution, Library};
 
@@ -293,8 +327,17 @@ mod tests {
         if !cfg!(target_os = "linux") {
             assert!(!linux.ready && linux.detail.contains("build on Linux"), "{}", linux.detail);
         }
-        for platform in
-            report.platforms.iter().filter(|p| !["windows", "linux"].contains(&p.platform.as_str()))
+        let android = &report.platforms[3];
+        assert_eq!(android.platform, "android");
+        assert!(
+            android.ready || android.detail.starts_with("missing "),
+            "Android says what is missing: {}",
+            android.detail
+        );
+        for platform in report
+            .platforms
+            .iter()
+            .filter(|p| !["windows", "linux", "android"].contains(&p.platform.as_str()))
         {
             assert!(!platform.ready, "{} has no backend yet", platform.platform);
             assert!(platform.detail.contains("no backend yet"));

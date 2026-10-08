@@ -13,7 +13,8 @@ before anyone relies on it.
 | Web, static and edge | Not applicable | Owed with Web milestones J and K |
 | iOS | **Forbidden**: executable code arrives only through the App Store (App Store Review Guideline 2.5.2) | Data and models only (`PayloadKind::Model`); owed with Milestone 36 |
 | iPadOS | **Forbidden**, under the same rule as iOS: an iPad application is distributed through the same store, often in the same universal bundle | Data and models only (`PayloadKind::Model`), one manifest for both targets of a universal bundle; owed with Milestone 70 |
-| Android | Google Play forbids self-update outside Play; sideloaded builds may use the package installer | Owed with Milestone 35 |
+| Android, from Google Play | **Forbidden** for code: Play updates the application, and its policy forbids updating code any other way | Play's own update (in-app update prompts are Play's API, not this updater); `rustnative_android::update::AndroidUpdater::install` refuses (`UpdateError::Forbidden`, decided from the installing package); model and data payloads allowed (`stage_model`) |
+| Android, sideloaded | Permitted, through the system package installer, with the person's confirmation | `AndroidUpdater`: the same signed manifests and staged rollout as Windows; the APK verified against the manifest's SHA-256, then committed to a `PackageInstaller` session — Android shows its confirmation and checks the new APK is signed with the same key; the application declares `REQUEST_INSTALL_PACKAGES` |
 | Embedded firmware | Permitted with an A/B or bootloader-verified scheme | Owed with Milestone 37 (`C81`) |
 
 ## Model and data payloads

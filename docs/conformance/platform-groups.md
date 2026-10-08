@@ -10,6 +10,7 @@ second member is written; the crate is created when that member is.
 | Apple | macOS (33), iOS (36), iPadOS (70) | Objective-C runtime bindings and the retain/release convention, Core Text measurement, `NSAccessibility`/`UIAccessibility` role mapping, Foundation locale facilities, the Keychain, the Apple toolchain driver | `rustnative-apple` |
 | UIKit (inside Apple) | iOS (36), iPadOS (70) | UIKit realization of node kinds, the scene bridge and the idiom launcher of a universal bundle, `UITextInput`, the touch, gesture, and drag bridge, `UIAccessibility` elements, `CADisplayLink` pacing, the UIKit services both realize identically | `rustnative-uikit` |
 | Draw-list | terminal (38), embedded displays (37), the in-application overlay (44) | rasterizing `DrawList`, cell/pixel geometry conversion, a focus-ring and hit-test model for hosts with no native controls | `rustnative-drawlist` |
+| Android | Android (35) only | nothing to share: no other host runs the Android framework | none |
 | Desktop shell | Windows, macOS, Linux | tray/menu-bar extras, jump lists and dock menus, document windows (Milestones 48, 57) | `rustnative-desktop-shell` |
 
 Rules:
@@ -56,3 +57,18 @@ revisited when macOS (Milestone 33) arrives: its dock menu and status item
 are the most likely place for a third member to share a host-level
 algorithm (menu diffing against a live native menu, say) with one of the
 other two.
+
+**Android, decided at its first member (Milestone 35, 2026-10-09).**
+Android is the only member of the Android family: no other host runs its
+framework, its Java host library, or JNI. What it has in common with iOS
+and iPadOS is what any mobile host has — the five permission states, the
+suspend/resume/terminate lifecycle with restoration after process death,
+safe areas and cutouts, back as a command, ongoing activities and widgets
+as surfaces — and every one of those is already a portable model in
+`rustnative-core` (`permission`, `Lifecycle` and `persistence`,
+`environment::keys::SAFE_AREA`, `command::standard::BACK`,
+`surfaces::SurfaceCommand`). What remains per backend is the host's API
+(Activity versus `UIScene`, `requestPermissions` versus the authorization
+APIs, `AccessibilityNodeInfo` versus `UIAccessibility`), so no mobile group
+crate is created. The question is revisited when iOS (Milestone 36) lands,
+by comparing the two backends' code as the desktop shell's decision did.

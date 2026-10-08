@@ -28,6 +28,14 @@ impl AndroidPlatform {
     pub const fn new() -> Self {
         Self { _private: () }
     }
+
+    /// The platform, as the desktop backends take an application id. On
+    /// Android the id is the package's (`rustnative.toml`'s `app.id`,
+    /// fixed at build time), so this is the same platform.
+    #[must_use]
+    pub const fn with_app_id(self, _app_id: &str) -> Self {
+        self
+    }
 }
 
 #[cfg(target_os = "android")]

@@ -179,5 +179,6 @@ pub(crate) fn create(
         tag,
         style: None,
         drop: false,
+        cursor: None,
     })
 }

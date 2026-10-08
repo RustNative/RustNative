@@ -31,6 +31,12 @@ rustnative-data.workspace = true
 rustnative-conformance = { workspace = true, optional = true }
 # A native surface's handle in the form every Rust graphics library takes.
 raw-window-handle = "0.6"
+# Updates (`update`): the desktops' signed manifest — Ed25519 over JSON —
+# and the package's SHA-256.
+ed25519-dalek = "2"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+sha2 = "0.10"
 
 [target.'cfg(target_os = "android")'.dependencies]
 # The JNI boundary (`jni_host`, the one module that names it). 0.21 is the

@@ -32,6 +32,8 @@ pub(crate) struct HostObject {
     pub(crate) style: Option<u64>,
     /// Whether the view is a drop target now.
     pub(crate) drop: bool,
+    /// The pointer icon applied (`None`: the view's own).
+    pub(crate) cursor: Option<rustnative_core::Cursor>,
 }
 
 /// What, beyond its kind, decided which view realizes a node.

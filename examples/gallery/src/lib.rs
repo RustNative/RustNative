@@ -198,3 +198,20 @@ impl Component for Gallery {
         Node::column("gallery", [navigation, toast])
     }
 }
+
+/// The Android entry: the gallery in the launcher activity.
+#[cfg(target_os = "android")]
+mod android {
+    use rustnative_core::{Application, Component, Platform, Size, Window};
+
+    fn main() -> Result<(), rustnative_android::Error> {
+        let mut application = Application::new(
+            super::Gallery::new(()),
+            Window::new("Rust Native gallery", Size::new(900, 720)),
+        );
+        application.set_theme(super::theme());
+        rustnative_android::AndroidPlatform::new().run(&mut application)
+    }
+
+    rustnative_android::export_main!(main);
+}
