@@ -109,6 +109,12 @@ fn window(raw: jlong) -> u64 {
 
 extern "system" fn native_init(mut env: JNIEnv<'_>, _class: JClass<'_>, context: JObject<'_>) {
     super::guard("nativeInit", || {
+        // How long the process lived before the library loaded: the
+        // startup trace counts from the process's creation (Milestone 42).
+        if let Ok(age) = super::call_static(super::Class::Bridge, "processAgeMillis", "()J", &[]) {
+            let age = u64::try_from(age.long()).unwrap_or(0);
+            rustnative_core::perf::set_process_start(std::time::Duration::from_millis(age));
+        }
         if let Some(context) = reference(&mut env, &context) {
             crate::entry::init(context);
         }

@@ -69,6 +69,16 @@ public final class RnBridge {
 
     // ---- Helpers Rust calls. ----
 
+    /** Milliseconds since this process was created (the startup trace's origin). */
+    static long processAgeMillis() {
+        return android.os.SystemClock.uptimeMillis() - android.os.Process.getStartUptimeMillis();
+    }
+
+    /** Finishes an activity (the inspector asked the application to quit). */
+    static void finish(Activity activity) {
+        activity.finish();
+    }
+
     /** Sets {@link #muted}. */
     static void setMuted(boolean value) {
         muted = value;

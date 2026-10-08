@@ -179,6 +179,10 @@ const TESTS: &[(&str, Test)] = &[
         "conformance::a_panicking_handler_ends_the_application_not_the_process",
         conformance::a_panicking_handler_ends_the_application_not_the_process,
     ),
+    (
+        "conformance::the_inspector_reads_the_realized_views_over_its_socket",
+        conformance::the_inspector_reads_the_realized_views_over_its_socket,
+    ),
 ];
 
 fn report(instrumentation: &JavaRef, name: &str, status: i32, message: Option<&str>) {

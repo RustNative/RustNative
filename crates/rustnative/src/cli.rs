@@ -279,6 +279,10 @@ enum Command {
         /// Build with optimizations.
         #[arg(long)]
         release: bool,
+        /// Start it with the inspector attached (Android: then
+        /// `rustnative inspect --android`).
+        #[arg(long)]
+        inspect: bool,
     },
     /// Check the application compiles, without building it fully.
     Check {
@@ -413,7 +417,7 @@ impl Cli {
             Command::Build { platform: Platform::Web, release, mode, host, .. } => {
                 crate::web::build(&Project::find(&here)?, mode, host, release).map(|_| ())
             }
-            Command::Run { platform: Platform::Web, release } => {
+            Command::Run { platform: Platform::Web, release, .. } => {
                 crate::web::run(&Project::find(&here)?, release)
             }
             Command::Dev { platform: Platform::Web, once, .. } => {
@@ -493,9 +497,9 @@ impl Cli {
                 println!("Built {}", apk.display());
                 Ok(())
             }
-            Command::Run { platform: Platform::Android, release } => {
+            Command::Run { platform: Platform::Android, release, inspect } => {
                 let project = Project::find(&here)?;
-                crate::package::android::run(&project.root, &project.config, release)
+                crate::package::android::run(&project.root, &project.config, release, inspect)
             }
             Command::Check { platform: Platform::Android } => {
                 let project = Project::find(&here)?;
@@ -538,7 +542,9 @@ impl Cli {
                     cargo_for(platform, &here, "build", release, wrapper)
                 }
             }
-            Command::Run { platform, release } => cargo_for(platform, &here, "run", release, &[]),
+            Command::Run { platform, release, .. } => {
+                cargo_for(platform, &here, "run", release, &[])
+            }
             Command::Check { platform } => cargo_for(platform, &here, "check", false, &[]),
             Command::Test { watch, browser, arguments } => {
                 let project = Project::find(&here)?;
@@ -562,7 +568,7 @@ impl Cli {
                 }
                 let remote =
                     remote.zip(token).map(|(addr, token)| crate::dev::Remote { addr, token });
-                crate::dev::run(&here, remote, once)
+                crate::dev::run(&here, remote, platform == Platform::Android, once)
             }
             Command::DevAgent { listen, max_deployments } => {
                 crate::dev::agent(listen, max_deployments)

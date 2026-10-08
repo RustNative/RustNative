@@ -273,7 +273,12 @@ pub fn prepare(root: &Path, config: &Config, options: &Options) -> Result<PathBu
         std::fs::copy(&built, destination.join(format!("lib{}.so", metadata.library)))
             .map_err(io(format!("copy {}", built.display())))?;
     }
-    let project = describe(config, &metadata.library, options.instrumentation, root)?;
+    let mut project = describe(config, &metadata.library, options.instrumentation, root)?;
+    if !options.release {
+        // A debug build can be inspected (`run android --inspect`), whose
+        // server listens on the device's loopback: a socket needs INTERNET.
+        project.permissions.push("android.permission.INTERNET".to_owned());
+    }
     for (path, contents) in project.files() {
         let path = project_dir.join(path);
         if let Some(parent) = path.parent() {
@@ -458,7 +463,7 @@ pub fn adb(toolchain: &AndroidToolchain, arguments: &[&str]) -> Result<String> {
 /// # Errors
 ///
 /// As [`build`], and a failed install or launch.
-pub fn run(root: &Path, config: &Config, release: bool) -> Result<()> {
+pub fn run(root: &Path, config: &Config, release: bool, inspect: bool) -> Result<()> {
     let toolchain = toolchain()?;
     // Only the device's own ABI: a debug library per ABI is large, and the
     // device runs one.
@@ -471,7 +476,13 @@ pub fn run(root: &Path, config: &Config, release: bool) -> Result<()> {
     let apk = build(root, config, &Options { release, abis, ..Options::default() })?;
     install(&toolchain, &apk)?;
     let component = format!("{}/dev.rustnative.android.RnActivity", application_id(config));
-    let output = adb(&toolchain, &["shell", "am", "start", "-W", "-n", &component])?;
+    let mut start = vec!["shell", "am", "start", "-W", "-n", component.as_str()];
+    if inspect {
+        // `RnIntents.inspect`: the inspection server starts with the
+        // application (`rustnative inspect --android` reaches it).
+        start.extend(["--es", "dev.rustnative.inspect", "1"]);
+    }
+    let output = adb(&toolchain, &start)?;
     print!("{output}");
     Ok(())
 }

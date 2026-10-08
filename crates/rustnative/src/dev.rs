@@ -301,11 +301,36 @@ fn restore(endpoint: &Endpoint, states: &BTreeMap<String, Value>) -> (usize, usi
 
 /// Where the application runs, and how to start and stop it there.
 enum Host {
-    Local { child: Option<Child>, resources: Vec<(String, String)> },
+    Local {
+        child: Option<Child>,
+        resources: Vec<(String, String)>,
+    },
     Remote(Remote),
+    /// The attached Android device: the APK reinstalled and the activity
+    /// restarted with the inspector attached.
+    Android {
+        apk: PathBuf,
+    },
 }
 
 impl Host {
+    /// Builds what [`Self::start`] runs.
+    fn build(&mut self, project: &Project) -> Result<Duration> {
+        let Self::Android { apk } = self else { return build(project) };
+        let started = Instant::now();
+        let toolchain = crate::package::android::toolchain()?;
+        let abis =
+            crate::package::android::adb(&toolchain, &["shell", "getprop", "ro.product.cpu.abi"])
+                .map(|abi| vec![abi.trim().to_owned()])
+                .unwrap_or_default();
+        let options = crate::package::android::Options {
+            abis,
+            ..crate::package::android::Options::default()
+        };
+        *apk = crate::package::android::build(&project.root, &project.config, &options)?;
+        Ok(started.elapsed())
+    }
+
     fn start(&mut self, executable: &Path) -> Result<Endpoint> {
         match self {
             Self::Local { child, resources } => {
@@ -339,6 +364,49 @@ impl Host {
                 *child = Some(process);
                 endpoint
             }
+            Self::Android { apk } => {
+                let toolchain = crate::package::android::toolchain()?;
+                crate::package::android::install(&toolchain, apk)?;
+                let here = std::env::current_dir().map_err(|cause| Error::Io {
+                    what: "find the current directory".into(),
+                    cause,
+                })?;
+                let project = Project::find(&here)?;
+                let component = format!(
+                    "{}/dev.rustnative.android.RnActivity",
+                    crate::package::android::application_id(&project.config)
+                );
+                crate::package::android::adb(
+                    &toolchain,
+                    &[
+                        "shell",
+                        "am",
+                        "start",
+                        "-W",
+                        "-n",
+                        &component,
+                        "--es",
+                        "dev.rustnative.inspect",
+                        "1",
+                    ],
+                )?;
+                // The endpoint file is rewritten as the application starts;
+                // it is current once it answers.
+                let started = Instant::now();
+                loop {
+                    if let Ok(endpoint) = crate::inspect::android_endpoint() {
+                        if ask(&endpoint, &Request::Hello).is_ok() {
+                            return Ok(endpoint);
+                        }
+                    }
+                    if started.elapsed() > Duration::from_secs(30) {
+                        return Err(Error::Usage(
+                            "the application on the device did not start inspectable".into(),
+                        ));
+                    }
+                    std::thread::sleep(Duration::from_millis(200));
+                }
+            }
             Self::Remote(remote) => {
                 let reply = deploy(remote, executable, &[])?;
                 reply.endpoint.ok_or_else(|| {
@@ -357,6 +425,22 @@ impl Host {
     /// Asks the application to close; a local one that does not is ended.
     fn stop(&mut self, endpoint: &Endpoint) {
         let _ = ask(endpoint, &Request::Quit);
+        if matches!(self, Self::Android { .. }) {
+            // Quitting finishes the activity, flushing state; the process
+            // is then stopped so the next start is a fresh one.
+            std::thread::sleep(Duration::from_millis(300));
+            if let (Ok(toolchain), Ok(here)) =
+                (crate::package::android::toolchain(), std::env::current_dir())
+            {
+                if let Ok(project) = Project::find(&here) {
+                    let package = crate::package::android::application_id(&project.config);
+                    let _ = crate::package::android::adb(
+                        &toolchain,
+                        &["shell", "am", "force-stop", &package],
+                    );
+                }
+            }
+        }
         if let Self::Local { child: Some(child), .. } = self {
             let started = Instant::now();
             while child.try_wait().ok().flatten().is_none() {
@@ -401,7 +485,7 @@ fn restart(
     endpoint: &mut Endpoint,
     seen: Instant,
 ) -> Result<Restart> {
-    let build_time = build(project)?;
+    let build_time = host.build(project)?;
     let states = snapshot(endpoint);
     host.stop(endpoint);
     *endpoint = host.start(&executable(project))?;
@@ -425,15 +509,15 @@ fn restart(
 /// restart after start-up — the application's main file saved again —
 /// prints how it went as JSON, closes the application, and returns: what
 /// the budget harness measures.
-pub fn run(here: &Path, remote: Option<Remote>, once: bool) -> Result<()> {
+pub fn run(here: &Path, remote: Option<Remote>, android: bool, once: bool) -> Result<()> {
     let project = Project::find(here)?;
-    let resources = resource_env(&provision(&project)?);
     let mut host = match remote {
+        _ if android => Host::Android { apk: PathBuf::new() },
         Some(remote) => Host::Remote(remote),
-        None => Host::Local { child: None, resources },
+        None => Host::Local { child: None, resources: resource_env(&provision(&project)?) },
     };
     println!("dev: building {}", project.config.app.display_name);
-    build(&project)?;
+    host.build(&project)?;
     let mut endpoint = host.start(&executable(&project))?;
     println!("dev: running; watching for changes (Ctrl+C to stop)");
 

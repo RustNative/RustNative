@@ -40,6 +40,8 @@ pub enum BenchTarget {
     /// The serverless shapes (`examples/web-notes` as a function and as an
     /// edge module), under the emulators.
     Serverless,
+    /// The Android backend, on the attached device (`examples/hello-label`).
+    Android,
 }
 
 impl BenchTarget {
@@ -50,6 +52,7 @@ impl BenchTarget {
             Self::Headless => "headless",
             Self::Web => "web",
             Self::Serverless => "serverless",
+            Self::Android => "android",
         }
     }
 
@@ -59,6 +62,7 @@ impl BenchTarget {
             Self::Windows | Self::Linux | Self::Headless => "bench-app",
             Self::Web => "web-bench",
             Self::Serverless => "web-notes",
+            Self::Android => "hello-label",
         }
     }
 
@@ -75,8 +79,8 @@ impl BenchTarget {
             ],
             Self::Headless => &[("headless", 3), ("core", 1), ("compile", 1)],
             Self::Web => &[("web", 3)],
-            // Measured in this process, under the emulators.
-            Self::Serverless => &[],
+            // Measured in this process, under the emulators; on the device.
+            Self::Serverless | Self::Android => &[],
         }
     }
 }
@@ -363,6 +367,10 @@ pub fn run(here: &Path, target: BenchTarget, options: Options) -> Result<()> {
         let measured = serverless(&root)?;
         return finish(&root, &budgets, &budget_path, &measured, (low_end, unpaced_display), check);
     }
+    if target == BenchTarget::Android {
+        let measured = android(&root)?;
+        return finish(&root, &budgets, &budget_path, &measured, (low_end, unpaced_display), check);
+    }
 
     println!("bench: building the scenarios (release)");
     let mut command = cargo();
@@ -415,6 +423,93 @@ pub fn run(here: &Path, target: BenchTarget, options: Options) -> Result<()> {
     }
 
     finish(&root, &budgets, &budget_path, &measured, (low_end, unpaced_display), check)
+}
+
+/// The Android budgets, on the attached device: `examples/hello-label`
+/// built optimized for the device's ABI (debug-signed, so it installs),
+/// launched cold five times — `am start -W`'s total time, and the startup
+/// trace the backend logs (`rustnative startup: {…}`) — then its memory
+/// (`dumpsys meminfo`'s total PSS) and the APK's size.
+fn android(root: &Path) -> Result<BTreeMap<String, f64>> {
+    use crate::package::android;
+    let project = root.join("examples").join("hello-label");
+    let config = crate::config::Config::load(&project)?;
+    let toolchain = android::toolchain()?;
+    let adb = |arguments: &[&str]| android::adb(&toolchain, arguments);
+    let abi = adb(&["shell", "getprop", "ro.product.cpu.abi"])?.trim().to_owned();
+    println!("bench: building hello-label for {abi} (optimized)");
+    // Optimized, but signed with the debug key so it installs: the release
+    // profile's settings on the debug build.
+    // SAFETY: single-threaded here; the variables reach the Cargo child.
+    unsafe {
+        std::env::set_var("CARGO_PROFILE_DEV_OPT_LEVEL", "3");
+        std::env::set_var("CARGO_PROFILE_DEV_DEBUG", "0");
+        std::env::set_var("CARGO_PROFILE_DEV_DEBUG_ASSERTIONS", "false");
+        std::env::set_var("CARGO_PROFILE_DEV_OVERFLOW_CHECKS", "false");
+    }
+    let apk = android::build(
+        &project,
+        &config,
+        &android::Options { abis: vec![abi], ..android::Options::default() },
+    )?;
+    android::install(&toolchain, &apk)?;
+    let package = android::application_id(&config);
+    let component = format!("{package}/dev.rustnative.android.RnActivity");
+    let mut runs = Vec::new();
+    for run in 0..5 {
+        println!("bench: cold start {}/5", run + 1);
+        adb(&["shell", "am", "force-stop", &package])?;
+        std::thread::sleep(std::time::Duration::from_secs(2));
+        adb(&["logcat", "-c"])?;
+        let started = adb(&["shell", "am", "start", "-W", "-n", &component])?;
+        let total = started
+            .lines()
+            .find_map(|line| line.trim().strip_prefix("TotalTime:"))
+            .and_then(|value| value.trim().parse::<f64>().ok())
+            .ok_or_else(|| {
+                Error::Usage(format!(
+                    "am start -W reported no total time:
+{started}"
+                ))
+            })?;
+        let mut measured = BTreeMap::from([("cold_start_ms".to_owned(), total)]);
+        let deadline = Instant::now() + std::time::Duration::from_secs(20);
+        loop {
+            let log = adb(&["logcat", "-d", "-s", "RustNative"])?;
+            if let Some(json) = log.lines().find_map(|line| {
+                line.split_once("rustnative startup: ").map(|(_, json)| json.to_owned())
+            }) {
+                let value: Value = serde_json::from_str(json.trim())
+                    .map_err(|error| Error::Usage(format!("the startup trace: {error}")))?;
+                measured.extend(numbers(&value));
+                break;
+            }
+            if Instant::now() > deadline {
+                return Err(Error::Usage("hello-label logged no startup trace".to_owned()));
+            }
+            std::thread::sleep(std::time::Duration::from_millis(200));
+        }
+        runs.push(measured);
+    }
+    let mut measured = medians(&runs);
+    std::thread::sleep(std::time::Duration::from_secs(3));
+    let memory = adb(&["shell", "dumpsys", "meminfo", &package])?;
+    let pss = memory
+        .lines()
+        .find_map(|line| {
+            let line = line.trim();
+            line.strip_prefix("TOTAL PSS:")
+                .or_else(|| line.strip_prefix("TOTAL:"))
+                .or_else(|| line.strip_prefix("TOTAL"))
+        })
+        .and_then(|rest| rest.split_whitespace().next())
+        .and_then(|kilobytes| kilobytes.parse::<f64>().ok());
+    if let Some(kilobytes) = pss {
+        measured.insert("resident_memory_mb".to_owned(), kilobytes / 1024.0);
+    }
+    measured.insert("artifact_size_kb".to_owned(), kilobytes(&apk)?);
+    adb(&["shell", "am", "force-stop", &package])?;
+    Ok(measured)
 }
 
 /// Judges `measured`, writes the report, and prints the verdicts.

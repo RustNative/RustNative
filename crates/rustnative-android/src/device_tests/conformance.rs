@@ -122,3 +122,25 @@ pub(super) fn a_panicking_handler_ends_the_application_not_the_process(_: &Instr
         // The process — and the JVM — are still here: this test returns.
     });
 }
+
+pub(super) fn the_inspector_reads_the_realized_views_over_its_socket(_: &Instrumentation) {
+    use rustnative_core::inspect::{Reply, Request, send_request};
+    let endpoint = on_main(|| {
+        let mut application = Application::new(Panel, Window::new("Inspect", Size::new(320, 240)));
+        let endpoint = application.enable_inspection(None).expect("the server starts");
+        super::harness::keep(Harness::launch(application));
+        endpoint
+    });
+    // Answered on the main thread when the server wakes the looper, as a
+    // request from `rustnative inspect` is.
+    let reply = send_request(&endpoint, &Request::Realized { window: None }).expect("an answer");
+    let Reply::Ok(value) = reply else { panic!("an answer, not {reply:?}") };
+    let objects = value.as_array().cloned().unwrap_or_default();
+    let go = objects.iter().find(|object| object["key"] == "go").expect("the button is listed");
+    assert_eq!(go["host_type"], "android.widget.Button");
+    assert!(go["handle"].as_str().is_some_and(|handle| handle.starts_with("0x")));
+    let hello = send_request(&endpoint, &Request::Hello).expect("an answer");
+    let Reply::Ok(hello) = hello else { panic!("hello") };
+    assert_eq!(hello["backend"], "android-views");
+    on_main(super::harness::stop_running);
+}

@@ -46,6 +46,7 @@ impl Platform for AndroidPlatform {
         use rustnative_core::WindowId;
         let pending = crate::entry::take_pending().ok_or(Error::NoActivity)?;
         rustnative_core::perf::mark(rustnative_core::perf::StartupPhase::RuntimeReady);
+        crate::inspect::enable_from_intent(application, pending.intent.as_ref());
         let backend = crate::backend::Backend::start(application.take());
         let attached = backend.guarded(WindowId::PRIMARY, |registry| {
             registry.attach_activity(
@@ -62,6 +63,13 @@ impl Platform for AndroidPlatform {
         }
         if attached.is_some() {
             rustnative_core::perf::mark(rustnative_core::perf::StartupPhase::FirstFrame);
+            // The first idle after this marks content and interaction.
+            let _ = crate::jni_host::call_static(
+                crate::jni_host::Class::Bridge,
+                "scheduleIdle",
+                "()V",
+                &[],
+            );
         }
         Ok(())
     }

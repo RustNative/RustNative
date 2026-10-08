@@ -35,6 +35,11 @@ pub struct Target {
     /// Print the protocol's JSON rather than text.
     #[arg(long)]
     json: bool,
+    /// The application on the attached Android device (started with
+    /// `rustnative run android --inspect`): its port is forwarded with
+    /// `adb forward`, and its endpoint read with `run-as`.
+    #[arg(long, conflicts_with_all = ["addr", "pid"])]
+    android: bool,
 }
 
 /// What to ask.
@@ -164,6 +169,9 @@ fn endpoint(target: &Target) -> Result<Endpoint> {
     if let (Some(addr), Some(token)) = (target.addr, &target.token) {
         return Ok(Endpoint { addr, token: token.clone(), pid: 0 });
     }
+    if target.android {
+        return android_endpoint();
+    }
     let directory = endpoint_directory();
     let read = |path: &Path| -> Option<(std::time::SystemTime, Endpoint)> {
         let modified = std::fs::metadata(path).and_then(|meta| meta.modified()).ok()?;
@@ -184,6 +192,28 @@ fn endpoint(target: &Target) -> Result<Endpoint> {
             directory.display()
         ))
     })
+}
+
+/// The endpoint of the project's application on the attached Android
+/// device: the device's inspection port (`rustnative_android`'s
+/// `inspect::PORT`) forwarded to the same port here.
+pub(crate) fn android_endpoint() -> Result<Endpoint> {
+    const PORT: u16 = 7920;
+    let here = std::env::current_dir().map_err(io("find the current directory"))?;
+    let project = crate::project::Project::find(&here)?;
+    let package = crate::package::android::application_id(&project.config);
+    let toolchain = crate::package::android::toolchain()?;
+    let adb = |arguments: &[&str]| crate::package::android::adb(&toolchain, arguments);
+    let port = format!("tcp:{PORT}");
+    adb(&["forward", &port, &port])?;
+    let json = adb(&["shell", "run-as", &package, "cat", "files/rustnative/inspect.json"])?;
+    let mut endpoint: Endpoint = serde_json::from_str(json.trim()).map_err(|_| {
+        Error::Usage(format!(
+            "{package} is not inspectable: start it with `rustnative run android --inspect` (a debug build)"
+        ))
+    })?;
+    endpoint.addr = SocketAddr::from(([127, 0, 0, 1], PORT));
+    Ok(endpoint)
 }
 
 /// Runs `question` against the application `target` names.

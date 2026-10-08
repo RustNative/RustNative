@@ -690,6 +690,43 @@ final class RnViews {
     }
 
     /** A view's text, for tests. */
+    // ---- Inspection (`inspect.rs`). ----
+
+    /** {@code view}'s bounds in {@code root}, in pixels. */
+    static int[] boundsIn(View view, View root) {
+        int[] at = new int[2];
+        int[] origin = new int[2];
+        view.getLocationInWindow(at);
+        root.getLocationInWindow(origin);
+        return new int[] {at[0] - origin[0], at[1] - origin[1], view.getWidth(), view.getHeight()};
+    }
+
+    /** A view's class and identity hash code (its handle, as the inspector shows it). */
+    static String[] identify(View view) {
+        return new String[] {view.getClass().getName(),
+            String.format("0x%08x", System.identityHashCode(view))};
+    }
+
+    /** Shows the inspection overlay over {@code root} (creating it when {@code existing} is null). */
+    static View overlay(View root, View existing, byte[] commands) {
+        View overlay = existing;
+        if (overlay == null) {
+            overlay = new RnCanvasView(root.getContext(), null);
+            overlay.setClickable(false);
+            overlay.setFocusable(false);
+            overlay.setImportantForAccessibility(View.IMPORTANT_FOR_ACCESSIBILITY_NO_HIDE_DESCENDANTS);
+            ((android.view.ViewGroup) root).addView(overlay);
+        }
+        RnLayout.place(overlay, 0, 0, root.getWidth(), root.getHeight());
+        overlay.bringToFront();
+        RnCanvasView.setCommands(overlay, commands);
+        return overlay;
+    }
+
+    static void removeOverlay(View root, View overlay) {
+        ((android.view.ViewGroup) root).removeView(overlay);
+    }
+
     /** Sets a view's tooltip (a mapper's example; API 26+). */
     static void setTooltip(View view, String text) {
         view.setTooltipText(text);

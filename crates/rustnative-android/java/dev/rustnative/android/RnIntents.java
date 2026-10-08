@@ -65,6 +65,11 @@ final class RnIntents {
     }
 
     /** Whether the intent marks a test run (the device suite's activity). */
+    /** Whether the launch asked for inspection (`rustnative run android --inspect`). */
+    static boolean inspect(Intent intent) {
+        return intent != null && intent.hasExtra("dev.rustnative.inspect");
+    }
+
     static boolean isTest(Intent intent) {
         return intent != null && intent.getBooleanExtra("dev.rustnative.test", false);
     }

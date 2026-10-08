@@ -269,6 +269,26 @@ Per-property mappers (`register_mapper`) extend or replace how a node's
 text, style, accessibility, or visibility reaches its `View`, with the
 `View` in hand through JNI (`NativeView`, `java_vm()`).
 
+## Inspection and the development loop
+
+```sh
+rustnative run android --inspect   # start it with the inspector attached
+rustnative inspect --android tree  # then ask it anything `rustnative inspect` asks
+rustnative dev android             # rebuild, reinstall, and restart on save, keeping state
+```
+
+`--inspect` starts the inspection server inside the application, on the
+device's loopback (port 7920); `inspect --android` forwards that port with
+`adb forward` and reads the endpoint and its token with `run-as`, so it
+works with debug builds (which `rustnative` gives `INTERNET`, for the
+socket). The inspector sees each node's `View` — its class, identity hash
+code, and rectangle — the lifetime census, the capability answers, the
+style table, and the mappers, and draws the layout overlay over the
+window. `dev android` builds for the device's ABI only, snapshots the
+running application's state through the inspector, reinstalls, restarts,
+and restores it; theme and catalogue changes apply live, without a
+rebuild, as on the desktops.
+
 ## Packaging
 
 ```sh

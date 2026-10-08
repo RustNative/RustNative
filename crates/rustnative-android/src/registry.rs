@@ -54,6 +54,8 @@ pub(crate) struct WindowRuntime {
     pub(crate) menu: Option<Vec<crate::menus::Entry>>,
     /// Running animations and transitions (`animation`).
     pub(crate) animation: crate::animation::AnimationState,
+    /// The inspection overlay over the window, while one shows.
+    pub(crate) overlay: Option<JavaRef>,
 }
 
 impl std::fmt::Debug for WindowRuntime {
@@ -152,6 +154,7 @@ impl WindowRegistry {
             started: false,
             menu: None,
             animation: crate::animation::AnimationState::default(),
+            overlay: None,
         });
         if let Some(mut old) = runtime.renderer.take() {
             // A recreated activity: the old views belonged to the old one.
@@ -297,6 +300,7 @@ impl WindowRegistry {
     /// The main thread is idle: run deferred work, one window at a time.
     fn idle(&mut self) -> Result<(), Error> {
         self.idle_scheduled = false;
+        startup_settled();
         let windows: Vec<WindowId> = self.windows.keys().copied().collect();
         for window in windows {
             if self.with_application(|application| application.pump_deferred_for(window)) {
@@ -659,6 +663,7 @@ impl WindowRegistry {
                     started: false,
                     menu: None,
                     animation: crate::animation::AnimationState::default(),
+                    overlay: None,
                 },
             );
             call_static(
@@ -752,6 +757,30 @@ impl WindowRegistry {
             self.render(window)?;
         }
         Ok(())
+    }
+}
+
+/// The first idle after the first frame: the content has been drawn (the
+/// looper drew it before going idle) and nothing is left to do. Logs the
+/// startup trace once, as one line `rustnative bench --target android`
+/// reads from logcat.
+fn startup_settled() {
+    use rustnative_core::perf::{self, StartupPhase};
+    if !perf::reached(StartupPhase::FirstFrame) {
+        return;
+    }
+    perf::mark(StartupPhase::FirstContent);
+    if perf::mark(StartupPhase::Interactive) {
+        let trace = perf::startup_trace();
+        let ms =
+            |phase| trace.get(phase).map_or(-1.0, |at: std::time::Duration| at.as_secs_f64() * 1e3);
+        crate::log::info(&format!(
+            "rustnative startup: {{\"runtime_ready_ms\":{:.1},\"first_frame_ms\":{:.1},\"first_content_ms\":{:.1},\"interactive_ms\":{:.1}}}",
+            ms(StartupPhase::RuntimeReady),
+            ms(StartupPhase::FirstFrame),
+            ms(StartupPhase::FirstContent),
+            ms(StartupPhase::Interactive),
+        ));
     }
 }
 
