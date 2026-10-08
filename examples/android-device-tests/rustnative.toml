@@ -1,0 +1,23 @@
+# The device suite's application: `tools/android-device-test.sh` packages it
+# with the instrumentation and runs `am instrument` against it.
+[app]
+name = "android-device-tests"
+id = "dev.rustnative.devicetests"
+display-name = "Rust Native device suite"
+version = "0.1.0"
+description = "The Android backend's device suite"
+url-schemes = ["rustnativetest"]
+
+[android]
+# What the services suite reads and flips with `pm grant`/`pm revoke`.
+permissions = ["android.permission.CAMERA", "android.permission.INTERNET", "android.permission.POST_NOTIFICATIONS"]
+share-types = ["text/plain"]
+
+# A widget and a tile the surfaces suite updates and reads back.
+[[android.widgets]]
+id = "glance"
+label = "Suite glance"
+
+[[android.tiles]]
+id = "toggle"
+label = "Suite toggle"

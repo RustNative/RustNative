@@ -3914,6 +3914,8 @@
     "SelectionChanged",
     "DateChanged",
     "Command",
+    "BackProgress",
+    "ShareReceived",
     "DeepLink",
     "Lifecycle",
     "SurfaceResized",

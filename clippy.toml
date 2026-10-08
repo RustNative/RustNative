@@ -19,7 +19,12 @@ too-many-lines-threshold = 200
 # `windows` crate ecosystem's own release cadence, not a choice made here —
 # so it is named as an accepted exception rather than left for
 # `multiple_crate_versions` to flag as if it were an oversight.
-allowed-duplicate-crates = ["syn"]
+#
+# `rustnative-android`'s `jni` 0.21 adds two more of the same kind: its
+# `jni-sys` 0.3.1 is a compatibility shim re-exporting `jni-sys` 0.4 (the
+# "semver trick"), and its `windows-sys` 0.45 is a Windows-only dependency
+# never built for Android. Neither is code this workspace runs twice.
+allowed-duplicate-crates = ["syn", "jni-sys", "windows-sys"]
 
 # `unwrap_used`/`expect_used` (see `[workspace.lints.clippy]` in the root
 # Cargo.toml) are about *library* code panicking inside somebody else's
@@ -34,4 +39,4 @@ allow-expect-in-tests = true
 # Proper names the Linux backend's documentation uses, which
 # `doc_markdown` would otherwise ask to be code (`..` keeps clippy's own
 # list).
-doc-valid-idents = ["..", "XTest", "LXQt", "WSLg", "Xwayland", "GNOME", "KDE", "AppImage", "AppStream", "GDBus", "GLib", "GObject", "OpenURI", "FileChooser", "NetworkManager", "UPower", "UnifiedPush", "KWallet", "KeePassXC", "StatusNotifierItem", "XEmbed", "AppIndicator", "GApplication", "EndeavourOS", "CentOS"]
+doc-valid-idents = ["..", "XTest", "LXQt", "WSLg", "Xwayland", "GNOME", "KDE", "AppImage", "AppStream", "GDBus", "GLib", "GObject", "OpenURI", "FileChooser", "NetworkManager", "UPower", "UnifiedPush", "KWallet", "KeePassXC", "StatusNotifierItem", "XEmbed", "AppIndicator", "GApplication", "EndeavourOS", "CentOS", "TalkBack", "HyperOS", "AndroidX"]

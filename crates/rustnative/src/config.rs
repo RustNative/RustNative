@@ -81,6 +81,86 @@ pub struct Config {
     /// The web platform (`[web]`, Web milestone J).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub web: Option<crate::web::WebConfig>,
+    /// The Android platform (`[android]`, Milestone 35).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub android: Option<Android>,
+}
+
+/// The `[android]` table: what the generated Android project declares
+/// beyond `[app]`.
+#[derive(Debug, Clone, PartialEq, Eq, Default, Serialize, Deserialize)]
+#[serde(rename_all = "kebab-case", deny_unknown_fields)]
+pub struct Android {
+    /// The application id, when `app.id` is not one Android accepts as it
+    /// is (by default it is `app.id` with every `-` made `_`).
+    #[serde(default)]
+    pub application_id: Option<String>,
+    /// The oldest API level it runs on (at least 26).
+    #[serde(default)]
+    pub min_sdk: Option<u32>,
+    /// The API level it targets.
+    #[serde(default)]
+    pub target_sdk: Option<u32>,
+    /// The ABIs it ships (`arm64-v8a`, `armeabi-v7a`, `x86_64`, `x86`);
+    /// all four by default.
+    #[serde(default)]
+    pub abis: Vec<String>,
+    /// Permissions it uses (`android.permission.CAMERA`).
+    #[serde(default)]
+    pub permissions: Vec<String>,
+    /// MIME types it accepts shares of (`text/plain`, `image/*`).
+    #[serde(default)]
+    pub share_types: Vec<String>,
+    /// Home-screen widgets.
+    #[serde(default)]
+    pub widgets: Vec<AndroidSurface>,
+    /// Quick-settings tiles.
+    #[serde(default)]
+    pub tiles: Vec<AndroidSurface>,
+    /// Asset packs in the bundle.
+    #[serde(default)]
+    pub asset_packs: Vec<AndroidAssetPack>,
+    /// The release keystore.
+    #[serde(default)]
+    pub keystore: Option<AndroidKeystore>,
+}
+
+/// A widget or tile (`[[android.widgets]]`, `[[android.tiles]]`).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "kebab-case", deny_unknown_fields)]
+pub struct AndroidSurface {
+    /// Its id, as the application names it.
+    pub id: String,
+    /// What people see it called.
+    pub label: String,
+}
+
+/// An asset pack (`[[android.asset-packs]]`).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "kebab-case", deny_unknown_fields)]
+pub struct AndroidAssetPack {
+    /// Its module name.
+    pub name: String,
+    /// `install-time`, `fast-follow`, or `on-demand`.
+    pub delivery: String,
+    /// The folder, relative to the project, whose files it carries.
+    pub path: PathBuf,
+}
+
+/// The release keystore (`[android.keystore]`): where it is and which
+/// environment variables hold its passwords. The passwords themselves never
+/// appear in the project.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "kebab-case", deny_unknown_fields)]
+pub struct AndroidKeystore {
+    /// The keystore file (absolute, or relative to the project).
+    pub store: PathBuf,
+    /// The key's alias.
+    pub alias: String,
+    /// The environment variable with the store's password.
+    pub store_password_env: String,
+    /// The environment variable with the key's password.
+    pub key_password_env: String,
 }
 
 /// The `[package]` table: what goes into the generated native project
@@ -277,6 +357,7 @@ impl Config {
             package: Package::default(),
             update: None,
             web: None,
+            android: None,
         }
     }
 }

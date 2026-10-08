@@ -733,6 +733,20 @@ impl ComponentTree {
         id: crate::command::CommandId,
         focused: Option<NodeId>,
     ) -> bool {
+        self.deliver_to_command(id, focused, &Event::Command { id })
+    }
+
+    /// Delivers `event` to the component command `id` routes to from
+    /// `focused`, as [`Self::invoke_command`] delivers the command itself —
+    /// how a host's progress toward invoking it (a predictive back gesture)
+    /// reaches the component that will handle it. Returns whether an
+    /// enabled declaration was found.
+    pub fn deliver_to_command(
+        &mut self,
+        id: crate::command::CommandId,
+        focused: Option<NodeId>,
+        event: &Event,
+    ) -> bool {
         let chain = self.focus_chain(focused);
         let Some((owner, command)) = self.commands.resolve(id, &chain) else {
             return false;
@@ -740,7 +754,7 @@ impl ComponentTree {
         if !command.is_enabled() {
             return false;
         }
-        self.update_component(owner, &Event::Command { id });
+        self.update_component(owner, event);
         if !self.message_sink.borrow().is_empty() {
             self.drain_messages();
         }

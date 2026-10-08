@@ -231,7 +231,10 @@ impl WindowRegistry {
                 SurfaceCommand::Progress(progress) => {
                     crate::desktop::tray::set_progress(&app_id, progress);
                 }
-                SurfaceCommand::Notify { title, body } => {
+                // The tray's notifications carry no buttons: one with actions
+                // shows as a plain notification whose click still returns.
+                SurfaceCommand::Notify { title, body }
+                | SurfaceCommand::NotifyWithActions { title, body, .. } => {
                     let application =
                         glib::application_name().map(|name| name.to_string()).unwrap_or_default();
                     glib::MainContext::default().spawn_local(async move {

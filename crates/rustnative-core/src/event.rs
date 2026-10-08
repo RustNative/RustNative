@@ -51,6 +51,8 @@ pub const EVENT_NAMES: &[&str] = &[
     "SelectionChanged",
     "DateChanged",
     "Command",
+    "BackProgress",
+    "ShareReceived",
     "DeepLink",
     "Lifecycle",
     "SurfaceResized",
@@ -342,6 +344,25 @@ pub enum Event {
         /// The command.
         id: crate::command::CommandId,
     },
+    /// The person is partway through the host's back gesture (Android's
+    /// predictive back), which will invoke
+    /// [`crate::command::standard::BACK`] if they finish it. Delivered to
+    /// the component that declared `BACK` enabled, so a screen can preview
+    /// what going back reveals; a finished gesture arrives as
+    /// [`Event::Command`], an abandoned one as [`BackPhase::Cancelled`].
+    BackProgress {
+        /// The window the gesture is in.
+        window: crate::identity::WindowId,
+        /// How far along it is.
+        phase: BackPhase,
+    },
+    /// Content another application shared with this one through the host's
+    /// share sheet (an Android share target, an iOS share extension).
+    /// Delivered to the primary window's root component.
+    ShareReceived {
+        /// What was shared.
+        share: SharedContent,
+    },
     /// The application was asked to open `url` — launched with it, or
     /// handed it by a second launch while already running.
     ///
@@ -457,6 +478,8 @@ impl Event {
             | Self::ClipboardChanged { .. }
             | Self::DeepLink { .. }
             | Self::Command { .. }
+            | Self::BackProgress { .. }
+            | Self::ShareReceived { .. }
             | Self::Lifecycle(_) => None,
         }
     }
@@ -511,10 +534,63 @@ impl Event {
             | Self::ClipboardChanged { .. }
             | Self::DeepLink { .. }
             | Self::Command { .. }
+            | Self::BackProgress { .. }
+            | Self::ShareReceived { .. }
             | Self::Lifecycle(_) => {}
         }
         self
     }
+}
+
+/// How far the host's back gesture has gone ([`Event::BackProgress`]).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[non_exhaustive]
+pub enum BackPhase {
+    /// The gesture began, from `edge`.
+    Started {
+        /// The screen edge the swipe came from.
+        edge: BackEdge,
+    },
+    /// The gesture moved: `progress` runs from 0 (just started) to 1 (as
+    /// far as it goes), following the person's finger.
+    Progressed {
+        /// How far along, 0 to 1.
+        progress: crate::input::Scalar,
+    },
+    /// The person let go without finishing; nothing goes back.
+    Cancelled,
+}
+
+/// The screen edge a back gesture came from.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum BackEdge {
+    /// The left edge.
+    Left,
+    /// The right edge.
+    Right,
+    /// No edge: a button or key started it.
+    None,
+}
+
+/// What another application shared ([`Event::ShareReceived`]).
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
+pub struct SharedContent {
+    /// Shared text, if any.
+    pub text: Option<String>,
+    /// A subject or title that came with it.
+    pub subject: Option<String>,
+    /// Shared items (files, images), each a URI this application was
+    /// granted read access to, with its MIME type.
+    pub items: Vec<SharedItem>,
+}
+
+/// One shared item ([`SharedContent::items`]).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct SharedItem {
+    /// Where to read it (a `content://` URI on Android).
+    pub uri: String,
+    /// Its MIME type, as the sender declared it.
+    pub mime_type: String,
 }
 
 /// A platform-independent keyboard key. Backends translate their native

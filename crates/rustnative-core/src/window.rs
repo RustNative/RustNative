@@ -112,6 +112,7 @@ pub(crate) fn event_window_id(event: &Event) -> Option<WindowId> {
         | Event::WindowStateChanged { window, .. }
         | Event::MenuAction { window, .. }
         | Event::SurfaceAction { window, .. }
+        | Event::BackProgress { window, .. }
         | Event::ClipboardChanged { window } => Some(*window),
         _ => None,
     }

@@ -27,6 +27,7 @@
 
 #![deny(missing_docs)]
 
+pub mod android;
 pub mod assets;
 pub mod icon;
 pub mod manifest;

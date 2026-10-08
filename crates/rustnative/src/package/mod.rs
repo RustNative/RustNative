@@ -14,6 +14,7 @@
 //! `build.rs` runs, so an executable carries its resources however it was
 //! built, not only when it was packaged.
 
+pub mod android;
 pub mod linux;
 pub mod msix;
 pub mod sign;
@@ -44,6 +45,10 @@ pub enum Format {
     /// A self-contained AppImage (Linux; needs `appimagetool`).
     #[value(name = "appimage")]
     AppImage,
+    /// An Android APK, signed with the `[android.keystore]` when declared.
+    Apk,
+    /// An Android application bundle (for Play), with its asset packs.
+    Aab,
     /// Every format of the platform (on Linux, the AppImage only when
     /// `appimagetool` is installed).
     All,
@@ -62,6 +67,12 @@ impl Format {
     #[must_use]
     pub const fn is_windows(self) -> bool {
         matches!(self, Self::Zip | Self::Msix | Self::All)
+    }
+
+    /// Whether this format is one of Android's (`apk`, `aab`, or `all`).
+    #[must_use]
+    pub const fn is_android(self) -> bool {
+        matches!(self, Self::Apk | Self::Aab | Self::All)
     }
 
     /// Whether this format is one of Linux's (`deb`, `rpm`, `pacman`,

@@ -15,7 +15,7 @@ use std::time::SystemTime;
 use proc_macro::TokenStream;
 use proc_macro2::Span;
 use quote::{quote, quote_spanned};
-use rustnative_style::{LINUX, StyleSupport, StyleValue, Vocabulary, WINDOWS};
+use rustnative_style::{ANDROID, LINUX, StyleSupport, StyleValue, Vocabulary, WINDOWS};
 
 /// The markup syntax, delimited, inside any `.rs` file (`PLAN.md` 2.9).
 ///
@@ -167,7 +167,11 @@ fn style_macro(input: proc_macro2::TokenStream, kind: Kind) -> proc_macro2::Toke
     // One native backend per operating system today, so the target OS
     // selects the table; the error is emitted under that OS's `cfg`, which
     // the *application's* build evaluates.
-    let targets = [(WINDOWS, "windows", "WINDOWS"), (LINUX, "linux", "LINUX")];
+    let targets = [
+        (WINDOWS, "windows", "WINDOWS"),
+        (LINUX, "linux", "LINUX"),
+        (ANDROID, "android", "ANDROID"),
+    ];
     let unavailable = pieces.iter().flat_map(|piece| {
         let declarations = resolve(piece).unwrap_or_default();
         declarations.into_iter().flat_map(move |declaration| {

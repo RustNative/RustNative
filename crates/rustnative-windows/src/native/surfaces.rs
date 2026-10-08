@@ -194,7 +194,10 @@ pub(crate) fn apply(runtime: &mut Runtime) {
             SurfaceCommand::Progress(progress) => {
                 let _ = set_progress(runtime.window, progress);
             }
-            SurfaceCommand::Notify { title, body } => {
+            // A balloon has no buttons: a notification with actions shows as
+            // a plain one, and its click still arrives as `NOTIFICATION`.
+            SurfaceCommand::Notify { title, body }
+            | SurfaceCommand::NotifyWithActions { title, body, .. } => {
                 notify(runtime, &title, &body);
             }
             _ => {}

@@ -257,6 +257,13 @@ enum Command {
         /// For `web --mode serverless`: where it runs.
         #[arg(long, value_enum)]
         host: Option<crate::web::WebHost>,
+        /// For `android`: the ABIs to build (repeatable; all of
+        /// `[android] abis` by default).
+        #[arg(long = "abi")]
+        abis: Vec<String>,
+        /// For `android`: carry the device suite's instrumentation.
+        #[arg(long, hide = true)]
+        instrumentation: bool,
     },
     /// Serve a build locally as its host would (`rustnative serve static
     /// target/web/client`).
@@ -472,6 +479,46 @@ impl Cli {
                     },
                 )
             }
+            Command::Build {
+                platform: Platform::Android, release, abis, instrumentation, ..
+            } => {
+                let project = Project::find(&here)?;
+                let options = crate::package::android::Options {
+                    release,
+                    abis,
+                    instrumentation,
+                    ..Default::default()
+                };
+                let apk = crate::package::android::build(&project.root, &project.config, &options)?;
+                println!("Built {}", apk.display());
+                Ok(())
+            }
+            Command::Run { platform: Platform::Android, release } => {
+                let project = Project::find(&here)?;
+                crate::package::android::run(&project.root, &project.config, release)
+            }
+            Command::Check { platform: Platform::Android } => {
+                let project = Project::find(&here)?;
+                let toolchain = crate::package::android::toolchain()?;
+                let mut cargo = std::process::Command::new("cargo");
+                cargo.current_dir(&project.root).args([
+                    "check",
+                    "--lib",
+                    "--target",
+                    "aarch64-linux-android",
+                ]);
+                for (name, value) in toolchain.cargo_environment("aarch64-linux-android") {
+                    cargo.env(name, value);
+                }
+                let status = cargo
+                    .status()
+                    .map_err(|cause| Error::Io { what: "run cargo".to_owned(), cause })?;
+                if status.success() {
+                    Ok(())
+                } else {
+                    Err(Error::Usage("the check failed".to_owned()))
+                }
+            }
             Command::Build { platform, release, pgo, cache, .. } => {
                 if pgo {
                     if platform.backend().is_none() {
@@ -646,6 +693,22 @@ impl Cli {
             }
             Command::Lsp { server } => crate::lsp::serve(&server),
             Command::EchoLsp => crate::lsp::echo_server(),
+            Command::Package { platform: Platform::Android, format, .. } => {
+                if !format.is_android() {
+                    return Err(Error::Usage("Android packages are apk, aab, or all".to_owned()));
+                }
+                let project = Project::find(&here)?;
+                let apk =
+                    matches!(format, crate::package::Format::Apk | crate::package::Format::All);
+                let aab =
+                    matches!(format, crate::package::Format::Aab | crate::package::Format::All);
+                for path in
+                    crate::package::android::package(&project.root, &project.config, apk, aab)?
+                {
+                    println!("Packaged {}", path.display());
+                }
+                Ok(())
+            }
             Command::Package { platform: Platform::Linux, format, .. } => {
                 if !format.is_linux() {
                     return Err(Error::Usage(

@@ -1,0 +1,24 @@
+[package]
+name = "android-device-tests"
+version = "0.1.0"
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+description = "The Android backend's device suite, packaged as an application with its instrumentation"
+repository.workspace = true
+homepage.workspace = true
+readme.workspace = true
+keywords.workspace = true
+categories.workspace = true
+publish = false
+
+[lints]
+workspace = true
+
+[lib]
+# Built as a `cdylib` for Android by `rustnative build android`
+# (`cargo rustc --crate-type cdylib`), never by a desktop build.
+crate-type = ["lib"]
+
+[dependencies]
+rustnative-android = { workspace = true, features = ["device-tests"] }

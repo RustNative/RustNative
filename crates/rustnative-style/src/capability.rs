@@ -147,6 +147,31 @@ table!(LINUX, "Linux", [
     Display => StyleSupport::Realized,
 ]);
 
+table!(ANDROID, "Android", [
+    // Every property is applied to the real platform widget through the
+    // host's own mechanisms (`rustnative_android`'s styling module): a
+    // `GradientDrawable` background with its stroke and corner radii
+    // (wrapped in the host's ripple for pressable controls), `TextView`'s
+    // colour, typeface, and size, `setPadding`, `setAlpha`, and
+    // `setVisibility` — the way Android applications style their own views,
+    // not owner drawing. An unstyled control keeps the device theme's look.
+    Foreground => StyleSupport::Realized,
+    Background => StyleSupport::Realized,
+    BorderColor => StyleSupport::Realized,
+    BorderRadius => StyleSupport::Realized,
+    FontSize => StyleSupport::Realized,
+    FontWeight => StyleSupport::Realized,
+    FontFamily => StyleSupport::Approximated(
+        "the first family in the list is used, through `Typeface.create`; the generic families map to the          system's `sans-serif`, `serif`, and `monospace` families, and `system-ui` to the device's default"
+    ),
+    Shadow => StyleSupport::Approximated(
+        "realized as elevation (`View.setElevation`) over an outline that follows the corner radius: the host          draws its own ambient and key-light shadow, so the declared blur sets the elevation and the declared          offset and colour are not used"
+    ),
+    Overflow => StyleSupport::Realized,
+    Opacity => StyleSupport::Realized,
+    Display => StyleSupport::Realized,
+]);
+
 table!(HEADLESS, "headless", [
     Foreground => StyleSupport::Realized,
     Background => StyleSupport::Realized,
@@ -218,6 +243,15 @@ pub const LINUX_UNITS: UnitMapping = UnitMapping {
     rounding: "half away from zero, once, where a length becomes whole application pixels",
 };
 
+/// The Android backend's unit mapping.
+pub const ANDROID_UNITS: UnitMapping = UnitMapping {
+    backend: "Android",
+    host_unit: "density-independent pixels (dp)",
+    pixel: "one logical pixel is one dp; the backend places views in device pixels at dp ×             `DisplayMetrics.density` (2.75 on a typical phone), and a native surface reports that density as its             `scale_factor`",
+    rem: "16 dp × the system font scale (`Configuration.fontScale`, fed into `keys::TEXT_SCALE`) for lengths;           fonts are realized at their specified size × the font scale (as `sp` are), and `StaticLayout` measures           them at that size",
+    rounding: "half away from zero, once, where a length becomes whole device pixels",
+};
+
 /// The headless backend's unit mapping.
 pub const HEADLESS_UNITS: UnitMapping = UnitMapping {
     backend: "headless",
@@ -233,7 +267,7 @@ mod tests {
 
     #[test]
     fn every_shipped_table_answers_every_property() {
-        for table in [WINDOWS, LINUX, HEADLESS, WEB] {
+        for table in [WINDOWS, LINUX, ANDROID, HEADLESS, WEB] {
             for property in StyleProperty::ALL {
                 assert!(
                     table.entries.iter().any(|(entry, _)| entry == property),

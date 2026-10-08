@@ -76,6 +76,17 @@ pub mod standard {
     pub const CLOSE: CommandId = CommandId::new("rustnative.close");
     /// Find in the current view.
     pub const FIND: CommandId = CommandId::new("rustnative.find");
+    /// Go back: pop a navigation stack, close a sheet, leave a mode.
+    ///
+    /// A component declares it enabled while it has somewhere to go back
+    /// to (`NavigationStack::can_go_back`). A backend binds the host's own
+    /// back to it — Android's system back and predictive back gesture, a
+    /// mouse's back button — and asks before claiming the gesture
+    /// (`Application::handles_back`): with no enabled declaration, the
+    /// host's own back happens instead (leaving the application). Progress
+    /// through a predictive gesture arrives first as
+    /// [`crate::Event::BackProgress`].
+    pub const BACK: CommandId = CommandId::new("rustnative.back");
 }
 
 /// A key combination that invokes a command.

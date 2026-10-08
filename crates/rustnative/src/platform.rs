@@ -37,6 +37,7 @@ impl Platform {
         match self {
             Self::Windows => Some("rustnative-windows"),
             Self::Linux => Some("rustnative-linux"),
+            Self::Android => Some("rustnative-android"),
             Self::Web => Some("rustnative-web"),
             _ => None,
         }
@@ -49,9 +50,8 @@ impl Platform {
         match self {
             // The web target has a roadmap section rather than a numbered
             // milestone, so it names none either.
-            Self::Windows | Self::Linux | Self::Web => None,
+            Self::Windows | Self::Linux | Self::Android | Self::Web => None,
             Self::Macos => Some(33),
-            Self::Android => Some(35),
             Self::Ios => Some(36),
             Self::Embedded => Some(37),
         }
@@ -78,10 +78,12 @@ mod tests {
     use super::*;
 
     #[test]
-    fn windows_linux_and_web_have_backends_and_every_other_names_its_milestone() {
+    fn windows_linux_android_and_web_have_backends_and_every_other_names_its_milestone() {
         assert_eq!(Platform::Windows.backend(), Some("rustnative-windows"));
         assert_eq!(Platform::Linux.backend(), Some("rustnative-linux"));
-        for platform in [Platform::Macos, Platform::Android, Platform::Ios, Platform::Embedded] {
+        assert_eq!(Platform::Android.backend(), Some("rustnative-android"));
+        assert_eq!(Platform::Android.planned_milestone(), None);
+        for platform in [Platform::Macos, Platform::Ios, Platform::Embedded] {
             assert!(platform.backend().is_none(), "{platform} has no backend yet");
             assert!(platform.planned_milestone().is_some(), "{platform} names its milestone");
         }

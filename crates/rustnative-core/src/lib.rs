@@ -385,7 +385,10 @@ pub use environment::{
     Breakpoint, ColorScheme, Contrast, EnvKey, EnvValue, Environment, Locale, PointerPrecision,
     Posture, Preference, PreferenceKey, SizeClass, SizeClasses, WindowMode, keys,
 };
-pub use event::{AccessibilityInfo, AccessibilityRole, Event, KeyCode, KeyModifiers};
+pub use event::{
+    AccessibilityInfo, AccessibilityRole, BackEdge, BackPhase, Event, KeyCode, KeyModifiers,
+    SharedContent, SharedItem,
+};
 pub use grant::{Grant, GrantSet, Granted, ScopedServices};
 pub use graphics::{
     DrawCommand, DrawList, ImageData, ImageError, Paint, Path, PathSegment, RectF, SurfaceId,

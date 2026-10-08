@@ -197,6 +197,51 @@ impl Application {
         application
     }
 
+    /// Moves the application out, leaving an empty one with no windows in
+    /// its place.
+    ///
+    /// For a host whose loop the application cannot block in: Android's
+    /// main thread belongs to the host's own loop, so its backend's
+    /// `Platform::run` adopts the application it was handed and returns,
+    /// and the host's loop drives it from then on. What is left behind has
+    /// no windows, no components, and default services; dropping it does
+    /// nothing.
+    ///
+    /// ```
+    /// use rustnative_core::{Application, Component, Event, Node, Size, Window};
+    /// # struct Root;
+    /// # impl Component for Root {
+    /// #     type Props = ();
+    /// #     type Message = ();
+    /// #     fn new((): Self::Props) -> Self { Self }
+    /// #     fn props(&self) -> &Self::Props { &() }
+    /// #     fn set_props(&mut self, (): Self::Props) {}
+    /// #     fn view(&self) -> Node { Node::label("greeting", "Hello") }
+    /// #     fn update(&mut self, _event: Event) {}
+    /// # }
+    /// let mut application = Application::new(Root, Window::new("Root", Size::new(320, 200)));
+    /// let adopted = application.take();
+    /// assert_eq!(adopted.window_ids().len(), 1);
+    /// assert!(application.window_ids().is_empty());
+    /// ```
+    #[must_use]
+    pub fn take(&mut self) -> Self {
+        let empty = Self {
+            windows: HashMap::new(),
+            primary_window: WindowId::PRIMARY,
+            next_window_id: 1,
+            services: Services::default(),
+            theme: Theme::default(),
+            panic_policy: PanicPolicy::default(),
+            motion: crate::MotionPreference::default(),
+            executor: None,
+            environment: crate::environment::Environment::new(),
+            inspection: crate::inspect::Inspection::default(),
+            host_palette: None,
+        };
+        std::mem::replace(self, empty)
+    }
+
     /// Dispatches `event` to the primary window. Returns whether it was
     /// handled.
     pub fn dispatch(&mut self, event: Event) -> bool {
@@ -708,6 +753,39 @@ impl Application {
         let commands = entry.components.take_window_commands();
         self.apply_window_commands(commands);
         invoked
+    }
+
+    /// Reports the host's back gesture progressing toward the back command
+    /// ([`crate::command::standard::BACK`]) in window `id`, delivering
+    /// [`Event::BackProgress`] to the component that declared it enabled.
+    /// Returns whether one did — when none does, the host handles back
+    /// itself and no progress is reported. A completed gesture is
+    /// [`Self::invoke_command`] with `BACK`.
+    pub fn back_progress(
+        &mut self,
+        id: WindowId,
+        phase: crate::event::BackPhase,
+        focused: Option<crate::identity::NodeId>,
+    ) -> bool {
+        let Some(entry) = self.windows.get_mut(&id) else { return false };
+        let delivered = entry.components.deliver_to_command(
+            crate::command::standard::BACK,
+            focused,
+            &Event::BackProgress { window: id, phase },
+        );
+        let commands = entry.components.take_window_commands();
+        self.apply_window_commands(commands);
+        delivered
+    }
+
+    /// Whether window `id` has a component that handles the back command
+    /// right now — what a host asks before claiming its back gesture, so
+    /// that with nothing to go back to, the host's own back (leaving the
+    /// application, with its own animation) happens instead.
+    #[must_use]
+    pub fn handles_back(&self, id: WindowId, focused: Option<crate::identity::NodeId>) -> bool {
+        self.command_state(id, crate::command::standard::BACK, focused)
+            .is_some_and(|command| command.is_enabled())
     }
 
     /// Offers a key press to window `id`'s command shortcuts before it is

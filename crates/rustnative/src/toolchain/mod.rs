@@ -11,6 +11,7 @@
 //! `rustnative` never reimplements a toolchain: it finds one, runs it, and reports
 //! honestly when it is not there.
 
+pub mod android;
 pub mod cargo;
 pub mod linux_distro;
 pub mod windows_sdk;

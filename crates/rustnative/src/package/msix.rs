@@ -302,6 +302,7 @@ mod tests {
             package: crate::config::Package::default(),
             update: None,
             web: None,
+            android: None,
         }
     }
 
