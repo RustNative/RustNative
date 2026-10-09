@@ -4,7 +4,7 @@
 //!
 //! - **Installed from Google Play:** Play updates it, and Play's policy
 //!   forbids an application updating its own code any other way.
-//!   [`AndroidUpdater::install`] refuses (`UpdateError::Forbidden`); model
+//!   `AndroidUpdater::install` refuses (`UpdateError::Forbidden`); model
 //!   and data payloads ([`PayloadKind::Model`]) are still allowed — they
 //!   are data, not code.
 //! - **Sideloaded** (an APK from the publisher's site, an enterprise
@@ -158,7 +158,7 @@ pub struct AndroidUpdater {
 
 impl AndroidUpdater {
     /// The updater keeping its records under `root` (on a device,
-    /// [`AndroidUpdater::for_application`]), running version `current`,
+    /// `AndroidUpdater::for_application`), running version `current`,
     /// trusting `public_key` (hex).
     ///
     /// # Errors
