@@ -460,3 +460,66 @@ fn the_linux_capability_table_is_what_gtk_paints() {
         );
     });
 }
+
+/// A padded label beside a plain one.
+struct Badges;
+
+impl Component for Badges {
+    type Props = ();
+    type Message = ();
+    fn new((): ()) -> Self {
+        Self
+    }
+    fn props(&self) -> &() {
+        &()
+    }
+    fn set_props(&mut self, (): ()) {}
+    fn view(&self) -> Node {
+        Node::row(
+            "root",
+            [
+                Node::label("badge", "Badge"),
+                Node::label("padded", "Badge").with_style(
+                    rustnative_core::VisualStyle::default().padding(rustnative_core::EdgeInsets {
+                        top: 2,
+                        end: 4,
+                        bottom: 2,
+                        start: 12,
+                    }),
+                ),
+            ],
+        )
+    }
+    fn update(&mut self, _: Event) {}
+}
+
+#[test]
+fn a_labels_padding_insets_its_text_and_widens_it() {
+    on_gtk(|| {
+        let mut application = Application::new(Badges, Window::new("Badges", Size::new(360, 120)));
+        // SAFETY: `application` outlives `harness`, declared after it.
+        let harness = unsafe { Harness::attach(&mut application) };
+        let placed = harness.with_registry(|registry| {
+            registry.windows[&WindowId::PRIMARY].renderer.placed_rects().clone()
+        });
+        let (plain, padded) =
+            (placed[&NodeId::from_key("badge")], placed[&NodeId::from_key("padded")]);
+        assert_eq!(padded.width, plain.width + 16, "the box reserves the padding");
+        let padding = |key: &str| {
+            #[allow(deprecated, reason = "GTK's own reading of the computed padding")]
+            let border = harness.expect(key).style_context().padding();
+            (border.left(), border.right())
+        };
+        assert_eq!(padding("badge"), (0, 0), "a plain label keeps its own");
+        assert_eq!(padding("padded"), (12, 4), "the text is inset at its start");
+
+        harness.with_registry(|registry| {
+            registry.with_application(|application| {
+                application.set_locale(rustnative_core::Locale::new("ar-EG"));
+            });
+            registry.render(WindowId::PRIMARY).expect("re-render after the locale change");
+        });
+        harness.pump();
+        assert_eq!(padding("padded"), (4, 12), "right to left, the start is the right");
+    });
+}

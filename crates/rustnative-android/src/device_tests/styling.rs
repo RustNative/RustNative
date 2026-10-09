@@ -1,5 +1,6 @@
 //! Styling, host traits, direction, and the environment on a real device
-//! (Phase 2): the `ANDROID` table is what the backend applies; an unstyled
+//! (Phase 2): the `ANDROID` table is what the backend applies; a leaf's
+//! padding insets its text and widens its box; an unstyled
 //! control keeps the device theme's look; night mode and font scale reach
 //! the environment and restyle the same views; right to left mirrors with
 //! the same views; the safe area is the window's insets.
@@ -7,14 +8,15 @@
 use std::time::Duration;
 
 use rustnative_core::{
-    Application, Color, ColorScheme, Component, Event, LayoutDirection, Locale, Node, Scalar, Size,
-    Typography, VisualStyle, Window, WindowId, keys,
+    Application, Color, ColorScheme, Component, EdgeInsets, Event, LayoutDirection, Locale, Node,
+    Scalar, Size, Typography, VisualStyle, Window, WindowId, keys,
 };
 
 use super::harness::{Harness, Instrumentation, java, keep, on_main, with_kept};
 use crate::jni_host::{Arg, Class};
 
-/// A styled button beside a plain one, in a row.
+/// A styled button beside a plain one, in a row, and a padded label beside
+/// a plain one.
 struct Styled;
 
 impl Component for Styled {
@@ -45,6 +47,20 @@ impl Component for Styled {
                     ],
                 ),
                 Node::label("caption", "Caption"),
+                Node::row(
+                    "badges",
+                    [
+                        Node::label("badge", "Badge"),
+                        Node::label("padded", "Badge").with_style(
+                            VisualStyle::default().padding(EdgeInsets {
+                                top: 2,
+                                end: 4,
+                                bottom: 2,
+                                start: 12,
+                            }),
+                        ),
+                    ],
+                ),
             ],
         )
     }
@@ -97,6 +113,31 @@ pub(super) fn the_android_table_is_what_the_backend_applies(_: &Instrumentation)
             0,
             "no framework box behind the plain button"
         );
+    });
+}
+
+pub(super) fn a_leafs_padding_insets_its_text_and_widens_it(_: &Instrumentation) {
+    on_main(|| {
+        let harness =
+            Harness::launch(Application::new(Styled, Window::new("Styled", Size::new(360, 400))));
+        let density = harness.density();
+        let (plain, padded) = (harness.placed("badge"), harness.placed("padded"));
+        let (plain, padded) = (plain.expect("badge placed"), padded.expect("padded placed"));
+        assert_eq!(padded.width, plain.width + 16, "the box reserves the padding");
+        // Left and right padding in pixels, against start and end in dp.
+        let inset = |key: &str, (left, right): (i32, i32)| {
+            let style = style_of(&harness, key);
+            let px = |dp: i32| f64::from(crate::units::to_px(dp, density));
+            (f64::from(style[10]) - px(left)).abs() < 0.5
+                && (f64::from(style[11]) - px(right)).abs() < 0.5
+        };
+        assert!(inset("padded", (12, 4)), "the text is inset at its start");
+        assert!(inset("badge", (0, 0)), "a plain label keeps its own");
+        harness.with_registry(|registry| {
+            registry.with_application(|application| application.set_locale(Locale::new("ar-EG")));
+            registry.render(WindowId::PRIMARY).expect("rendered");
+        });
+        assert!(inset("padded", (4, 12)), "right to left, the start is the right");
     });
 }
 

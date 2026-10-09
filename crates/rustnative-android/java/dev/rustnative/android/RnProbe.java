@@ -19,7 +19,8 @@ final class RnProbe {
      * The view's style: background colour (ARGB, 0 when the background is
      * not the framework's), text colour, text size (px), font weight, corner
      * radius (px), elevation (px), alpha, layout direction (1 right to left),
-     * visibility (1 visible), enabled (1).
+     * visibility (1 visible), enabled (1), left padding (px), right padding
+     * (px).
      */
     static float[] style(View view) {
         float background = 0;
@@ -47,6 +48,7 @@ final class RnProbe {
             view.getLayoutDirection() == View.LAYOUT_DIRECTION_RTL ? 1 : 0,
             view.getVisibility() == View.VISIBLE ? 1 : 0,
             view.isEnabled() ? 1 : 0,
+            view.getPaddingLeft(), view.getPaddingRight(),
         };
     }
 

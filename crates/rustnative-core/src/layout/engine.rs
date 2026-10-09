@@ -1030,14 +1030,15 @@ impl LayoutEngine {
     ) -> i32 {
         let base = match node.kind {
             NodeKind::Label | NodeKind::Button | NodeKind::TextInput | NodeKind::TabBar => {
-                measurer
+                (measurer
                     .measure_styled(
                         node.kind,
                         node.text.as_deref(),
                         None,
                         node.visual_style.properties().typography_override(),
                     )
-                    .width as i32
+                    .width as i32)
+                    .saturating_add(leaf_padding(node).horizontal())
             }
             NodeKind::Control => node
                 .control
@@ -1088,14 +1089,16 @@ impl LayoutEngine {
         }
         match node.kind {
             NodeKind::Label | NodeKind::Button | NodeKind::TextInput | NodeKind::TabBar => {
-                measurer
+                let padding = leaf_padding(node);
+                (measurer
                     .measure_styled(
                         node.kind,
                         node.text.as_deref(),
-                        max_width,
+                        max_width.map(|width| width.saturating_sub(padding.horizontal())),
                         node.visual_style.properties().typography_override(),
                     )
-                    .height as i32
+                    .height as i32)
+                    .saturating_add(padding.vertical())
             }
             NodeKind::Control => node
                 .control
@@ -1209,6 +1212,12 @@ fn preferred_width_hint(node: &TreeNode) -> Option<i32> {
 
 fn ordered_children(snapshot: &TreeSnapshot, parent: NodeId) -> Vec<&TreeNode> {
     snapshot.children_of(parent).collect()
+}
+
+/// A text leaf's own padding (its visual style's): the host insets its text
+/// by it inside the leaf's box, so the box is measured with it.
+fn leaf_padding(node: &TreeNode) -> EdgeInsets {
+    node.visual_style.properties().padding_override().unwrap_or_default()
 }
 
 fn inner_rect(rect: Rect, padding: EdgeInsets) -> Rect {
@@ -1376,6 +1385,30 @@ mod tests {
         // Relative to `inner`'s own content rect, not the root's.
         assert_eq!(leaf.x, 5);
         assert_eq!(leaf.y, 5);
+    }
+
+    #[test]
+    fn a_leafs_padding_is_measured_into_its_box() {
+        let tree = Node::row(
+            "root",
+            [
+                Node::label("plain", "badge"),
+                Node::label("padded", "badge").with_style(
+                    crate::style::VisualStyle::new().padding(EdgeInsets {
+                        top: 2,
+                        end: 8,
+                        bottom: 2,
+                        start: 8,
+                    }),
+                ),
+            ],
+        );
+        let snapshot =
+            TreeSnapshot::from_node_with_theme(&tree, &crate::style::Theme::default()).unwrap();
+        let rects = LayoutEngine::new().layout(&snapshot, Size::new(400, 100));
+        let plain = rects[&NodeId::from_key("plain")];
+        let padded = rects[&NodeId::from_key("padded")];
+        assert_eq!(padded.width, plain.width + 16);
     }
 
     #[test]

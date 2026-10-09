@@ -737,12 +737,16 @@ impl Renderer {
                 hwnd,
                 Some(colorref_to_color(background)),
             ),
-            NodeKind::Label
-            | NodeKind::Button
-            | NodeKind::TextInput
-            | NodeKind::TabBar
-            | NodeKind::Control
-            | NodeKind::Surface => {}
+            // A leaf's own padding insets its text.
+            NodeKind::Label | NodeKind::TextInput => super::padding::set(
+                hwnd,
+                node.visual_style.properties().padding_override(),
+                node.kind == NodeKind::TextInput,
+            ),
+            NodeKind::Button => {
+                super::padding::set_button(hwnd, node.visual_style.properties().padding_override());
+            }
+            NodeKind::TabBar | NodeKind::Control | NodeKind::Surface => {}
         }
 
         // SAFETY: `hwnd` is a live HWND owned by this renderer's registry;

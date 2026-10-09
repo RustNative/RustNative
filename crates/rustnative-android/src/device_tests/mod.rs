@@ -66,6 +66,10 @@ const TESTS: &[(&str, Test)] = &[
         styling::the_android_table_is_what_the_backend_applies,
     ),
     (
+        "styling::a_leafs_padding_insets_its_text_and_widens_it",
+        styling::a_leafs_padding_insets_its_text_and_widens_it,
+    ),
+    (
         "styling::night_mode_reaches_the_environment_and_keeps_the_views",
         styling::night_mode_reaches_the_environment_and_keeps_the_views,
     ),

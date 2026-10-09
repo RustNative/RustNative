@@ -24,6 +24,7 @@ use crate::protocol::{
     ST_BACKGROUND, ST_BORDER, ST_ELEVATION, ST_FOREGROUND, ST_RADIUS, STATE_FLOATS, STATE_INTS,
     STATES,
 };
+use crate::units::to_px;
 
 /// What `RnStyle.apply` takes for one node.
 #[derive(Debug, Clone, PartialEq)]
@@ -41,6 +42,9 @@ pub(crate) struct StyleSpec {
     pub(crate) weight: i32,
     /// The font family (`None`: the theme's).
     pub(crate) family: Option<String>,
+    /// A leaf's own padding — start, top, end, bottom, in pixels — added to
+    /// the widget's own (`None`: the widget's own alone).
+    pub(crate) padding: Option<[i32; 4]>,
     /// A digest of everything above, so an unchanged style is not sent.
     pub(crate) digest: u64,
 }
@@ -65,6 +69,7 @@ impl StyleSpec {
             && self.font_size == 0.0
             && self.weight == 0
             && self.family.is_none()
+            && self.padding.is_none()
     }
 }
 
@@ -133,6 +138,7 @@ impl StyleSheet {
         let mut floats = vec![0.0; STATES * STATE_FLOATS];
         let mut border_width = 0.0;
         let mut font = (0.0, 0, None);
+        let mut padding = None;
         for (index, state) in [
             ControlState::Normal,
             ControlState::Hovered,
@@ -173,6 +179,10 @@ impl StyleSheet {
             }
             ints[at] = flags;
             if index == 0 {
+                padding = style.padding_override().map(|insets| {
+                    [insets.start, insets.top, insets.end, insets.bottom]
+                        .map(|length| to_px(length, self.density))
+                });
                 if let Some(typography) =
                     changed(style.typography_override(), host.typography_override())
                 {
@@ -184,7 +194,8 @@ impl StyleSheet {
                 }
             }
         }
-        let digest = fnv64(format!("{ints:?}{floats:?}{border_width}{font:?}").as_bytes());
+        let digest =
+            fnv64(format!("{ints:?}{floats:?}{border_width}{font:?}{padding:?}").as_bytes());
         StyleSpec {
             ints,
             floats,
@@ -192,6 +203,7 @@ impl StyleSheet {
             font_size: font.0,
             weight: font.1,
             family: font.2,
+            padding,
             digest,
         }
     }

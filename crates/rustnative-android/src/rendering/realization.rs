@@ -601,7 +601,7 @@ fn apply_style(
             Arg::Ints(&spec.ints),
             Arg::Floats(&spec.floats),
             Arg::Float(spec.border_width),
-            Arg::Null,
+            spec.padding.as_ref().map_or(Arg::Null, |padding| Arg::Ints(padding)),
             Arg::Float(spec.font_size),
             Arg::Int(spec.weight),
             Arg::OptStr(spec.family.as_deref()),

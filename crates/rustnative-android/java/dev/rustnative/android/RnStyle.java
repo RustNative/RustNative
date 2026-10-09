@@ -67,8 +67,9 @@ final class RnStyle {
      * {@link Rn#STATE_INTS} (flags, background, foreground, border);
      * {@code floats} holds {@link Rn#STATES} entries of
      * {@link Rn#STATE_FLOATS} (corner radius and elevation, in pixels).
-     * {@code padding} is left, top, right, bottom pixels, or null for the
-     * widget's own.
+     * {@code padding} is start, top, end, bottom pixels added to the
+     * widget's own, or null for the widget's own alone. Start and end
+     * follow the view's layout direction.
      */
     static void apply(View view, int kind, int[] ints, float[] floats, float borderWidth,
         int[] padding, float fontSize, int weight, String family) {
@@ -111,10 +112,23 @@ final class RnStyle {
             }
             applyFont(text, fontSize, weight, family);
         }
-        int[] pad = padding != null ? padding : defaults.padding;
-        if (view.getPaddingLeft() != pad[0] || view.getPaddingTop() != pad[1]
-            || view.getPaddingRight() != pad[2] || view.getPaddingBottom() != pad[3]) {
-            view.setPadding(pad[0], pad[1], pad[2], pad[3]);
+        int[] own = defaults.padding;
+        if (padding == null) {
+            if (view.getPaddingLeft() != own[0] || view.getPaddingTop() != own[1]
+                || view.getPaddingRight() != own[2] || view.getPaddingBottom() != own[3]) {
+                view.setPadding(own[0], own[1], own[2], own[3]);
+            }
+        } else {
+            // A widget's own horizontal padding is symmetric, so its left
+            // stands for its start in either direction.
+            int start = own[0] + padding[0];
+            int top = own[1] + padding[1];
+            int end = own[2] + padding[2];
+            int bottom = own[3] + padding[3];
+            if (view.getPaddingStart() != start || view.getPaddingTop() != top
+                || view.getPaddingEnd() != end || view.getPaddingBottom() != bottom) {
+                view.setPaddingRelative(start, top, end, bottom);
+            }
         }
     }
 

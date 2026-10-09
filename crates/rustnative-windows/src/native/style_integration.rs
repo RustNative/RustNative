@@ -15,12 +15,14 @@ use rustnative_core::{
     Application, Color, ColorScheme, Component, Event, Node, Platform, Size, StyleValue, Theme,
     Window, WindowId, classes,
 };
-use windows_sys::Win32::Foundation::{HWND, WPARAM};
+use windows_sys::Win32::Foundation::{HWND, POINT, RECT, WPARAM};
 use windows_sys::Win32::Graphics::Gdi::{
-    COMPLEXREGION, CreateCompatibleDC, CreateRectRgn, DeleteDC, DeleteObject, GetBkColor,
-    GetObjectW, GetTextColor, GetWindowRgn, HGDIOBJ, LOGFONTW,
+    COMPLEXREGION, ClientToScreen, CreateCompatibleDC, CreateRectRgn, DeleteDC, DeleteObject,
+    GetBkColor, GetObjectW, GetTextColor, GetWindowRgn, HGDIOBJ, LOGFONTW,
 };
-use windows_sys::Win32::UI::WindowsAndMessaging::{WM_CTLCOLORSTATIC, WM_GETFONT};
+use windows_sys::Win32::UI::WindowsAndMessaging::{
+    GetClientRect, GetWindowRect, WM_CTLCOLORSTATIC, WM_GETFONT,
+};
 
 use super::harness::NativeHarness;
 use super::user_data::BackgroundColorSlot;
@@ -163,4 +165,102 @@ fn the_windows_capability_table_is_what_the_backend_applies() {
             "`{key}` is the same native object"
         );
     }
+}
+
+/// A padded label beside a plain one.
+struct Badges;
+
+impl Component for Badges {
+    type Props = ();
+    type Message = ();
+    fn new((): ()) -> Self {
+        Self
+    }
+    fn props(&self) -> &() {
+        &()
+    }
+    fn set_props(&mut self, (): ()) {}
+    fn view(&self) -> Node {
+        Node::row(
+            "root",
+            [
+                Node::label("badge", "Badge"),
+                Node::label("padded", "Badge").with_style(padding()),
+                Node::button("button", "Go"),
+                Node::button("padded-button", "Go").with_style(padding()),
+            ],
+        )
+    }
+    fn update(&mut self, _: Event) {}
+}
+
+fn padding() -> rustnative_core::VisualStyle {
+    rustnative_core::VisualStyle::default().padding(rustnative_core::EdgeInsets {
+        top: 2,
+        end: 4,
+        bottom: 2,
+        start: 12,
+    })
+}
+
+/// The window rectangle, and how far the client area is inset from its
+/// left and right edges on screen.
+fn insets(hwnd: HWND) -> (RECT, i32, i32) {
+    let (mut window, mut client) = (RECT::default(), RECT::default());
+    let (mut origin, mut corner) = (POINT::default(), POINT::default());
+    // SAFETY: `hwnd` is live; the out-parameters are valid.
+    unsafe {
+        GetWindowRect(hwnd, &raw mut window);
+        GetClientRect(hwnd, &raw mut client);
+        corner.x = client.right;
+        ClientToScreen(hwnd, &raw mut origin);
+        ClientToScreen(hwnd, &raw mut corner);
+    }
+    let (low, high) = (origin.x.min(corner.x), origin.x.max(corner.x));
+    (window, low - window.left, window.right - high)
+}
+
+#[test]
+fn a_labels_padding_insets_its_text_and_widens_it() {
+    let mut application = Application::new(Badges, Window::new("Badges", Size::new(360, 120)));
+    // SAFETY: `application` is declared before the harness and outlives it.
+    let mut harness = unsafe { NativeHarness::attach(&mut application) };
+    let badge = harness.expect_control(WindowId::PRIMARY, "badge");
+    let padded = harness.expect_control(WindowId::PRIMARY, "padded");
+    let (plain, plain_left, plain_right) = insets(badge);
+    let (window, left, right) = insets(padded);
+    assert_eq!(
+        window.right - window.left,
+        plain.right - plain.left + 16,
+        "the box reserves the padding"
+    );
+    assert_eq!((plain_left, plain_right), (0, 0), "a plain label keeps its own");
+    assert_eq!((left, right), (12, 4), "the text is inset at its start");
+    let width = |hwnd: HWND| insets(hwnd).0.right - insets(hwnd).0.left;
+    let (button, padded_button) = (
+        harness.expect_control(WindowId::PRIMARY, "button"),
+        harness.expect_control(WindowId::PRIMARY, "padded-button"),
+    );
+    assert_eq!(width(padded_button), width(button) + 16, "a button's box reserves it too");
+    // Text margins are comctl32 6's, which an application's manifest
+    // loads and this test executable's does not.
+    if let (Some(own), Some(margin)) = (
+        super::rendering::padding::button_margin(button),
+        super::rendering::padding::button_margin(padded_button),
+    ) {
+        assert_eq!(
+            (margin.left - own.left, margin.top - own.top, margin.right - own.right),
+            (12, 2, 4),
+            "and its text margins carry it"
+        );
+    }
+
+    harness.with_runtime_mut(WindowId::PRIMARY, |runtime| {
+        runtime.with_application(|application| {
+            application.set_locale(rustnative_core::Locale::new("ar-EG"));
+        });
+        runtime.render().unwrap();
+    });
+    let (_, left, right) = insets(padded);
+    assert_eq!((left, right), (4, 12), "right to left, the start is the right");
 }

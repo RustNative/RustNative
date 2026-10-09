@@ -32,7 +32,8 @@ use std::fmt::Write as _;
 
 use gtk::prelude::*;
 use rustnative_core::{
-    Color, ControlState, NodeKind, ShadowLayer, StyleOverride, Theme, Typography, VisualStyle,
+    Color, ControlState, EdgeInsets, NodeKind, ShadowLayer, StyleOverride, Theme, Typography,
+    VisualStyle,
 };
 
 /// The display-wide style sheet and the classes already written into it.
@@ -162,6 +163,23 @@ impl StyleSheet {
             if !declarations.is_empty() {
                 let _ = writeln!(body, "{{SELF}}{selector} {{ {declarations} }}");
             }
+        }
+        // A leaf's own padding insets its content; CSS here has no logical
+        // sides, so each direction gets its own rule.
+        if let Some(padding) = theme
+            .resolve(kind, ControlState::Normal, override_style)
+            .properties()
+            .padding_override()
+        {
+            let EdgeInsets { top, end, bottom, start } = padding;
+            let _ = writeln!(
+                body,
+                "{{SELF}}:dir(ltr) {{ padding: {top}px {end}px {bottom}px {start}px; }}"
+            );
+            let _ = writeln!(
+                body,
+                "{{SELF}}:dir(rtl) {{ padding: {top}px {start}px {bottom}px {end}px; }}"
+            );
         }
         if body.is_empty() {
             return None;
