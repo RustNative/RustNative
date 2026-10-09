@@ -173,7 +173,10 @@ restart in 27 s, 17 s of it the build, two state fields restored); and
 the unsigned release APK and App Bundle carry the library for the declared
 ABI only, and a keystore-signed APK verifies with `apksigner` under that
 key, with no password in the generated project
-(`tests/android_packaging.rs`). On the API 35 emulator: the device suite's first phases. The
+(`tests/android_packaging.rs`). In CI's `android` job (run 37964573034): the whole device suite,
+47 of 47, on the API 35 emulator with TalkBack, and the packaging tests;
+the emulator's Keystore is software, which the backend answers
+(`hardware_backed: false`), and the test expects hardware only on a phone. The
 Android gate (clippy for the device target under 1.98 and 1.99, the four
 ABIs, host tests, MSRV, docs) and the Windows gate. The checklist's Android
 column (`docs/conformance/new-backend-checklist.md`) names the test for
@@ -186,8 +189,7 @@ chart is a fixed 360 dp wide, so on a 392 dp screen the layout shrinks the
 canvas and the drawing is clipped (an application-layout choice).
 
 **Owed.** Play Billing (needs an application on a Play Console track) and
-Firebase push end to end (needs a Firebase project); the device suite on
-CI's emulator (the `android` job is written, not yet run); gesture
+Firebase push end to end (needs a Firebase project); gesture
 arbitration (checklist row 6) has no device test injecting a competing pan;
 a deep link arriving during restoration is covered by host tests only; and
 the extended style range (rows 23–25), as on every backend.

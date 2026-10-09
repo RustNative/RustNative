@@ -1145,7 +1145,7 @@ Implemented (`rustnative-android`; guide: `docs/android.md`):
 - surfaces: widgets, quick-settings tiles, ongoing activities, launcher shortcuts, the share target (`Event::ShareReceived`), notifications with actions; the options menu;
 - embedding: `RustNativeView` in a host's activity, foreign views, library-only mode (`examples/adoption-android`); updates: signed manifests and staged rollout, `PackageInstaller` for sideloaded installations, code updates refused for Play installations, model payloads;
 - tooling: `rustnative build|run|check|package android` (a generated Gradle project, APK and App Bundle, keystore signing), `run --inspect`, `inspect --android`, `dev android`, `bench --target android` and `budgets/android.toml`, a `doctor` row, the template's Android entry;
-- verified on a Redmi Note 14 (Android 16, HyperOS 3) — the device suite, the lifecycle script, the budgets, the development loop — and on the API 35 emulator; owed: Play Billing and Firebase push against real accounts, and CI's emulator run (`BUILD_STATUS.md`).
+- verified on a Redmi Note 14 (Android 16, HyperOS 3) — the device suite, the lifecycle script, the budgets, the development loop — and on the API 35 emulator in CI; owed: Play Billing and Firebase push against real accounts (`BUILD_STATUS.md`).
 
 ## Milestone 36 — iOS backend
 
