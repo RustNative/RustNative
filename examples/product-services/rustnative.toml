@@ -1,0 +1,12 @@
+# Milestone 57's example: what `rustnative build|run|package` read.
+[app]
+name = "product-services"
+id = "dev.rustnative.product-services"
+display-name = "Product services"
+version = "0.1.0"
+publisher = "CN=Rust Native"
+description = "An application that lives partly outside its window"
+
+[android]
+# Its notifications (export finished) post on the default channel.
+permissions = ["android.permission.POST_NOTIFICATIONS"]

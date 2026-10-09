@@ -1135,6 +1135,18 @@ Native Android view hierarchy, lifecycle integration, and a disciplined JNI boun
 - home-screen widgets, quick-settings tiles, share targets, remote push, store billing, and keystore-backed secure storage from the surface and product-service contracts (Milestone 57);
 - verification on an emulator and on a physical device, including the lifecycle conformance suite of Milestone 45 — process death and restoration, configuration change, deep-link entry during restoration, and low-memory trim — and a low-end device profile in the budget matrix (Milestone 42).
 
+Implemented (`rustnative-android`; guide: `docs/android.md`):
+
+- the runtime on the main `Looper`'s thread, behind one JNI ownership module (`jni_host`) with a Java host library of platform APIs only; `export_main!` and `AndroidPlatform::run`, which adopts the application (`Application::take`) and returns;
+- every node kind as a platform `View` in `RnLayout`, measured by prototype views and `StaticLayout`, kept clear of the safe area; styles as a diff against the device theme (`rustnative_style::ANDROID`, `ANDROID_UNITS`); `Choreographer` animation, recycling virtual lists, the canvas, native surfaces as `ANativeWindow`s, `WebView` host content, `PointerIcon` cursors, per-property mappers;
+- input: pointer (touch, mouse, stylus, hover, wheel), keys and shortcuts, system and predictive back (`BACK`, `Event::BackProgress`), game controllers, the input method for custom text targets, drag and drop;
+- accessibility through `AccessibilityNodeInfo` delegates and a node provider, verified through `UiAutomation` and with TalkBack running;
+- the lifecycle and restoration contracts — configuration changes in place, process death restored from the state store, trim — and the services: clipboard, the Storage Access Framework, URLs, notification channels, the share sheet, the five permission states, Keystore-sealed secure storage, HTTP with pins, ICU, conditions, image decoding, PDF printing, `JobScheduler` work, FCM push by reflection, billing and serial answered unavailable;
+- surfaces: widgets, quick-settings tiles, ongoing activities, launcher shortcuts, the share target (`Event::ShareReceived`), notifications with actions; the options menu;
+- embedding: `RustNativeView` in a host's activity, foreign views, library-only mode (`examples/adoption-android`); updates: signed manifests and staged rollout, `PackageInstaller` for sideloaded installations, code updates refused for Play installations, model payloads;
+- tooling: `rustnative build|run|check|package android` (a generated Gradle project, APK and App Bundle, keystore signing), `run --inspect`, `inspect --android`, `dev android`, `bench --target android` and `budgets/android.toml`, a `doctor` row, the template's Android entry;
+- verified on a Redmi Note 14 (Android 16, HyperOS 3) — the device suite, the lifecycle script, the budgets, the development loop — and on the API 35 emulator; owed: Play Billing and Firebase push against real accounts, and CI's emulator run (`BUILD_STATUS.md`).
+
 ## Milestone 36 — iOS backend
 
 Native UIKit interoperability, sharing the Objective-C interop and Core Text work with Milestone 33 wherever the two platforms genuinely agree, and not pretending they agree where they do not:

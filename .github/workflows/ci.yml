@@ -155,6 +155,11 @@ jobs:
           RUSTDOCFLAGS="-D warnings" cargo doc -p rustnative-android --target aarch64-linux-android --no-deps
       - name: host tests
         run: cargo test -p rustnative-android && cargo test -p rustnative-build android
+      - name: the APK, the App Bundle, and release signing, read back
+        run: |
+          export ANDROID_NDK_HOME="$ANDROID_NDK_LATEST_HOME"
+          source tools/android-env.sh
+          cargo test -p rustnative-cli --test android_packaging -- --ignored --test-threads 1
       - name: KVM for the emulator
         run: |
           echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
@@ -313,6 +318,6 @@ jobs:
       # hover, where `SetCursorPos` succeeds but no mouse message reaches the
       # test window; it is owed to an attended desktop (BUILD_STATUS.md).
       - name: cargo test (interactive-desktop tests)
-        run: cargo test --workspace -- --ignored --skip native_pointer_hover_follows_the_real_cursor
+        run: cargo test --workspace -- --ignored --skip native_pointer_hover_follows_the_real_cursor --skip an_unsigned_release_is_an_apk --skip a_release_with_a_keystore_is_signed
       - name: cargo clippy (native backend included)
         run: cargo clippy --workspace --all-targets --all-features -- -D warnings

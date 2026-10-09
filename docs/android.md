@@ -289,6 +289,39 @@ running application's state through the inspector, reinstalls, restarts,
 and restores it; theme and catalogue changes apply live, without a
 rebuild, as on the desktops.
 
+## Embedding and library-only mode
+
+An existing Android application adopts Rust Native one screen at a time
+(Milestone 40):
+
+- **`RustNativeView`** (`dev.rustnative.android.RustNativeView`) is a `View`
+  the host puts in any of its own layouts — in XML or in code. When it is
+  attached, the library loads and its exported `main` runs, and
+  `AndroidPlatform::run` realizes the application into that view instead of
+  an activity of its own. The host activity's lifecycle drives the
+  application's (pause, stop, save, destroy); the host keeps its own title,
+  back handling, and menus.
+- **Foreign views** go the other way: `register_foreign` and
+  `register_foreign_class` adopt a host `View` as a leaf of the tree, laid
+  out and clipped by the portable layout.
+- **Library-only mode**: `export_main!()` with no `main`, and
+  `RnLibrary.start(context)` from the host's `Application.onCreate` — the
+  data layer, sync, secure storage, and the other services with no
+  framework UI.
+
+The host's own Java and its launcher activity are declared in
+`rustnative.toml`; `rustnative` compiles them into the APK beside the host
+library:
+
+```toml
+[android]
+java-sources = "java"                                  # relative to the project
+launcher = "dev.rustnative.adoption.HostActivity"      # in place of RnActivity
+```
+
+`examples/adoption-android` is such an application: its own screen, with a
+`RustNativeView` whose count is persisted state.
+
 ## Packaging
 
 ```sh
@@ -329,6 +362,35 @@ It keeps the screen on for the run, restores the device's settings
 afterwards (screen timeout, accessibility services), and exits non-zero on
 any failure. Host tests (`cargo test -p rustnative-android`) cover what
 needs no device.
+
+What needs a real process — and a person's gestures — runs on
+`examples/adoption-android`:
+
+```sh
+tools/android-lifecycle-test.sh
+```
+
+It checks the embedding, process death (pressed, backgrounded, killed with
+`am kill`, relaunched cold: the count is back), a rotation handled in the
+same process, and a memory trim, and restores the rotation settings it
+changed. The packaging tests build a real application and read the APK,
+the App Bundle, and the signature back
+(`cargo test -p rustnative-cli --test android_packaging -- --ignored`).
+
+`budgets/android.toml` holds the budgets — startup phases from the process's
+creation, `am start -W`'s cold start, memory (`dumpsys meminfo`), and the
+APK's packed size — measured on the attached device by
+`rustnative bench --target android`.
+
+**Devices that confirm every install.** HyperOS (and some other vendors'
+builds) ask the person to confirm each new package installed over USB.
+For an unattended run, `RUSTNATIVE_ANDROID_APPLICATION_ID` gives one build
+the id of a package the device already trusts (the same debug key makes it
+an update, which installs silently):
+
+```sh
+RUSTNATIVE_ANDROID_APPLICATION_ID=dev.rustnative.devicetests rustnative run android
+```
 
 ## What is owed
 

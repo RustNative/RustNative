@@ -706,9 +706,12 @@ their differences reported as capabilities, verified on the Debian, Fedora,
 and Arch families, and `.deb`, `.rpm`, pacman, tarball, and AppImage
 packaging.
 
-**Android** (Milestone 35) — a native `View` hierarchy over a disciplined JNI
-boundary, the activity/process lifecycle mapped onto the existing lifecycle
-and restoration contracts, `AccessibilityNodeInfo`, and Gradle/AAB packaging.
+**Android** (Milestone 35, **built**: [`docs/android.md`](docs/android.md)) —
+platform `View`s over one JNI ownership module, `StaticLayout` measurement,
+`AccessibilityNodeInfo` verified with TalkBack, the activity and process
+lifecycle on the restoration contracts (process death included), the
+Android services and surfaces, embedding in an existing application, and
+APK and App Bundle packaging, verified on a phone and an emulator.
 
 **iOS** (Milestone 36) — `UIView`/UIKit, the scene lifecycle, `UIAccessibility`,
 universal links into the existing deep-link model, and Xcode packaging.
@@ -1459,8 +1462,8 @@ cargo test --workspace -- --ignored
 
 The complete master roadmap—including completed milestones, architectural invariants, and all planned future stages—is maintained in [`PLAN.md`](PLAN.md).
 
-Milestones 25–32 and 34 are complete, and so is the Web track (Web milestones A–K).
-What remains is the rest of the platform matrix — macOS, Android, iOS,
+Milestones 25–32, 34, and 35 are complete, and so is the Web track (Web milestones A–K).
+What remains is the rest of the platform matrix — macOS, iOS,
 iPadOS, embedded, and terminal — plus the
 core work those targets share: a `no_std`-capable core subset, an executor
 seam for single-threaded hosts, and time from the host clock rather than

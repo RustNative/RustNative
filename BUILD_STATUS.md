@@ -99,6 +99,100 @@ guarantees, adoption-ladder, and surfaces documents.
 
 <!-- milestone entries, newest first -->
 
+### Milestone 35 — the Android backend — complete (store accounts owed)
+
+**Built.** Plan: `docs/superpowers/plans/2026-10-06-android-milestone-35.md`,
+Phases 0–9. Guide: `docs/android.md`, with `docs/android/lifecycle.md` and
+`docs/android/accessibility.md`. Crate: `rustnative-android`, with its Java
+host library (`java/dev/rustnative/android`: platform APIs only, no AndroidX
+or Kotlin), API 26 and newer, built against API 35, for `arm64-v8a`,
+`armeabi-v7a`, `x86_64`, and `x86`.
+
+- **The runtime**: Rust on the main thread behind one JNI ownership module
+  (`jni_host`: global references, local frames, attachment, exceptions); view
+  callbacks post to the backend's queue, never re-entering it; the main
+  `Looper` wakes it; `export_main!` exports the entry, and
+  `AndroidPlatform::run` adopts the application (`Application::take`, a new
+  core method) and returns.
+- **The realization**: every node kind as a platform `View`, placed by the
+  portable engine in `RnLayout` and kept clear of the safe area; measurement
+  through prototype views and `StaticLayout`; styles as a diff against the
+  device theme (`rustnative_style::ANDROID`, `ANDROID_UNITS`); animation on
+  `Choreographer`; virtual lists that recycle views; the canvas; native
+  surfaces as `ANativeWindow`s; `WebView` host content; per-node cursors as
+  `PointerIcon`s; per-property mappers.
+- **Input**: pointer (touch, mouse, stylus, hover, wheel), keys and command
+  shortcuts, system back and the predictive back gesture (`BACK`,
+  `Event::BackProgress`, both new in the core), game controllers, the input
+  method for custom text targets, drag and drop.
+- **Accessibility**: `AccessibilityNodeInfo` through per-view delegates and
+  a node provider for virtual elements, read back through `UiAutomation`
+  and with TalkBack running.
+- **Lifecycle and services**: the lifecycle and restoration contracts
+  (configuration changes in place, process death restored from the state
+  store, trim); clipboard, the Storage Access Framework, URLs,
+  notifications on channels, the share sheet, runtime permissions in the
+  five states, Keystore-sealed secure storage, HTTP with pins, ICU,
+  conditions, image decoding, PDF printing, `JobScheduler` work
+  (`AndroidWork`, `export_main!(main, work = …)`), push through FCM by
+  reflection, billing and serial answered unavailable.
+- **Surfaces**: widgets, quick-settings tiles, ongoing activities, launcher
+  shortcuts, the share target (`Event::ShareReceived`, new in the core),
+  notifications with actions; the options menu.
+- **Embedding**: `RustNativeView` in a host's own activity, foreign views,
+  library-only mode (`RnLibrary.start`); `examples/adoption-android`.
+- **Updates**: the desktops' signed manifests and staged rollout; a
+  sideloaded installation updates through `PackageInstaller`, a Play
+  installation is refused code updates, model payloads are staged on both.
+- **Tooling**: `rustnative build|run|check|package android` (a generated
+  Gradle project; APK and App Bundle; release signing from a keystore whose
+  passwords stay in the environment; libraries stripped), `run --inspect`,
+  `inspect --android`, `dev android`, `bench --target android`, a `doctor`
+  row, the `rustnative new` template's Android entry, and
+  `RUSTNATIVE_ANDROID_APPLICATION_ID`. hello-label, gallery, reference-app,
+  and product-services gain an Android entry.
+- **Found on the phone**: a second window's text kept the layout of its
+  first, zero-width measure (Rust placed children during a layout pass,
+  where Android drops `requestLayout`); content ran under the status bar
+  (the safe area reached the environment but not the layout); the
+  inspector answered for one window only; Gradle could not strip the
+  library without the NDK's version, so a debug APK was 290 MB.
+
+**Verified.** On a Redmi Note 14 (Android 16, HyperOS 3, arm64-v8a): the
+device suite, 47 of 47 (`tools/android-device-test.sh`: realization,
+styling, accessibility with TalkBack, graphics, input, services, surfaces
+and background work, conformance and inspection); the lifecycle script, 9
+of 9 (`tools/android-lifecycle-test.sh`: embedding, process death and
+restoration, rotation, trim); hello-label running with both windows and
+inspected from the development machine; gallery running (interactive
+0.97 s after the process started); `rustnative dev android --once` (a
+restart in 27 s, 17 s of it the build, two state fields restored); and
+`budgets/android.toml`, every key within (`rustnative bench --target android
+--check`). The packaging tests build a real application and read it back:
+the unsigned release APK and App Bundle carry the library for the declared
+ABI only, and a keystore-signed APK verifies with `apksigner` under that
+key, with no password in the generated project
+(`tests/android_packaging.rs`). On the API 35 emulator: the device suite's first phases. The
+Android gate (clippy for the device target under 1.98 and 1.99, the four
+ABIs, host tests, MSRV, docs) and the Windows gate. The checklist's Android
+column (`docs/conformance/new-backend-checklist.md`) names the test for
+every row it satisfies.
+
+Gallery on a phone in night mode showed two things that are not the
+backend's: the neutral badge pairs a fixed light fill with the host's
+light on-surface text (a component-library fix, every backend), and its
+chart is a fixed 360 dp wide, so on a 392 dp screen the layout shrinks the
+canvas and the drawing is clipped (an application-layout choice).
+
+**Owed.** reference-app and product-services build for Android and have not
+yet been run on the phone; Play Billing (needs an application on a Play Console track) and
+Firebase push end to end (needs a Firebase project); the device suite on
+CI's emulator (the `android` job is written, not yet run); gesture
+arbitration (checklist row 6) has no device test injecting a competing pan;
+a deep link arriving during restoration is covered by host tests only; and
+the extended style range (rows 23–25), as on every backend.
+
+
 ### Milestone 34 — the Linux backend on Fedora and Arch Linux — complete
 
 **Built.** Plan: `docs/superpowers/plans/2026-10-04-linux-fedora-arch.md`.

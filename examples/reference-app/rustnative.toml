@@ -1,0 +1,10 @@
+# The reference application of the published comparison: what
+# `rustnative build|run|package` read (the desktop binary needs none of it;
+# the Android build does).
+[app]
+name = "reference-app"
+id = "dev.rustnative.reference-app"
+display-name = "Reference application"
+version = "0.1.0"
+publisher = "CN=Rust Native"
+description = "The layout conformance suite's reference screen"
