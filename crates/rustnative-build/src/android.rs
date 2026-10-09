@@ -96,6 +96,12 @@ pub struct AndroidProject {
     pub icon: bool,
     /// The Android Gradle Plugin version.
     pub gradle_plugin: String,
+    /// The application's own launcher activity (a host application that
+    /// embeds `RustNativeView`), in place of `RnActivity`.
+    pub launcher: Option<String>,
+    /// The NDK the libraries were built with (`ndkVersion`), so the
+    /// Android Gradle Plugin strips their symbols with it.
+    pub ndk_version: Option<String>,
 }
 
 /// The configuration changes the activity handles itself — every one,
@@ -126,6 +132,8 @@ impl AndroidProject {
             instrumentation: false,
             icon: false,
             gradle_plugin: "8.7.3".to_owned(),
+            launcher: None,
+            ndk_version: None,
         }
     }
 
@@ -177,6 +185,9 @@ impl AndroidProject {
         let mut out = String::from("plugins {\n    id 'com.android.application'\n}\n\nandroid {\n");
         let _ = writeln!(out, "    namespace '{}'", self.application_id);
         let _ = writeln!(out, "    compileSdk {}", self.target_sdk);
+        if let Some(ndk) = &self.ndk_version {
+            let _ = writeln!(out, "    ndkVersion '{}'", ndk.replace('\'', ""));
+        }
         out.push_str("    defaultConfig {\n");
         let _ = writeln!(out, "        applicationId '{}'", self.application_id);
         let _ = writeln!(out, "        minSdk {}", self.min_sdk);
@@ -268,11 +279,21 @@ impl AndroidProject {
             xml(&self.library)
         );
         out.push_str("        <uses-library android:name=\"androidx.window.extensions\" android:required=\"false\" />\n");
-        // The launcher activity: window 0, the primary window.
+        // The launcher activity: window 0, the primary window — or the
+        // application's own, which embeds `RustNativeView`.
+        if let Some(launcher) = &self.launcher {
+            let _ = writeln!(
+                out,
+                "        <activity\n            android:name=\"{}\"\n            android:exported=\"true\"\n            android:configChanges=\"{CONFIG_CHANGES}\">\n            <intent-filter>\n                <action android:name=\"android.intent.action.MAIN\" />\n                <category android:name=\"android.intent.category.LAUNCHER\" />\n            </intent-filter>\n        </activity>",
+                xml(launcher)
+            );
+        }
         out.push_str("        <activity\n            android:name=\"dev.rustnative.android.RnActivity\"\n            android:exported=\"true\"\n            android:launchMode=\"singleTask\"\n");
         let _ = writeln!(out, "            android:configChanges=\"{CONFIG_CHANGES}\"");
         out.push_str("            android:windowSoftInputMode=\"adjustResize\">\n");
-        out.push_str("            <intent-filter>\n                <action android:name=\"android.intent.action.MAIN\" />\n                <category android:name=\"android.intent.category.LAUNCHER\" />\n            </intent-filter>\n");
+        if self.launcher.is_none() {
+            out.push_str("            <intent-filter>\n                <action android:name=\"android.intent.action.MAIN\" />\n                <category android:name=\"android.intent.category.LAUNCHER\" />\n            </intent-filter>\n");
+        }
         for scheme in &self.url_schemes {
             out.push_str("            <intent-filter>\n                <action android:name=\"android.intent.action.VIEW\" />\n                <category android:name=\"android.intent.category.DEFAULT\" />\n                <category android:name=\"android.intent.category.BROWSABLE\" />\n");
             let _ = writeln!(out, "                <data android:scheme=\"{}\" />", xml(scheme));

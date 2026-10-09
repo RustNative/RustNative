@@ -65,6 +65,23 @@ impl Component for App {
 pub fn previews() -> Vec<Preview> {
     vec![Preview::component::<App>("app", ()).with_matrix(PreviewMatrix::full())]
 }
+
+/// The Android entry: Android loads this crate as a library and calls
+/// `main` when the launcher activity starts (`rustnative run android`).
+#[cfg(target_os = "android")]
+mod android {
+    use rustnative_core::{Application, Component, Platform, Size, Window};
+
+    fn main() -> Result<(), Box<dyn std::error::Error>> {
+        let mut application =
+            Application::new(super::App::new(()), Window::new(super::APP_NAME, Size::new(480, 320)));
+        application.set_theme(rustnative_core::app_theme!());
+        rustnative_android::AndroidPlatform::new().with_app_id(super::APP_ID).run(&mut application)?;
+        Ok(())
+    }
+
+    rustnative_android::export_main!(main);
+}
 "#;
 
 /// The generated `src/main.rs`: the shell that runs the application — or,
@@ -160,7 +177,7 @@ pub const README: &str = r"# {{display_name}}
 A [Rust Native](https://github.com/<org>/RustNative) application.
 
 ```sh
-rustnative run windows      # build and run
+rustnative run windows      # build and run (`linux`, or `android` on a connected phone)
 rustnative build windows    # build only, `--release` for an optimized build
 rustnative test             # run the project's tests (every preview is a golden test)
 rustnative preview          # browse the previews across themes, locales, text sizes
@@ -195,6 +212,23 @@ pub use app::App;
 #[must_use]
 pub fn previews() -> Vec<Preview> {
     vec![Preview::component::<App>("app", ()).with_matrix(PreviewMatrix::full())]
+}
+
+/// The Android entry: Android loads this crate as a library and calls
+/// `main` when the launcher activity starts (`rustnative run android`).
+#[cfg(target_os = "android")]
+mod android {
+    use rustnative_core::{Application, Component, Platform, Size, Window};
+
+    fn main() -> Result<(), Box<dyn std::error::Error>> {
+        let mut application =
+            Application::new(super::App::new(()), Window::new(super::APP_NAME, Size::new(480, 320)));
+        application.set_theme(rustnative_core::app_theme!());
+        rustnative_android::AndroidPlatform::new().with_app_id(super::APP_ID).run(&mut application)?;
+        Ok(())
+    }
+
+    rustnative_android::export_main!(main);
 }
 "#;
 

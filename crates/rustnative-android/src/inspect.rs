@@ -25,9 +25,9 @@ use crate::registry::{WindowRegistry, WindowRuntime};
 /// The device-side port the inspection server listens on.
 pub(crate) const PORT: u16 = 7920;
 
-/// One window's renderer, answering for that window.
+/// Every window's renderer, answering for any of them.
 struct AndroidInspect<'a> {
-    runtime: &'a WindowRuntime,
+    windows: &'a HashMap<WindowId, WindowRuntime>,
 }
 
 /// `view`'s bounds in `root`, in pixels.
@@ -44,12 +44,14 @@ fn bounds(view: &JavaRef, root: &JavaRef) -> Option<[i32; 4]> {
 }
 
 impl AndroidInspect<'_> {
-    /// Every realized node at its window rectangle (dp), as Android placed it.
-    fn window_rects(&self) -> HashMap<NodeId, Rect> {
-        let (Some(renderer), Some(root)) = (&self.runtime.renderer, &self.runtime.root) else {
+    /// Every realized node of `window` at its window rectangle (dp), as
+    /// Android placed it.
+    fn window_rects(&self, window: WindowId) -> HashMap<NodeId, Rect> {
+        let Some(runtime) = self.windows.get(&window) else { return HashMap::new() };
+        let (Some(renderer), Some(root)) = (&runtime.renderer, &runtime.root) else {
             return HashMap::new();
         };
-        let density = self.runtime.density.max(0.1);
+        let density = runtime.density.max(0.1);
         #[allow(
             clippy::cast_possible_truncation,
             clippy::cast_precision_loss,
@@ -74,7 +76,7 @@ impl InspectBackend for AndroidInspect<'_> {
 
     fn realized(&self, window: WindowId) -> Vec<RealizedObject> {
         let Some(renderer) =
-            (window == self.runtime.id).then_some(()).and(self.runtime.renderer.as_ref())
+            self.windows.get(&window).and_then(|runtime| runtime.renderer.as_ref())
         else {
             return Vec::new();
         };
@@ -105,16 +107,21 @@ impl InspectBackend for AndroidInspect<'_> {
     }
 
     fn rects(&self, window: WindowId) -> Option<HashMap<NodeId, Rect>> {
-        (window == self.runtime.id).then(|| self.window_rects())
+        self.windows.contains_key(&window).then(|| self.window_rects(window))
     }
 
     fn lifetimes(&self) -> Lifetimes {
-        let Some(renderer) = &self.runtime.renderer else { return Lifetimes::default() };
-        let registry = &renderer.registry;
+        let (created, destroyed) = self
+            .windows
+            .values()
+            .filter_map(|runtime| runtime.renderer.as_ref())
+            .fold((0, 0), |(created, destroyed), renderer| {
+                (created + renderer.registry.created, destroyed + renderer.registry.destroyed)
+            });
         Lifetimes {
-            created: registry.created,
-            destroyed: registry.destroyed,
-            live: registry.created.saturating_sub(registry.destroyed),
+            created,
+            destroyed,
+            live: created.saturating_sub(destroyed),
             recent: Vec::new(),
         }
     }
@@ -151,15 +158,14 @@ impl InspectBackend for AndroidInspect<'_> {
 /// request was answered (the tree may have changed). Then brings the
 /// overlay in line with the application's overlay mode.
 pub(crate) fn poll(registry: &mut WindowRegistry, window: WindowId) -> bool {
-    let Some(runtime) = registry.windows.remove(&window) else { return false };
+    let inspect = AndroidInspect { windows: &registry.windows };
     let (answered, quit) = registry.with_application(|application| {
-        let answered = application.poll_inspection(&AndroidInspect { runtime: &runtime });
+        let answered = application.poll_inspection(&inspect);
         (answered, application.take_quit_request())
     });
-    let rects = AndroidInspect { runtime: &runtime }.window_rects();
+    let rects = inspect.window_rects(window);
     let list =
         registry.with_application(|application| application.overlay_draw_list(window, &rects));
-    registry.windows.insert(window, runtime);
     if let Some(runtime) = registry.windows.get_mut(&window) {
         if let Err(error) = sync_overlay(runtime, list.as_ref()) {
             crate::log::warn(&format!("the inspection overlay: {error}"));

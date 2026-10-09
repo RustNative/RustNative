@@ -507,7 +507,7 @@ fn android(root: &Path) -> Result<BTreeMap<String, f64>> {
     if let Some(kilobytes) = pss {
         measured.insert("resident_memory_mb".to_owned(), kilobytes / 1024.0);
     }
-    measured.insert("artifact_size_kb".to_owned(), kilobytes(&apk)?);
+    measured.insert("artifact_size_kb".to_owned(), packed_kilobytes(&apk)?);
     adb(&["shell", "am", "force-stop", &package])?;
     Ok(measured)
 }
@@ -585,6 +585,38 @@ fn timed_get(port: u16, path: &str) -> Result<(f64, Vec<(String, String)>)> {
         .map(|(name, value)| (name.trim().to_ascii_lowercase(), value.trim().to_owned()))
         .collect();
     Ok((elapsed, headers))
+}
+
+/// What an archive's entries take, compressed (kilobytes): the download.
+/// Gradle's incremental packager leaves gaps in an APK, so its size on disk
+/// overstates it. Read from the zip's central directory.
+fn packed_kilobytes(path: &Path) -> Result<f64> {
+    let bytes = std::fs::read(path).map_err(io(format!("read {}", path.display())))?;
+    let malformed = || Error::Usage(format!("{} is not a zip archive", path.display()));
+    let u16_at = |at: usize| bytes.get(at..at + 2).map(|b| u16::from_le_bytes([b[0], b[1]]));
+    let u32_at =
+        |at: usize| bytes.get(at..at + 4).map(|b| u32::from_le_bytes([b[0], b[1], b[2], b[3]]));
+    // The end-of-central-directory record: its signature, searched from the end.
+    let end = (0..bytes.len().saturating_sub(21))
+        .rev()
+        .find(|at| u32_at(*at) == Some(0x0605_4b50))
+        .ok_or_else(malformed)?;
+    let entries = u16_at(end + 10).ok_or_else(malformed)?;
+    let mut at =
+        usize::try_from(u32_at(end + 16).ok_or_else(malformed)?).map_err(|_| malformed())?;
+    let mut total: u64 = 0;
+    for _ in 0..entries {
+        if u32_at(at) != Some(0x0201_4b50) {
+            return Err(malformed());
+        }
+        total += u64::from(u32_at(at + 20).ok_or_else(malformed)?);
+        let name = usize::from(u16_at(at + 28).ok_or_else(malformed)?);
+        let extra = usize::from(u16_at(at + 30).ok_or_else(malformed)?);
+        let comment = usize::from(u16_at(at + 32).ok_or_else(malformed)?);
+        at += 46 + name + extra + comment;
+    }
+    #[allow(clippy::cast_precision_loss, reason = "kilobytes")]
+    Ok(total as f64 / 1024.0)
 }
 
 fn kilobytes(path: &Path) -> Result<f64> {

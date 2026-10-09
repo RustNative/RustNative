@@ -120,6 +120,15 @@ pub struct Android {
     /// Asset packs in the bundle.
     #[serde(default)]
     pub asset_packs: Vec<AndroidAssetPack>,
+    /// The application's own Java sources (a directory, relative to the
+    /// project), compiled into the APK beside the host library — a host
+    /// application embedding `RustNativeView`, say.
+    #[serde(default)]
+    pub java_sources: Option<PathBuf>,
+    /// The application's own launcher activity (a class in
+    /// `java-sources`), in place of `RnActivity`.
+    #[serde(default)]
+    pub launcher: Option<String>,
     /// The release keystore.
     #[serde(default)]
     pub keystore: Option<AndroidKeystore>,

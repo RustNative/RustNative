@@ -13,7 +13,7 @@ use rustnative_core::WindowId;
 use rustnative_core::command::standard::BACK;
 
 use crate::Error;
-use crate::jni_host::{Arg, call};
+use crate::jni_host::{Arg, Class, call_static};
 use crate::protocol;
 use crate::registry::WindowRegistry;
 
@@ -28,7 +28,12 @@ pub(crate) fn sync_back(registry: &mut WindowRegistry, window: WindowId) -> Resu
         return Ok(());
     }
     if let Some(activity) = &runtime.activity {
-        call(activity, "setBackHandled", "(Z)V", &[Arg::Bool(handles)])?;
+        call_static(
+            Class::Bridge,
+            "setBackHandled",
+            "(Landroid/app/Activity;Z)V",
+            &[Arg::Obj(activity), Arg::Bool(handles)],
+        )?;
         runtime.back_claimed = handles;
     }
     Ok(())

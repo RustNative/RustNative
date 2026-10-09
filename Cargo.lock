@@ -3,6 +3,14 @@
 version = 4
 
 [[package]]
+name = "adoption-android"
+version = "0.1.0"
+dependencies = [
+ "rustnative-android",
+ "rustnative-core",
+]
+
+[[package]]
 name = "adoption-foreign"
 version = "0.1.0"
 dependencies = [

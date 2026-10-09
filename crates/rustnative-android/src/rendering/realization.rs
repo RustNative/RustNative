@@ -59,6 +59,9 @@ pub(crate) struct Renderer {
     direction: LayoutDirection,
     /// Set when every node must be restyled (a text-scale or density change).
     restyle_all: bool,
+    /// What content stays clear of (`keys::SAFE_AREA`, dp): the system
+    /// bars and cutout of an edge-to-edge window.
+    pub(crate) safe_area: rustnative_core::EdgeInsets,
     pub(crate) density: f32,
     pub(crate) text_scale: f32,
     /// Per-frame animated values.
@@ -100,6 +103,7 @@ impl Renderer {
             theme: Theme::default(),
             direction: LayoutDirection::Ltr,
             restyle_all: false,
+            safe_area: rustnative_core::EdgeInsets::default(),
             density,
             text_scale: 1.0,
             animated: AnimatedOverrides::default(),
@@ -467,6 +471,25 @@ impl Renderer {
     /// Runs layout, and once more if measuring a virtual list's realized
     /// items moved any of its offsets.
     fn lay_out(&mut self, size: Size) -> LayoutResult {
+        // Content stays clear of the safe area: the root is laid out in what
+        // remains, and placed inside the insets (as the headless reference
+        // backend does).
+        let area = self.safe_area;
+        let inner = Size::new(
+            size.width.saturating_sub(u32::try_from(area.horizontal().max(0)).unwrap_or(0)),
+            size.height.saturating_sub(u32::try_from(area.vertical().max(0)).unwrap_or(0)),
+        );
+        let mut output = self.lay_out_in(inner);
+        if let Some(root) = self.snapshot.ordered_nodes().first().map(|node| node.id) {
+            if let Some(rect) = output.rects.get_mut(&root) {
+                rect.x += area.left(self.direction);
+                rect.y += area.top;
+            }
+        }
+        output
+    }
+
+    fn lay_out_in(&mut self, size: Size) -> LayoutResult {
         let measurer = AndroidMeasurer {
             activity: &self.activity,
             density: self.density,

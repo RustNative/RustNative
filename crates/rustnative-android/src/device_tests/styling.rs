@@ -251,6 +251,10 @@ pub(super) fn the_safe_area_is_the_windows_insets(instrumentation: &Instrumentat
             assert!(area.top > 0, "a phone has a status bar the content must clear");
             let bottom = crate::units::to_dp(insets[3].max(insets[7]).max(insets[11]), density);
             assert_eq!(u32::try_from(area.bottom).unwrap_or(0), bottom, "the navigation bar");
+            // Content is placed clear of it, not just told about it.
+            harness.settle();
+            let root = harness.placed("root").expect("the root is placed");
+            assert_eq!(root.y, area.top, "the content starts below the status bar");
         });
     });
 }

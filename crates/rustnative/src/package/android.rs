@@ -158,7 +158,14 @@ pub fn describe(
 ) -> Result<AndroidProject> {
     let app = &config.app;
     let android = config.android.clone().unwrap_or_default();
-    let id = android.application_id.clone().unwrap_or_else(|| app.id.clone());
+    // `RUSTNATIVE_ANDROID_APPLICATION_ID` overrides it for one build: a
+    // device that confirms every new package's install (HyperOS) takes an
+    // update of one it already trusts without asking.
+    let id = std::env::var("RUSTNATIVE_ANDROID_APPLICATION_ID")
+        .ok()
+        .filter(|id| !id.is_empty())
+        .or_else(|| android.application_id.clone())
+        .unwrap_or_else(|| app.id.clone());
     let mut project = AndroidProject::new(&id, &app.display_name, &app.version, library);
     if let Some(min) = android.min_sdk {
         project.min_sdk = min.max(crate::toolchain::android::MIN_API);
@@ -169,6 +176,7 @@ pub fn describe(
     project.url_schemes.clone_from(&app.url_schemes);
     project.share_types.clone_from(&android.share_types);
     project.permissions.clone_from(&android.permissions);
+    project.launcher.clone_from(&android.launcher);
     if android.widgets.len() > SURFACE_SLOTS || android.tiles.len() > SURFACE_SLOTS {
         return Err(usage(format!(
             "an application may declare at most {SURFACE_SLOTS} widgets and {SURFACE_SLOTS} tiles"
@@ -274,6 +282,13 @@ pub fn prepare(root: &Path, config: &Config, options: &Options) -> Result<PathBu
             .map_err(io(format!("copy {}", built.display())))?;
     }
     let mut project = describe(config, &metadata.library, options.instrumentation, root)?;
+    // The NDK's version is its directory's name (`ndk/29.0.14206865`).
+    project.ndk_version = toolchain
+        .ndk
+        .as_ref()
+        .and_then(|ndk| ndk.file_name())
+        .map(|name| name.to_string_lossy().into_owned())
+        .filter(|name| name.chars().next().is_some_and(|first| first.is_ascii_digit()));
     if !options.release {
         // A debug build can be inspected (`run android --inspect`), whose
         // server listens on the device's loopback: a socket needs INTERNET.
@@ -291,6 +306,10 @@ pub fn prepare(root: &Path, config: &Config, options: &Options) -> Result<PathBu
         }
     }
     copy_tree(&metadata.java, &main.join("java"))?;
+    if let Some(sources) = config.android.as_ref().and_then(|android| android.java_sources.as_ref())
+    {
+        copy_tree(&root.join(sources), &main.join("java"))?;
+    }
     if let Some(icon) = &config.app.icon {
         let destination = main.join("res").join("mipmap-xxxhdpi");
         std::fs::create_dir_all(&destination)
@@ -426,10 +445,10 @@ pub fn package(root: &Path, config: &Config, apk: bool, aab: bool) -> Result<Vec
 /// The application id `config` gives.
 #[must_use]
 pub fn application_id(config: &Config) -> String {
-    let id = config
-        .android
-        .as_ref()
-        .and_then(|android| android.application_id.clone())
+    let id = std::env::var("RUSTNATIVE_ANDROID_APPLICATION_ID")
+        .ok()
+        .filter(|id| !id.is_empty())
+        .or_else(|| config.android.as_ref().and_then(|android| android.application_id.clone()))
         .unwrap_or_else(|| config.app.id.clone());
     rustnative_build::android::application_id_from(&id)
 }

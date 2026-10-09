@@ -1,0 +1,26 @@
+[package]
+name = "adoption-android"
+version = "0.1.0"
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+description = "Milestone 40 on Android: a host application embedding a Rust Native view in its own activity"
+repository.workspace = true
+homepage.workspace = true
+readme.workspace = true
+keywords.workspace = true
+categories.workspace = true
+publish = false
+
+[lints]
+workspace = true
+
+[lib]
+# Built as a `cdylib` for Android by `rustnative build android`.
+crate-type = ["lib"]
+
+[dependencies]
+rustnative-core.workspace = true
+
+[target.'cfg(target_os = "android")'.dependencies]
+rustnative-android.workspace = true

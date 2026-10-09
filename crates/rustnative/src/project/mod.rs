@@ -65,7 +65,7 @@ impl FrameworkSource {
             Self::Published(version) => {
                 format!(
                     "rustnative-core = \"{version}\"\nrustnative-windows = \"{version}\"\n\
-                     rustnative-linux = \"{version}\"\n"
+                     rustnative-linux = \"{version}\"\nrustnative-android = \"{version}\"\n"
                 )
             }
             Self::Path(path) => {
@@ -73,7 +73,8 @@ impl FrameworkSource {
                 format!(
                     "rustnative-core = {{ path = \"{path}/crates/rustnative-core\" }}\n\
                      rustnative-windows = {{ path = \"{path}/crates/rustnative-windows\" }}\n\
-                     rustnative-linux = {{ path = \"{path}/crates/rustnative-linux\" }}\n"
+                     rustnative-linux = {{ path = \"{path}/crates/rustnative-linux\" }}\n\
+                     rustnative-android = {{ path = \"{path}/crates/rustnative-android\" }}\n"
                 )
             }
         }

@@ -15,7 +15,7 @@ use std::sync::OnceLock;
 use rustnative_core::WindowId;
 
 use crate::backend::{Work, post};
-use crate::jni_host::{Arg, Class, JavaRef, call, call_static};
+use crate::jni_host::{Arg, Class, JavaRef, call_static};
 
 static MAIN: OnceLock<Option<fn()>> = OnceLock::new();
 
@@ -89,7 +89,12 @@ pub(crate) fn activity_created(
                 crate::backend::window_id(window_raw)
             };
             let Some(window) = window else {
-                let _ = call(&activity, "finish", "()V", &[]);
+                let _ = call_static(
+                    Class::Bridge,
+                    "finishWindow",
+                    "(Landroid/app/Activity;)V",
+                    &[Arg::Obj(&activity)],
+                );
                 return;
             };
             post(Work::Call(Box::new(move |registry| {
@@ -117,6 +122,11 @@ pub(crate) fn activity_created(
     if take_pending().is_some() {
         // `main` returned without `run`: there is nothing to show.
         crate::log::error("the application's main returned without calling AndroidPlatform::run");
-        let _ = call(&activity, "finish", "()V", &[]);
+        let _ = call_static(
+            Class::Bridge,
+            "finishWindow",
+            "(Landroid/app/Activity;)V",
+            &[Arg::Obj(&activity)],
+        );
     }
 }

@@ -287,6 +287,10 @@ pub(crate) fn call_static(
 }
 
 /// Calls instance method `name` with signature `signature` on `object`.
+#[cfg_attr(
+    not(feature = "device-tests"),
+    allow(dead_code, reason = "the backend calls statics; the device suite calls instances")
+)]
 pub(crate) fn call(
     object: &JavaRef,
     name: &str,

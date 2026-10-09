@@ -138,8 +138,16 @@ public class RnLayout extends ViewGroup {
                 continue;
             }
             Params params = (Params) raw;
-            child.layout(params.x, params.y, params.x + Math.max(0, params.width),
-                params.y + Math.max(0, params.height));
+            int width = Math.max(0, params.width);
+            int height = Math.max(0, params.height);
+            // A child placed while a layout pass was running (Rust answers a
+            // size change synchronously) missed that pass's measure: its
+            // text would keep the layout of its old width.
+            if (child.getMeasuredWidth() != width || child.getMeasuredHeight() != height) {
+                child.measure(MeasureSpec.makeMeasureSpec(width, MeasureSpec.EXACTLY),
+                    MeasureSpec.makeMeasureSpec(height, MeasureSpec.EXACTLY));
+            }
+            child.layout(params.x, params.y, params.x + width, params.y + height);
         }
     }
 

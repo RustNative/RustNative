@@ -1,0 +1,13 @@
+# An existing Android application adopting Rust Native (Milestone 40): its
+# own launcher activity (`java/…/HostActivity.java`) keeps its own screen
+# and puts a `RustNativeView` in it, which shows this crate's application.
+[app]
+name = "adoption-android"
+id = "dev.rustnative.adoption-android"
+display-name = "Adoption on Android"
+version = "0.1.0"
+description = "A host application embedding a Rust Native view"
+
+[android]
+java-sources = "java"
+launcher = "dev.rustnative.adoption.HostActivity"

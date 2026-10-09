@@ -14,7 +14,7 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use rustnative_core::{Application, Event, Lifecycle, NodeId, Size, WindowId};
 
 use crate::backend::{Flow, Work, post};
-use crate::jni_host::{Arg, Class, JavaRef, call, call_static};
+use crate::jni_host::{Arg, Class, JavaRef, call_static};
 use crate::rendering::realization::Renderer;
 use crate::{Error, NativeContext, protocol};
 
@@ -127,7 +127,16 @@ impl WindowRegistry {
         root: JavaRef,
         intent: Option<&JavaRef>,
     ) -> Result<(), Error> {
-        call(&activity, "attach", "(J)V", &[Arg::Long(i64::try_from(window.get()).unwrap_or(0))])?;
+        call_static(
+            Class::Bridge,
+            "attach",
+            "(Landroid/app/Activity;Landroid/view/View;J)V",
+            &[
+                Arg::Obj(&activity),
+                Arg::Obj(&root),
+                Arg::Long(i64::try_from(window.get()).unwrap_or(0)),
+            ],
+        )?;
         let density = call_static(
             Class::Bridge,
             "density",
@@ -208,7 +217,12 @@ impl WindowRegistry {
     pub(crate) fn finish_activities(&self) {
         for runtime in self.windows.values() {
             if let Some(activity) = &runtime.activity {
-                let _ = call(activity, "finish", "()V", &[]);
+                let _ = call_static(
+                    Class::Bridge,
+                    "finishWindow",
+                    "(Landroid/app/Activity;)V",
+                    &[Arg::Obj(activity)],
+                );
             }
         }
     }
@@ -220,7 +234,12 @@ impl WindowRegistry {
             runtime.input.release();
             if runtime.back_claimed {
                 if let Some(activity) = &runtime.activity {
-                    let _ = call(activity, "setBackHandled", "(Z)V", &[Arg::Bool(false)]);
+                    let _ = call_static(
+                        Class::Bridge,
+                        "setBackHandled",
+                        "(Landroid/app/Activity;Z)V",
+                        &[Arg::Obj(activity), Arg::Bool(false)],
+                    );
                 }
                 runtime.back_claimed = false;
             }
@@ -354,6 +373,8 @@ impl WindowRegistry {
         runtime.insets = insets;
         crate::environment::window_changed(self, window);
         self.render(window)?;
+        // The root is laid out inside the safe area, which just changed.
+        self.relayout(window)?;
         self.after_change(window)
     }
 
@@ -693,7 +714,12 @@ impl WindowRegistry {
             renderer.release();
         }
         if let Some(activity) = runtime.activity.take() {
-            let _ = call(&activity, "finish", "()V", &[]);
+            let _ = call_static(
+                Class::Bridge,
+                "finishWindow",
+                "(Landroid/app/Activity;)V",
+                &[Arg::Obj(&activity)],
+            );
         }
         runtime.root = None;
     }

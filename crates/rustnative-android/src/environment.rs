@@ -61,6 +61,11 @@ pub(crate) fn window_changed(registry: &mut crate::registry::WindowRegistry, win
     let posture = crate::posture::read(runtime);
     let precision =
         if runtime.input.fine_pointer { PointerPrecision::Fine } else { PointerPrecision::Coarse };
+    if let Some(renderer) =
+        registry.windows.get_mut(&window).and_then(|runtime| runtime.renderer.as_mut())
+    {
+        renderer.safe_area = area;
+    }
     registry.with_application(|application| {
         application.set_window_environment(window, &keys::SAFE_AREA, area);
         application.set_window_environment(window, &keys::WINDOW_MODE, mode);

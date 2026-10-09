@@ -76,7 +76,34 @@ public final class RnBridge {
 
     /** Finishes an activity (the inspector asked the application to quit). */
     static void finish(Activity activity) {
-        activity.finish();
+        finishWindow(activity);
+    }
+
+    // The activity calls Rust makes go through these, so an activity that
+    // only hosts a `RustNativeView` (not an RnActivity) works too.
+
+    /** Names the window {@code root} shows. */
+    static void attach(Activity activity, android.view.View root, long window) {
+        if (activity instanceof RnActivity && ((RnActivity) activity).root == root) {
+            ((RnActivity) activity).attach(window);
+        } else {
+            ((RnLayout) root).becomeRoot(window);
+            root.requestApplyInsets();
+        }
+    }
+
+    /** Whether the application handles back (its own activities only). */
+    static void setBackHandled(Activity activity, boolean handled) {
+        if (activity instanceof RnActivity) {
+            ((RnActivity) activity).setBackHandled(handled);
+        }
+    }
+
+    /** Ends a window's activity — never a host's that embeds the application. */
+    static void finishWindow(Activity activity) {
+        if (activity instanceof RnActivity) {
+            activity.finish();
+        }
     }
 
     /** Sets {@link #muted}. */

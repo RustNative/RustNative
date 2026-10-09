@@ -1,0 +1,29 @@
+# The Android backend's budgets (`PLAN.md` Milestones 35 and 42). See
+# SCHEMA.md for every key's meaning. `max` is the budget; a measurement
+# fails `rustnative bench --target android --check` above
+# `max × (1 + tolerance)`.
+#
+# Reference device: Redmi Note 14 (Android 16, HyperOS 3, arm64-v8a),
+# measured over USB with `examples/hello-label` built optimized (the release
+# profile's settings on a debug-signed build, so it installs) for the
+# device's ABI. Measured values at the time are in the comments.
+#
+# Startup counts from the process's creation (`Process.getStartUptimeMillis`):
+# Android forks the process from the zygote and loads the library before
+# `main` runs. hello-label opens two windows (two activities) at start, so
+# its first content waits for the second.
+target = "android"
+
+[budget]
+# Startup phases (median of 5 cold launches).
+runtime_ready_ms = { max = 400, tolerance = 0.5 }          # 273–279
+first_frame_ms = { max = 900, tolerance = 0.5 }            # 632–641
+first_content_ms = { max = 2000, tolerance = 0.5 }         # 1520–1556
+interactive_ms = { max = 2000, tolerance = 0.5 }           # 1520–1556
+# `am start -W`'s total time: process creation to the first window drawn.
+cold_start_ms = { max = 2200, tolerance = 0.5 }            # 1684–1718
+# `dumpsys meminfo`'s total PSS, three seconds after start.
+resident_memory_mb = { max = 160, tolerance = 0.2 }        # 125–126
+# The APK's entries, compressed: what an install downloads (the stripped
+# library is most of it).
+artifact_size_kb = { max = 4000, tolerance = 0.1 }        # 3035
