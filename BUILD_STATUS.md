@@ -183,8 +183,11 @@ column (`docs/conformance/new-backend-checklist.md`) names the test for
 every row it satisfies.
 
 Gallery on a phone in night mode showed two things that are not the
-backend's: the neutral badge pairs a fixed light fill with the host's
-light on-surface text (a component-library fix, every backend), and its
+backend's: the neutral badge paired a fixed light fill with the host's
+light on-surface text, unreadable in any dark scheme (fixed in the
+component library: it is now a surface badge with an outline, and
+`every_badge_tone_reads_in_a_dark_scheme` checks every tone's contrast
+under a dark host palette); and its
 chart is a fixed 360 dp wide, so on a 392 dp screen the layout shrinks the
 canvas and the drawing is clipped (an application-layout choice).
 

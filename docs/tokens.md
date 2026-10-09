@@ -95,11 +95,18 @@ brand values:
 - `accent` and `on-accent`
 - `danger` and `on-danger`
 - `surface` and `on-surface`
-- `muted`, `border`, and `subtle`
+- `muted` and `border`
 
 Its defaults are in `crates/rustnative-components/components.css`. The
 accent, surface, text, border, and muted roles follow the host. Danger is a
 brand value.
+
+A style pairs a fill with the text colour of the same pair — `accent` with
+`on-accent`, `surface` with `on-surface`, `danger` with `on-danger` — so
+both follow the host or neither does. A fixed light fill under the host's
+text reads in a light scheme and vanishes in a dark one (the neutral badge
+once paired a fixed `subtle` fill with `on-surface`; it is now a surface
+badge with an outline).
 
 An application's theme passes through `rustnative_components::with_roles`.
 Where the application defines a role, its own value is kept. Where it does

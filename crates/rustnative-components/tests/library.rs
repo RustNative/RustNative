@@ -13,11 +13,11 @@ use std::time::Duration;
 
 use rustnative_components::behaviour::TreeItem;
 use rustnative_components::{
-    ActionButton, ActionButtonProps, ButtonVariant, Chart, ChartKind, ChartProps, CommandPalette,
-    CommandPaletteProps, DataTable, DataTableProps, Dialog, DialogProps, IDIOMS, Idioms, ListView,
-    ListViewProps, RadioGroup, RadioGroupProps, Section, SectionLayout, SectionedView,
-    SectionedViewProps, Series, TextField, Toast, ToastProps, TreeView, TreeViewProps,
-    sorted_order, with_roles,
+    ActionButton, ActionButtonProps, Badge, BadgeProps, ButtonVariant, Chart, ChartKind,
+    ChartProps, CommandPalette, CommandPaletteProps, DataTable, DataTableProps, Dialog,
+    DialogProps, IDIOMS, Idioms, ListView, ListViewProps, RadioGroup, RadioGroupProps, Section,
+    SectionLayout, SectionedView, SectionedViewProps, Series, TextField, Toast, ToastProps, Tone,
+    TreeView, TreeViewProps, sorted_order, with_roles,
 };
 use rustnative_core::{
     AccessibilityRole, Command, CommandId, Component, ComponentContext, Event, KeyCode,
@@ -345,4 +345,94 @@ fn sections_lay_out_as_list_grid_and_carousel() {
     // A carousel is one row.
     assert_eq!(rect("s2-0").y, rect("s2-3").y);
     assert!(rect("s2-3").x > rect("s2-0").x);
+}
+
+/// One badge of each tone.
+struct Badges;
+
+impl Component for Badges {
+    type Props = ();
+    type Message = ();
+    fn new((): ()) -> Self {
+        Self
+    }
+    fn props(&self) -> &() {
+        &()
+    }
+    fn set_props(&mut self, (): ()) {}
+    fn view(&self) -> Node {
+        Node::column("badges", [])
+    }
+    fn update(&mut self, _event: Event) {}
+    fn render(&mut self, context: &mut ComponentContext<'_, ()>) -> Node {
+        let badges =
+            [("neutral", Tone::Neutral), ("accent", Tone::Accent), ("danger", Tone::Danger)].map(
+                |(key, tone)| {
+                    Node::column(
+                        key,
+                        [context.child_with_props::<Badge, _>(
+                            key,
+                            BadgeProps { text: key.to_owned(), tone },
+                            Badge::new,
+                        )],
+                    )
+                },
+            );
+        Node::column("badges", badges)
+    }
+}
+
+/// WCAG 2's contrast ratio between two opaque colours.
+fn contrast(a: rustnative_core::Color, b: rustnative_core::Color) -> f64 {
+    let luminance = |color: rustnative_core::Color| {
+        let channel = |value: u8| {
+            let value = f64::from(value) / 255.0;
+            if value <= 0.039_28 { value / 12.92 } else { ((value + 0.055) / 1.055).powf(2.4) }
+        };
+        0.2126 * channel(color.red) + 0.7152 * channel(color.green) + 0.0722 * channel(color.blue)
+    };
+    let (light, dark) = {
+        let (x, y) = (luminance(a), luminance(b));
+        if x > y { (x, y) } else { (y, x) }
+    };
+    (light + 0.05) / (dark + 0.05)
+}
+
+/// A badge's text reads on its fill in a dark scheme too: a fill and a text
+/// colour either both follow the host or both stay fixed, never one of each
+/// (a fixed light fill under the host's light dark-mode text was
+/// unreadable).
+#[test]
+fn every_badge_tone_reads_in_a_dark_scheme() {
+    use rustnative_core::{Color, HostPalette};
+    let dark = HostPalette {
+        accent: Color::rgb(0x4c, 0xc2, 0xff),
+        on_accent: Color::rgb(0x00, 0x00, 0x00),
+        surface: Color::rgb(0x20, 0x20, 0x20),
+        on_surface: Color::rgb(0xff, 0xff, 0xff),
+        highlight: Color::rgb(0x4c, 0xc2, 0xff),
+        on_highlight: Color::rgb(0x00, 0x00, 0x00),
+        border: Color::rgb(0x6e, 0x6e, 0x6e),
+        muted: Color::rgb(0xc5, 0xc5, 0xc5),
+    };
+    for palette in [HostPalette::default(), dark] {
+        let mut app = HeadlessApp::launch_with(
+            Window::new("Badges", Size::new(400, 300)),
+            Services::default(),
+            with_roles(rustnative_core::Theme::default()),
+            || Badges::new(()),
+        );
+        app.application_mut().set_host_palette(palette);
+        app.settle();
+        for badge in app.find_all(&Query::key("badge")) {
+            let style = badge.style.properties();
+            let (Some(text), Some(fill)) =
+                (style.foreground_override(), style.background_override())
+            else {
+                panic!("a badge sets its text and fill: {style:?}");
+            };
+            let ratio = contrast(text, fill);
+            assert!(ratio >= 4.5, "{:?}: {text:?} on {fill:?} is {ratio:.2}:1", badge.name);
+        }
+    }
 }

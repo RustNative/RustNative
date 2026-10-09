@@ -32,7 +32,7 @@ pub fn role_theme() -> rustnative_core::Theme {
 }
 
 /// The names of the role tokens the library's styles use.
-pub const ROLES: [&str; 9] = [
+pub const ROLES: [&str; 8] = [
     "color-accent",
     "color-on-accent",
     "color-danger",
@@ -41,7 +41,6 @@ pub const ROLES: [&str; 9] = [
     "color-on-surface",
     "color-muted",
     "color-border",
-    "color-subtle",
 ];
 
 /// `theme` with every role token it does not define added at its default

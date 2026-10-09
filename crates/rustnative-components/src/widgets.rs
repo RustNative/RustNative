@@ -380,7 +380,12 @@ impl Badge {
     fn render_view(&self) -> Node {
         let label = Node::label("badge", self.props.text.clone());
         match self.props.tone {
-            Tone::Neutral => label.with_class(classes!("bg-subtle text-on-surface rounded px-2")),
+            // Fill and text from the same pair — both follow the host, as
+            // accent's do — so it reads in a dark scheme as in a light one;
+            // the outline sets it apart from the surface it sits on.
+            Tone::Neutral => {
+                label.with_class(classes!("bg-surface text-on-surface border-border rounded px-2"))
+            }
             Tone::Accent => label.with_class(classes!("bg-accent text-on-accent rounded px-2")),
             Tone::Danger => label.with_class(classes!("bg-danger text-on-danger rounded px-2")),
         }

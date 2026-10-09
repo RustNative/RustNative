@@ -9,7 +9,6 @@
   --color-on-accent: #ffffff; /* host: on-accent */
   --color-on-danger: #ffffff;
   --color-on-surface: var(--color-brand-ink); /* host: on-surface */
-  --color-subtle: var(--color-brand-mist);
   --color-surface: #ffffff; /* host: surface */
   --radius-card: 10px;
 }
