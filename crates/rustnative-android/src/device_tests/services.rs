@@ -89,7 +89,7 @@ pub(super) fn permission_states_follow_the_system(instrumentation: &Instrumentat
     assert!(!contacts.allows_use(), "{contacts:?}");
 }
 
-pub(super) fn secure_storage_round_trips_in_the_keystore(_: &Instrumentation) {
+pub(super) fn secure_storage_round_trips_in_the_keystore(instrumentation: &Instrumentation) {
     let store = AndroidSecureStorage;
     store.put("token", b"s3cret").expect("sealed");
     assert_eq!(store.get("token").expect("opened").as_deref(), Some(&b"s3cret"[..]));
@@ -97,7 +97,15 @@ pub(super) fn secure_storage_round_trips_in_the_keystore(_: &Instrumentation) {
     assert_eq!(store.get("token").expect("opened").as_deref(), Some(&b"rotated"[..]));
     store.delete("token").expect("deleted");
     assert_eq!(store.get("token").expect("opened"), None);
-    assert!(store.traits().hardware_backed, "this device keeps the key in secure hardware");
+    // A phone keeps the key in its TEE or StrongBox; the emulator's
+    // Keystore is software, and the answer says so.
+    let emulator = instrumentation.shell("getprop ro.kernel.qemu").trim() == "1"
+        || instrumentation.shell("getprop ro.boot.qemu").trim() == "1";
+    assert_eq!(
+        store.traits().hardware_backed,
+        !emulator,
+        "the answer is the device's (emulator: {emulator})"
+    );
 }
 
 pub(super) fn http_honours_the_platform_policy_and_pins(_: &Instrumentation) {
