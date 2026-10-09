@@ -164,8 +164,9 @@ styling, accessibility with TalkBack, graphics, input, services, surfaces
 and background work, conformance and inspection); the lifecycle script, 9
 of 9 (`tools/android-lifecycle-test.sh`: embedding, process death and
 restoration, rotation, trim); hello-label running with both windows and
-inspected from the development machine; gallery running (interactive
-0.97 s after the process started); `rustnative dev android --once` (a
+inspected from the development machine; gallery, reference-app, and
+product-services running (interactive 0.7–1.0 s after the process started;
+product-services' tray commands logged as ignored); `rustnative dev android --once` (a
 restart in 27 s, 17 s of it the build, two state fields restored); and
 `budgets/android.toml`, every key within (`rustnative bench --target android
 --check`). The packaging tests build a real application and read it back:
@@ -184,8 +185,7 @@ light on-surface text (a component-library fix, every backend), and its
 chart is a fixed 360 dp wide, so on a 392 dp screen the layout shrinks the
 canvas and the drawing is clipped (an application-layout choice).
 
-**Owed.** reference-app and product-services build for Android and have not
-yet been run on the phone; Play Billing (needs an application on a Play Console track) and
+**Owed.** Play Billing (needs an application on a Play Console track) and
 Firebase push end to end (needs a Firebase project); the device suite on
 CI's emulator (the `android` job is written, not yet run); gesture
 arbitration (checklist row 6) has no device test injecting a competing pan;
