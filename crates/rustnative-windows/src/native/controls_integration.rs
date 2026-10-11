@@ -116,8 +116,8 @@ fn native_controls_are_the_systems_own_and_controlled() {
         assert_eq!(class(control(&harness, key)), expected, "{key}");
     }
     // `SysLink` needs Common Controls 6, which an application's manifest
-    // brings and this test binary lacks: then a link is clickable text.
-    assert!(["SysLink", "Static"].contains(&class(control(&harness, "help")).as_str()));
+    // brings, and so does this test binary's.
+    assert_eq!(class(control(&harness, "help")), "SysLink", "help");
     assert_eq!(send(control(&harness, "progress"), PBM_GETPOS, 0, 0), 40);
 
     // A check box the component accepts, and one it refuses.

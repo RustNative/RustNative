@@ -117,13 +117,13 @@ pub(crate) fn set_button(hwnd: HWND, padding: Option<EdgeInsets>) {
     unsafe { SendMessageW(hwnd, BCM_SETTEXTMARGIN, 0, &raw const margin as LPARAM) };
 }
 
-/// The text margins a button draws with, or `None` without comctl32 6.
+/// The text margins a button draws with.
 #[cfg(test)]
-pub(crate) fn button_margin(hwnd: HWND) -> Option<RECT> {
+pub(crate) fn button_margin(hwnd: HWND) -> RECT {
     let mut margin = RECT::default();
     // SAFETY: as in `set_button`.
-    let answered = unsafe { SendMessageW(hwnd, BCM_GETTEXTMARGIN, 0, &raw mut margin as LPARAM) };
-    (answered != 0).then_some(margin)
+    unsafe { SendMessageW(hwnd, BCM_GETTEXTMARGIN, 0, &raw mut margin as LPARAM) };
+    margin
 }
 
 /// `hwnd`'s recorded padding, if any.

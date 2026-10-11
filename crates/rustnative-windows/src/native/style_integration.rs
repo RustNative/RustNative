@@ -242,18 +242,13 @@ fn a_labels_padding_insets_its_text_and_widens_it() {
         harness.expect_control(WindowId::PRIMARY, "padded-button"),
     );
     assert_eq!(width(padded_button), width(button) + 16, "a button's box reserves it too");
-    // Text margins are comctl32 6's, which an application's manifest
-    // loads and this test executable's does not.
-    if let (Some(own), Some(margin)) = (
-        super::rendering::padding::button_margin(button),
-        super::rendering::padding::button_margin(padded_button),
-    ) {
-        assert_eq!(
-            (margin.left - own.left, margin.top - own.top, margin.right - own.right),
-            (12, 2, 4),
-            "and its text margins carry it"
-        );
-    }
+    let own = super::rendering::padding::button_margin(button);
+    let margin = super::rendering::padding::button_margin(padded_button);
+    assert_eq!(
+        (margin.left - own.left, margin.top - own.top, margin.right - own.right),
+        (12, 2, 4),
+        "and its text margins carry it"
+    );
 
     harness.with_runtime_mut(WindowId::PRIMARY, |runtime| {
         runtime.with_application(|application| {

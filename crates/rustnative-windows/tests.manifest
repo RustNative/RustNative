@@ -1,5 +1,19 @@
 <?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <assembly xmlns="urn:schemas-microsoft-com:asm.v1" manifestVersion="1.0">
+  <!-- Common Controls 6, as packaged applications declare it (see
+       rustnative-build's manifest.rs): the tests exercise the themed
+       controls that ship, not comctl32 5's. -->
+  <dependency>
+    <dependentAssembly>
+      <assemblyIdentity
+        type="win32"
+        name="Microsoft.Windows.Common-Controls"
+        version="6.0.0.0"
+        processorArchitecture="*"
+        publicKeyToken="6595b64144ccf1df"
+        language="*" />
+    </dependentAssembly>
+  </dependency>
   <!-- Declares which Windows releases this binary was built and tested
        for. Windows uses it to decide whether to grant behavior introduced
        after Windows Vista: this crate's tests need the Windows 8 entry,

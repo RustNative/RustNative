@@ -108,7 +108,12 @@ fn a_hidden_screen_stops_its_periodic_work_and_an_idle_window_is_not_woken() {
     assert!(shown >= 3, "ticking while shown: {shown}");
 
     harness.click(WindowId::PRIMARY, "toggle");
-    pump_for(&mut harness, Duration::from_millis(200)); // the tick in flight
+    // The tick in flight, and the system's own trailing work: a themed
+    // (comctl32 6) button paints through uxtheme's buffered-paint cache,
+    // which uxtheme frees about a second after its last use with a one-shot
+    // thread timer. That timer follows the last paint, not idleness, and
+    // never repeats, so it is let pass before idleness is measured.
+    pump_for(&mut harness, Duration::from_millis(1500));
     let at_hide = TICKS.load(Ordering::SeqCst);
     // Idle: the only periodic work is suspended, so nothing wakes the
     // window — no timer, no scheduler wake, nothing — for two seconds.

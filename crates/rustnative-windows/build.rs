@@ -9,7 +9,9 @@
 //! An application gets its manifest from packaging (Milestone 32). A test
 //! executable has no packaging step, so the manifest is linked in here —
 //! otherwise the opacity tests would be testing the absence of a manifest
-//! rather than the backend.
+//! rather than the backend. It also declares Common Controls 6, as the
+//! packaged manifest does (`rustnative_build::manifest`), so the tests drive
+//! the themed controls an application ships with rather than comctl32 5's.
 //!
 //! The flags go to every linked target of *this* package — which, since a
 //! library has no link step of its own, means its test executable — and
