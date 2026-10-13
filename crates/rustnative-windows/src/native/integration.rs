@@ -768,7 +768,8 @@ fn native_window_matches_its_visual_golden() {
     }
     let capture = capture.expect("PrintWindow captures a painted client area");
     super::capture::assert_matches_golden(
-        &std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/goldens/windows/counter.bmp"),
+        &std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/goldens/windows"),
+        "counter",
         &capture,
     );
 }

@@ -8,9 +8,13 @@
 //! can read and write in forty lines, with no image dependency.
 //!
 //! Pixel output depends on the machine's fonts, DPI, and theme, so a golden
-//! holds on the machine class it was blessed on; the comparison allows a
-//! per-channel tolerance for antialiasing noise and a small fraction of
-//! differing pixels. `BUILD_STATUS.md` records where the goldens were made.
+//! holds on the machine class it was blessed on: goldens live under a
+//! directory named for that class ([`machine_class`] — client or server
+//! Windows, and the system DPI), and the comparison allows a per-channel
+//! tolerance for antialiasing noise and a small fraction of differing
+//! pixels. A class with no golden yet fails with the capture written where
+//! the golden belongs (`.actual.bmp`), which CI uploads, so the image that
+//! gets reviewed and committed is the one that machine class renders.
 
 use std::path::Path;
 
@@ -170,10 +174,49 @@ impl Capture {
     }
 }
 
-/// Compares `actual` with the golden BMP at `path`, blessing it instead when
-/// `RUSTNATIVE_BLESS=1`. Panics — this is an assertion — when the sizes
-/// differ or more than 1% of pixels differ by more than 12 per channel.
-pub(crate) fn assert_matches_golden(path: &Path, actual: &Capture) {
+/// The machine class goldens are kept per: `client-96`, `server-120`, … —
+/// whether this is a client or a server edition of Windows (their themes
+/// draw common controls differently) and the system DPI.
+pub(crate) fn machine_class() -> String {
+    use windows_sys::Win32::System::Registry::{HKEY_LOCAL_MACHINE, RRF_RT_REG_SZ, RegGetValueW};
+    use windows_sys::Win32::UI::HiDpi::GetDpiForSystem;
+    let key = crate::ffi::wide_string("SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion");
+    let value = crate::ffi::wide_string("InstallationType");
+    let mut buffer = [0u16; 64];
+    let mut size = u32::try_from(std::mem::size_of_val(&buffer)).unwrap_or(0);
+    // SAFETY: the key and value names are NUL-terminated wide strings, and
+    // `buffer`/`size` describe a writable buffer of `size` bytes.
+    let status = unsafe {
+        RegGetValueW(
+            HKEY_LOCAL_MACHINE,
+            key.as_ptr(),
+            value.as_ptr(),
+            RRF_RT_REG_SZ,
+            std::ptr::null_mut(),
+            buffer.as_mut_ptr().cast(),
+            &raw mut size,
+        )
+    };
+    let installation = if status == 0 {
+        let length = buffer.iter().position(|unit| *unit == 0).unwrap_or(buffer.len());
+        String::from_utf16_lossy(&buffer[..length])
+    } else {
+        String::new()
+    };
+    let edition = if installation.contains("Server") { "server" } else { "client" };
+    // SAFETY: no preconditions.
+    let dpi = unsafe { GetDpiForSystem() };
+    format!("{edition}-{dpi}")
+}
+
+/// Compares `actual` with the golden `<name>.bmp` in `directory`'s
+/// subdirectory for this [`machine_class`], blessing it instead when
+/// `RUSTNATIVE_BLESS=1`. Panics — this is an assertion — when the class has
+/// no golden, the sizes differ, or more than 1% of pixels differ by more
+/// than 12 per channel.
+pub(crate) fn assert_matches_golden(directory: &Path, name: &str, actual: &Capture) {
+    let path = directory.join(machine_class()).join(format!("{name}.bmp"));
+    let path = path.as_path();
     if std::env::var("RUSTNATIVE_BLESS").is_ok_and(|value| value == "1") {
         if let Some(parent) = path.parent() {
             std::fs::create_dir_all(parent).expect("create the golden directory");
@@ -183,7 +226,17 @@ pub(crate) fn assert_matches_golden(path: &Path, actual: &Capture) {
     }
     let expected =
         std::fs::read(path).ok().and_then(|bytes| Capture::from_bmp(&bytes)).unwrap_or_else(|| {
-            panic!("golden {} is missing; bless it with RUSTNATIVE_BLESS=1", path.display())
+            let failed = path.with_extension("actual.bmp");
+            if let Some(parent) = failed.parent() {
+                let _ = std::fs::create_dir_all(parent);
+            }
+            let _ = std::fs::write(&failed, actual.to_bmp());
+            panic!(
+                "no golden {} for this machine class; review the capture written to {} and \
+                 commit it as the golden (or bless with RUSTNATIVE_BLESS=1)",
+                path.display(),
+                failed.display()
+            )
         });
     let difference = actual.difference(&expected, 12).unwrap_or_else(|| {
         panic!(

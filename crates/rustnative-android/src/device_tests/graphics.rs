@@ -68,21 +68,40 @@ pub(super) fn a_transition_runs_across_frames_and_settles(instrumentation: &Inst
         harness.click("fade");
         keep(harness);
     });
-    // The main looper runs Choreographer's frames while this thread waits.
-    std::thread::sleep(Duration::from_millis(250));
-    let midway = alpha("box");
-    assert!(midway > 0.02 && midway < 0.98, "partway through the transition: {midway}");
-    // Eased, the value nears its end before the duration does: wait for the
-    // timeline, then read where it settled.
-    instrumentation.wait_for("the transition to end", Duration::from_secs(5), || {
+    // The main looper runs Choreographer's frames while this thread samples
+    // the view's alpha. A fixed sleep before one sample was flaky on a
+    // loaded emulator (the frames had not started, or had all run); every
+    // sample is kept instead, and one of them must be partway.
+    let active = || {
         on_main(|| {
             with_kept(|harness| {
                 harness.with_registry(|registry| {
-                    !registry.windows[&WindowId::PRIMARY].animation.timeline.is_active()
+                    registry.windows[&WindowId::PRIMARY].animation.timeline.is_active()
                 })
             })
         })
+    };
+    let mut samples = Vec::new();
+    let until = std::time::Instant::now() + Duration::from_secs(5);
+    while std::time::Instant::now() < until {
+        let sample = alpha("box");
+        samples.push(sample);
+        if sample < 0.01 && !active() {
+            break;
+        }
+        std::thread::sleep(Duration::from_millis(10));
+    }
+    instrumentation.wait_for("the transition to end", Duration::from_secs(5), move || {
+        with_kept(|harness| {
+            harness.with_registry(|registry| {
+                !registry.windows[&WindowId::PRIMARY].animation.timeline.is_active()
+            })
+        })
     });
+    assert!(
+        samples.iter().any(|value| *value > 0.02 && *value < 0.98),
+        "a frame partway through the transition: {samples:?}"
+    );
     assert!(alpha("box") < 0.01, "it settled at its target");
 }
 

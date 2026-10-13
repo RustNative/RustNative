@@ -311,6 +311,15 @@ jobs:
         run: cargo check --workspace --all-targets
       - name: cargo test (native backend included)
         run: cargo test --workspace
+      # A visual golden is kept per machine class (`native::capture`); a
+      # failed or missing one leaves its capture as `*.actual.bmp`, which is
+      # what gets reviewed and committed.
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: windows-golden-captures
+          path: crates/rustnative-windows/tests/goldens/**/*.actual.bmp
+          if-no-files-found: ignore
       # Tests that need the interactive desktop's real cursor or the system
       # clipboard are `#[ignore]`d so a restricted local shell reports them
       # as not run instead of failing or silently passing; the runner's
