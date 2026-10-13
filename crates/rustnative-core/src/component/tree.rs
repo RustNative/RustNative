@@ -1252,6 +1252,13 @@ impl ComponentTree {
         self.state.borrow_mut().flush()
     }
 
+    /// This window's persisted-state buffer, shared — what the application
+    /// keeps when the window closes with writes its store refused, so they
+    /// are retried rather than dropped with the tree.
+    pub(crate) fn state_cache(&self) -> Rc<RefCell<crate::persistence::StateCache>> {
+        Rc::clone(&self.state)
+    }
+
     /// Whether this window has persisted-state writes not yet flushed.
     #[must_use]
     pub fn has_unsaved_state(&self) -> bool {

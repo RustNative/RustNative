@@ -99,6 +99,10 @@ pub struct Application {
     pub(crate) inspection: crate::inspect::Inspection,
     /// The host's colors, once a backend has read them.
     host_palette: Option<crate::style::HostPalette>,
+    /// Persisted-state buffers of closed windows whose last flush failed:
+    /// retried by every later [`Self::flush_state`] rather than dropped
+    /// with their trees.
+    orphaned_state: Vec<std::rc::Rc<std::cell::RefCell<crate::persistence::StateCache>>>,
 }
 
 impl fmt::Debug for Application {
@@ -187,6 +191,7 @@ impl Application {
             environment: crate::environment::Environment::new(),
             inspection: crate::inspect::Inspection::default(),
             host_palette: None,
+            orphaned_state: Vec::new(),
         };
         application.update_size_class(WindowId::PRIMARY);
         // A component may request another window from its first render. The
@@ -238,6 +243,7 @@ impl Application {
             environment: crate::environment::Environment::new(),
             inspection: crate::inspect::Inspection::default(),
             host_palette: None,
+            orphaned_state: Vec::new(),
         };
         std::mem::replace(self, empty)
     }
@@ -380,23 +386,33 @@ impl Application {
                 }
             }
         }
+        self.orphaned_state.retain(|cache| {
+            let mut cache = cache.borrow_mut();
+            if let Err(error) = cache.flush() {
+                first_error.get_or_insert(error);
+            }
+            cache.is_dirty()
+        });
         first_error.map_or(Ok(()), Err)
     }
 
-    /// Whether any window has persisted-state writes not yet flushed —
-    /// what a backend's idle flush waits on.
+    /// Whether any window — or a window closed with writes its store
+    /// refused — has persisted-state writes not yet flushed: what a
+    /// backend's idle flush waits on.
     #[must_use]
     pub fn has_unsaved_state(&self) -> bool {
         self.windows.values().any(|entry| entry.components.has_unsaved_state())
+            || self.orphaned_state.iter().any(|cache| cache.borrow().is_dirty())
     }
 
     /// Tells the application it is being suspended, resumed, or terminated.
     ///
-    /// Persisted state is flushed *first* for [`Lifecycle::Suspending`] and
-    /// [`Lifecycle::Terminating`] — a platform may not wait for anything
-    /// after this returns — and then [`Event::Lifecycle`] is delivered to
-    /// the primary window's root, so a component can do what is specific
-    /// to it.
+    /// Persisted state is flushed *first* for [`Lifecycle::Suspending`],
+    /// [`Lifecycle::Terminating`], and [`Lifecycle::LowMemory`] — a
+    /// platform may not wait for anything after this returns — and then
+    /// [`Event::Lifecycle`] is delivered to every open window's root,
+    /// primary first, so a component in any window can do what is specific
+    /// to it (on Android each window is an activity of its own).
     ///
     /// # Errors
     ///
@@ -415,7 +431,11 @@ impl Application {
             }
             _ => Ok(()),
         };
-        self.dispatch(Event::Lifecycle(lifecycle));
+        let mut ids = self.window_ids();
+        ids.sort_by_key(|id| *id != self.primary_window);
+        for id in ids {
+            self.dispatch_to_window(id, Event::Lifecycle(lifecycle));
+        }
         flushed
     }
 
@@ -557,11 +577,14 @@ impl Application {
     /// Records the platform's reduced-motion setting, for this application
     /// and every window it owns. A backend calls this at startup and
     /// whenever the system setting changes.
+    ///
+    /// This is the one channel for the trait: it drives the animation
+    /// timelines and [`crate::ComponentContext::motion_preference`], and
+    /// sets [`crate::environment::keys::REDUCED_MOTION`], which components
+    /// read and the `motion-reduce:` style variant resolves against.
     pub fn set_motion_preference(&mut self, motion: crate::MotionPreference) {
-        self.motion = motion;
-        for entry in self.windows.values() {
-            entry.components.set_motion_preference(motion);
-        }
+        // `set_environment` recognises the key and updates the timelines.
+        self.set_environment(&crate::environment::keys::REDUCED_MOTION, motion);
     }
 
     /// Returns the primary window's scheduler.
@@ -636,8 +659,23 @@ impl Application {
                 (entry.state.modal_parent() == Some(current)).then_some(*child)
             }));
         }
+        // A closing window's persisted writes are flushed before its tree
+        // goes; any its store refuses are kept and retried by the next
+        // flush, so closing a window never loses what it saved.
+        let mut closing = closing.into_iter().collect::<Vec<_>>();
+        closing.sort();
         for window in closing {
-            self.windows.remove(&window);
+            if let Some(entry) = self.windows.remove(&window) {
+                let cache = entry.components.state_cache();
+                drop(entry);
+                let refused = {
+                    let mut buffer = cache.borrow_mut();
+                    buffer.flush().is_err() || buffer.is_dirty()
+                };
+                if refused {
+                    self.orphaned_state.push(cache);
+                }
+            }
         }
         true
     }
@@ -832,6 +870,19 @@ impl Application {
         key: &crate::environment::EnvKey<T>,
         value: T,
     ) {
+        // Reduced motion is one trait with two readers — the environment
+        // (components, `motion-reduce:`) and the animation timelines — so
+        // setting it either way reaches both.
+        if key.name() == crate::environment::keys::REDUCED_MOTION.name() {
+            if let Some(motion) =
+                (&value as &dyn std::any::Any).downcast_ref::<crate::MotionPreference>()
+            {
+                self.motion = *motion;
+                for entry in self.windows.values() {
+                    entry.components.set_motion_preference(*motion);
+                }
+            }
+        }
         let _ = self.environment.set(key, value.clone(), 0);
         for entry in self.windows.values_mut() {
             entry.components.set_environment(key, value.clone());

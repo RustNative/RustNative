@@ -39,6 +39,9 @@ pub(crate) fn capabilities(session: &Session) -> Vec<rustnative_core::Capability
         Capability::UrlLaunch,
         Capability::Notifications,
         Capability::StatePersistence,
+        // libsoup, with certificate pins checked at the handshake
+        // (`crate::services::SoupHttp`).
+        Capability::Http,
         Capability::SerialPorts,
         Capability::Permissions,
         // logind, the memory monitor, and the idle flush

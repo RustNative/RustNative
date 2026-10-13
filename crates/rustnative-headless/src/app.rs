@@ -12,6 +12,7 @@ use rustnative_core::{
 };
 
 use crate::measure::HeadlessMeasurer;
+use crate::platform::headless_capabilities;
 use crate::query::{Query, QueryError, describe};
 use crate::services::MockHttp;
 use crate::tree::HeadlessTree;
@@ -147,6 +148,7 @@ impl HeadlessApp {
         // Host-following tokens take the fixed reference palette, the same on
         // every machine (`docs/tokens.md`).
         app.set_host_palette(rustnative_core::HostPalette::default());
+        app.set_environment(&rustnative_core::keys::CAPABILITIES, headless_capabilities());
         let mut headless = Self {
             factory,
             app,
@@ -203,12 +205,35 @@ impl HeadlessApp {
         self
     }
 
+    /// Answers `capabilities` to the application, as a backend of a host
+    /// with exactly those would — to test how a component adapts where, say,
+    /// there is no clipboard or a tray is available.
+    #[must_use]
+    pub fn with_capabilities(
+        mut self,
+        capabilities: rustnative_core::PlatformCapabilities,
+    ) -> Self {
+        self.app.set_environment(&rustnative_core::keys::CAPABILITIES, capabilities);
+        self.settle();
+        self
+    }
+
+    /// The surfaces beyond the window (tray, jump list, notifications,
+    /// widgets) the application asked for since the last call — what a
+    /// backend with them would apply.
+    pub fn take_surface_commands(&mut self) -> Vec<rustnative_core::surfaces::SurfaceCommand> {
+        self.app.services().surfaces().take()
+    }
+
     fn relaunch_fresh(&mut self) {
+        let capabilities =
+            self.app.environment_for(WindowId::PRIMARY, &rustnative_core::keys::CAPABILITIES);
         self.app = (self.factory)(
             self.services.clone(),
             self.theme.clone(),
             Arc::new(self.executor.clone()),
         );
+        self.app.set_environment(&rustnative_core::keys::CAPABILITIES, capabilities);
         self.trees.clear();
         self.reported_ranges.clear();
         self.settle();
@@ -510,13 +535,20 @@ impl HeadlessApp {
     /// The query failed, or the node is not an enabled text field.
     pub fn type_text(&mut self, query: &Query, text: &str) -> Result<(), QueryError> {
         let node = self.find(query)?.clone();
-        if node.kind != NodeKind::TextInput || !node.is_interactable() {
+        if !is_text_field(&node) || !node.is_interactable() {
             return Err(not_interactable(&node, "it is not an enabled text field"));
         }
         self.move_focus(Some(node.id));
         for character in text.chars() {
-            let mut value =
-                self.realized().get(node.id).and_then(|node| node.text.clone()).unwrap_or_default();
+            let mut value = self
+                .realized()
+                .get(node.id)
+                .and_then(|node| {
+                    node.text
+                        .clone()
+                        .or_else(|| node.control.as_ref().and_then(rustnative_core::Control::text))
+                })
+                .unwrap_or_default();
             value.push(character);
             self.set_native_value(node.id, value.clone());
             self.dispatch(Event::TextChanged { target: node.id, value });
@@ -532,7 +564,7 @@ impl HeadlessApp {
     /// See [`Self::type_text`].
     pub fn set_text(&mut self, query: &Query, text: &str) -> Result<(), QueryError> {
         let node = self.find(query)?.clone();
-        if node.kind != NodeKind::TextInput || !node.is_interactable() {
+        if !is_text_field(&node) || !node.is_interactable() {
             return Err(not_interactable(&node, "it is not an enabled text field"));
         }
         self.move_focus(Some(node.id));
@@ -924,10 +956,12 @@ impl HeadlessApp {
         let theme = self.theme.clone();
         let state = Arc::clone(&self.state);
         let http = self.http.take();
+        let capabilities =
+            self.app.environment_for(WindowId::PRIMARY, &rustnative_core::keys::CAPABILITIES);
         drop(self);
         let mut restored = Self::start(factory, services, theme, state);
         restored.http = http;
-        restored
+        restored.with_capabilities(capabilities)
     }
 
     /// Terminates politely — `Lifecycle::Terminating`, which flushes — then
@@ -953,6 +987,7 @@ impl HeadlessApp {
         let executor = ManualExecutor::new();
         let services = services.with_clock(Arc::new(executor.clone()));
         let mut app = factory(services.clone(), theme.clone(), Arc::new(executor.clone()));
+        app.set_environment(&rustnative_core::keys::CAPABILITIES, headless_capabilities());
         app.open_url(url);
         let mut restored = Self {
             factory,
@@ -1022,6 +1057,13 @@ impl Drop for HeadlessApp {
             );
         }
     }
+}
+
+/// Whether typing reaches `node`: a text field, or a multi-line text
+/// control (both report `Event::TextChanged`).
+fn is_text_field(node: &crate::tree::RealizedNode) -> bool {
+    node.kind == NodeKind::TextInput
+        || matches!(node.control, Some(rustnative_core::Control::MultilineText { .. }))
 }
 
 fn not_interactable(node: &crate::tree::RealizedNode, reason: &str) -> QueryError {

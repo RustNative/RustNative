@@ -462,6 +462,14 @@ pub mod keys {
     /// The primary pointer's precision (`pointer-coarse:`/`pointer-fine:`).
     pub const POINTER: EnvKey<PointerPrecision> =
         EnvKey::new("rustnative.pointer", PointerPrecision::default);
+    /// What the backend realizing this window genuinely realizes
+    /// (`PLAN.md` 2.5): set by every backend before the first render and
+    /// whenever its answer changes (a keyboard attached, a tray host
+    /// started), so a component asks for a capability rather than for a
+    /// platform. Empty until a backend sets it — a tree rendered with no
+    /// host (a server page, a unit test) is told nothing is available.
+    pub const CAPABILITIES: EnvKey<crate::capability::PlatformCapabilities> =
+        EnvKey::new("rustnative.capabilities", crate::capability::PlatformCapabilities::default);
 }
 
 /// The precision of the host's primary pointer.

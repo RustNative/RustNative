@@ -46,7 +46,7 @@ impl TrayMenuItem {
 
 /// A task in the jump list: the application started again with
 /// `arguments` (a second launch reaches the running instance as
-/// `Event::OpenUrl` when the arguments are a URL, Milestone 30).
+/// `Event::DeepLink` when the arguments are a URL, Milestone 30).
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct JumpTask {
     /// What the list shows.
@@ -166,9 +166,19 @@ pub struct Surfaces {
     queue: Arc<Mutex<VecDeque<SurfaceCommand>>>,
 }
 
+/// How many requests [`Surfaces`] holds for a backend that has not taken
+/// them. A backend with no surfaces (a server rendering pages, the headless
+/// backend in a long test) never drains the queue, so it keeps the newest
+/// this many and drops older ones rather than growing without bound.
+pub const QUEUE_LIMIT: usize = 256;
+
 impl Surfaces {
     fn push(&self, command: SurfaceCommand) {
-        self.queue.lock().unwrap_or_else(PoisonError::into_inner).push_back(command);
+        let mut queue = self.queue.lock().unwrap_or_else(PoisonError::into_inner);
+        if queue.len() >= QUEUE_LIMIT {
+            queue.pop_front();
+        }
+        queue.push_back(command);
     }
 
     /// Shows the tray icon with `tooltip` and `menu`.
@@ -237,5 +247,21 @@ impl Surfaces {
     #[must_use]
     pub fn take(&self) -> Vec<SurfaceCommand> {
         self.queue.lock().unwrap_or_else(PoisonError::into_inner).drain(..).collect()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn an_undrained_queue_keeps_only_the_newest_requests() {
+        let surfaces = Surfaces::default();
+        for index in 0..QUEUE_LIMIT + 10 {
+            surfaces.notify(&index.to_string(), "");
+        }
+        let taken = surfaces.take();
+        assert_eq!(taken.len(), QUEUE_LIMIT);
+        assert!(matches!(&taken[0], SurfaceCommand::Notify { title, .. } if title == "10"));
     }
 }

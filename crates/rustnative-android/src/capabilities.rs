@@ -69,7 +69,38 @@ pub(crate) fn realized(facts: &DeviceFacts) -> Vec<Capability> {
         Capability::NativeSurfaces,
         // `VideoView` with the host's controls (`foreign`).
         Capability::MediaPlayback,
+        // The services (`services`): `ClipboardManager`, the Storage
+        // Access Framework's pickers, `ACTION_VIEW`, notification channels,
+        // the share sheet, `HttpsURLConnection`, crash-safe state files, and
+        // the five permission states.
+        Capability::Clipboard,
+        Capability::FileDialogs,
+        Capability::UrlLaunch,
+        Capability::Notifications,
+        Capability::SystemShare,
+        Capability::Http,
+        Capability::StatePersistence,
+        Capability::Permissions,
+        // The input method for custom text targets (`input`), and drag and
+        // drop between views and applications (`input::drag`).
+        Capability::Ime,
+        Capability::DragAndDrop,
+        // Surfaces beyond the activity (`surfaces`): app widgets,
+        // quick-settings tiles, ongoing notifications, and launcher
+        // shortcuts (Android's jump list).
+        Capability::Surface(rustnative_core::SurfaceKind::Widget),
+        Capability::Surface(rustnative_core::SurfaceKind::Tile),
+        Capability::Surface(rustnative_core::SurfaceKind::LiveActivity),
+        Capability::Surface(rustnative_core::SurfaceKind::JumpList),
     ];
+    if facts.printing {
+        // `PrintManager` (`services::industrial`).
+        capabilities.push(Capability::Printing);
+    }
+    if facts.gamepad {
+        // Game controllers as `InputDevice`s (`input::gamepad`).
+        capabilities.push(Capability::Gamepad);
+    }
     if facts.web_view {
         capabilities.push(Capability::WebContent);
     }
@@ -84,8 +115,10 @@ pub(crate) fn realized(facts: &DeviceFacts) -> Vec<Capability> {
         capabilities.push(Capability::Pen);
     }
     if facts.mouse || facts.stylus {
-        // A hovering mouse or pen (`ACTION_HOVER_*`).
+        // A hovering mouse or pen (`ACTION_HOVER_*`), and the node's cursor
+        // as its view's `PointerIcon`.
         capabilities.push(Capability::Hover);
+        capabilities.push(Capability::Cursors);
     }
     if facts.keyboard {
         // Shortcuts need keys to press.
@@ -124,6 +157,29 @@ mod tests {
         assert!(!answered.contains(&Capability::Pen), "no stylus on this phone");
         assert!(!answered.contains(&Capability::Hover), "a finger does not hover");
         assert!(!answered.contains(&Capability::CommandShortcuts), "no keyboard to press them on");
+        assert!(!answered.contains(&Capability::Cursors), "no pointer to show one");
+        for realized in [
+            Capability::Clipboard,
+            Capability::FileDialogs,
+            Capability::UrlLaunch,
+            Capability::Notifications,
+            Capability::SystemShare,
+            Capability::Http,
+            Capability::StatePersistence,
+            Capability::Permissions,
+            Capability::Ime,
+            Capability::DragAndDrop,
+            Capability::Printing,
+            Capability::Surface(rustnative_core::SurfaceKind::Widget),
+            Capability::Surface(rustnative_core::SurfaceKind::Tile),
+            Capability::Surface(rustnative_core::SurfaceKind::LiveActivity),
+            Capability::Surface(rustnative_core::SurfaceKind::JumpList),
+        ] {
+            assert!(answered.contains(&realized), "{realized:?} is realized on every device");
+        }
+        assert!(!answered.contains(&Capability::Gamepad), "no controller attached");
+        // Never claimed on Android: no tray, no taskbar.
+        assert!(!answered.contains(&Capability::Surface(rustnative_core::SurfaceKind::TrayExtra)));
         // Never claimed on Android: the host places and sizes every window.
         assert!(!answered.contains(&Capability::WindowManagement));
         assert!(!answered.contains(&Capability::WindowPlacement));

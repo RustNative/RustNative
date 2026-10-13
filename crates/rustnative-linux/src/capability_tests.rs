@@ -16,6 +16,7 @@ fn capabilities_only_advertise_realized_backend_features() {
         Capability::UrlLaunch,
         Capability::Notifications,
         Capability::StatePersistence,
+        Capability::Http,
         Capability::Printing,
         Capability::SerialPorts,
         Capability::Permissions,

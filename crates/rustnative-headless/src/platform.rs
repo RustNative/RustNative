@@ -102,6 +102,22 @@ impl HeadlessPlatform {
     }
 }
 
+/// What the headless model realizes: windows and their state, persisted
+/// state, deep links, the lifecycle, right-to-left mirroring
+/// (`tests/portable_surface.rs`), and command shortcuts (through
+/// `HeadlessApp::press`) — and nothing it only records.
+pub(crate) fn headless_capabilities() -> PlatformCapabilities {
+    PlatformCapabilities::new([
+        Capability::MultipleWindows,
+        Capability::WindowManagement,
+        Capability::StatePersistence,
+        Capability::DeepLinks,
+        Capability::Lifecycle,
+        Capability::RightToLeft,
+        Capability::CommandShortcuts,
+    ])
+}
+
 impl Platform for HeadlessPlatform {
     type Error = UnsupportedPlatform;
 
@@ -115,6 +131,7 @@ impl Platform for HeadlessPlatform {
 
     fn run(&mut self, application: &mut Application) -> Result<(), Self::Error> {
         let _ = application.enable_inspection_from_env();
+        application.set_environment(&rustnative_core::keys::CAPABILITIES, self.capabilities());
         self.realize(application);
         let mut quiet_since = Instant::now();
         while quiet_since.elapsed() < self.idle_timeout {
@@ -134,13 +151,7 @@ impl Platform for HeadlessPlatform {
     /// only records. Draw lists, for instance, are kept but never
     /// rasterized, so [`Capability::CustomDrawing`] is not claimed.
     fn capabilities(&self) -> PlatformCapabilities {
-        PlatformCapabilities::new([
-            Capability::MultipleWindows,
-            Capability::WindowManagement,
-            Capability::StatePersistence,
-            Capability::DeepLinks,
-            Capability::Lifecycle,
-        ])
+        headless_capabilities()
     }
 
     fn native_extension(&self) -> &dyn Any {

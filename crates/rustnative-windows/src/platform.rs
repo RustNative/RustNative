@@ -65,6 +65,7 @@ impl WindowsPlatform {
         parent: windows_sys::Win32::Foundation::HWND,
         application: &'a mut Application,
     ) -> Result<crate::EmbeddedRoot<'a>, Error> {
+        application.set_environment(&rustnative_core::keys::CAPABILITIES, self.capabilities());
         crate::native::embed::EmbeddedRoot::start(application, parent)
     }
 
@@ -80,6 +81,7 @@ impl WindowsPlatform {
         &self,
         application: &'a mut Application,
     ) -> Result<crate::ExternalLoop<'a>, Error> {
+        application.set_environment(&rustnative_core::keys::CAPABILITIES, self.capabilities());
         crate::native::embed::ExternalLoop::start(application, std::ptr::null_mut())
     }
 }
@@ -89,6 +91,7 @@ impl Platform for WindowsPlatform {
     type Error = Error;
 
     fn run(&mut self, application: &mut Application) -> Result<(), Self::Error> {
+        application.set_environment(&rustnative_core::keys::CAPABILITIES, self.capabilities());
         crate::native::run_application(
             application,
             self.app_id.as_deref(),
@@ -109,6 +112,8 @@ impl Platform for WindowsPlatform {
             [
                 Capability::Clipboard,
                 Capability::UrlLaunch,
+                // WinHTTP, with certificate pins (`services::http`).
+                Capability::Http,
                 Capability::MultipleWindows,
                 Capability::WindowManagement,
                 Capability::FileDialogs,
@@ -179,6 +184,16 @@ impl Platform for WindowsPlatform {
         Err(Error::UnsupportedHost)
     }
 
+    // The tables describe the backend, not the machine compiling it: a
+    // build-time check on another OS reads the same answers.
+    fn style_capabilities(&self) -> rustnative_core::StyleCapabilities {
+        rustnative_style::WINDOWS
+    }
+
+    fn unit_mapping(&self) -> Option<rustnative_core::UnitMapping> {
+        Some(rustnative_style::WINDOWS_UNITS)
+    }
+
     fn capabilities(&self) -> PlatformCapabilities {
         PlatformCapabilities::default()
     }
@@ -199,6 +214,7 @@ mod tests {
         assert!(capabilities.supports(Capability::WindowManagement));
         assert!(capabilities.supports(Capability::Clipboard));
         assert!(capabilities.supports(Capability::UrlLaunch));
+        assert!(capabilities.supports(Capability::Http));
         assert!(capabilities.supports(Capability::FileDialogs));
         assert!(capabilities.supports(Capability::Notifications));
         assert!(capabilities.supports(Capability::Menus));

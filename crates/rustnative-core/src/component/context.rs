@@ -522,6 +522,46 @@ impl<M: Send + 'static> ComponentContext<'_, M> {
         self.tree.read_env(self.parent, key)
     }
 
+    /// What the backend realizing this window realizes
+    /// ([`crate::environment::keys::CAPABILITIES`]) — the portable question
+    /// to ask instead of which platform this is (`PLAN.md` 2.5). Recorded
+    /// like any environment read, so the component re-renders when the
+    /// answer changes.
+    ///
+    /// ```
+    /// use rustnative_core::{
+    ///     Application, Capability, Component, ComponentContext, Event, Node, PlatformCapabilities,
+    ///     Size, Window, keys,
+    /// };
+    ///
+    /// struct Copy;
+    /// impl Component for Copy {
+    ///     type Props = ();
+    ///     type Message = ();
+    ///     fn new((): ()) -> Self { Self }
+    ///     fn props(&self) -> &() { &() }
+    ///     fn set_props(&mut self, (): ()) {}
+    ///     fn view(&self) -> Node { Node::label("copy", "") }
+    ///     fn render(&mut self, context: &mut ComponentContext<'_, ()>) -> Node {
+    ///         if context.capabilities().supports(Capability::Clipboard) {
+    ///             Node::button("copy", "Copy")
+    ///         } else {
+    ///             Node::label("copy", "Select the text to copy it")
+    ///         }
+    ///     }
+    ///     fn update(&mut self, _: Event) {}
+    /// }
+    ///
+    /// let mut application = Application::new(Copy, Window::new("Copy", Size::new(200, 100)));
+    /// assert!(matches!(application.view(), Node::Label(_)), "no backend, no clipboard");
+    /// // What a backend does before its first render:
+    /// application.set_environment(&keys::CAPABILITIES, PlatformCapabilities::new([Capability::Clipboard]));
+    /// assert!(matches!(application.view(), Node::Button(_)));
+    /// ```
+    pub fn capabilities(&mut self) -> crate::capability::PlatformCapabilities {
+        self.env(&crate::environment::keys::CAPABILITIES)
+    }
+
     /// Provides `value` for `key` to every descendant of this component,
     /// overriding what the window or an ancestor provides. Provide before
     /// composing the children that read it; a reader composed earlier in

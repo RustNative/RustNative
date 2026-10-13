@@ -19,22 +19,31 @@ use crate::Error;
 /// [`Error::NoActivity`].
 #[derive(Debug, Default, Clone)]
 pub struct AndroidPlatform {
-    _private: (),
+    app_id: Option<String>,
 }
 
 impl AndroidPlatform {
     /// Creates the backend. Equivalent to [`Default::default`].
     #[must_use]
     pub const fn new() -> Self {
-        Self { _private: () }
+        Self { app_id: None }
     }
 
-    /// The platform, as the desktop backends take an application id. On
-    /// Android the id is the package's (`rustnative.toml`'s `app.id`,
-    /// fixed at build time), so this is the same platform.
+    /// Identifies the application, with the same signature as the desktop
+    /// backends so one `main` builds for all of them. On Android the
+    /// package is single-instance by construction and its identity is the
+    /// package name fixed at build time (`rustnative.toml`'s `app.id`), so
+    /// the id is recorded for [`Self::app_id`] and changes nothing else.
     #[must_use]
-    pub const fn with_app_id(self, _app_id: &str) -> Self {
+    pub fn with_app_id(mut self, app_id: impl Into<String>) -> Self {
+        self.app_id = Some(app_id.into());
         self
+    }
+
+    /// The application id, if one was set.
+    #[must_use]
+    pub fn app_id(&self) -> Option<&str> {
+        self.app_id.as_deref()
     }
 }
 
@@ -47,6 +56,7 @@ impl Platform for AndroidPlatform {
         let pending = crate::entry::take_pending().ok_or(Error::NoActivity)?;
         rustnative_core::perf::mark(rustnative_core::perf::StartupPhase::RuntimeReady);
         crate::inspect::enable_from_intent(application, pending.intent.as_ref());
+        application.set_environment(&rustnative_core::keys::CAPABILITIES, self.capabilities());
         let backend = crate::backend::Backend::start(application.take());
         let attached = backend.guarded(WindowId::PRIMARY, |registry| {
             registry.attach_activity(

@@ -31,6 +31,7 @@ impl LinuxPlatform {
         &self,
         application: &'a mut Application,
     ) -> Result<crate::ExternalLoop<'a>, Error> {
+        application.set_environment(&rustnative_core::keys::CAPABILITIES, self.capabilities());
         crate::gtk::embed::ExternalLoop::start(application, false)
     }
 
@@ -44,6 +45,7 @@ impl LinuxPlatform {
         &self,
         application: &'a mut Application,
     ) -> Result<crate::EmbeddedRoot<'a>, Error> {
+        application.set_environment(&rustnative_core::keys::CAPABILITIES, self.capabilities());
         crate::gtk::embed::EmbeddedRoot::start(application)
     }
 }
@@ -105,6 +107,7 @@ impl Platform for LinuxPlatform {
             launch_url: crate::toolkit::launch_url(std::env::args()),
             app_id: self.app_id.clone(),
         };
+        application.set_environment(&rustnative_core::keys::CAPABILITIES, self.capabilities());
         crate::toolkit::run(self.toolkit, application, &options, &Session::detect())
     }
 
@@ -131,6 +134,16 @@ impl Platform for LinuxPlatform {
 
     fn run(&mut self, _application: &mut Application) -> Result<(), Self::Error> {
         Err(Error::UnsupportedHost)
+    }
+
+    // The tables describe the backend, not the machine compiling it: a
+    // build-time check on another OS reads the same answers.
+    fn style_capabilities(&self) -> rustnative_core::StyleCapabilities {
+        rustnative_style::LINUX
+    }
+
+    fn unit_mapping(&self) -> Option<rustnative_core::UnitMapping> {
+        Some(rustnative_style::LINUX_UNITS)
     }
 
     fn capabilities(&self) -> PlatformCapabilities {
