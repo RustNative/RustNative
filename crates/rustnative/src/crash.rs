@@ -1,8 +1,12 @@
 //! `rustnative crash` (`PLAN.md` Milestone 51): the crash reports an
-//! application left on this machine.
+//! application left on this machine, in `rustnative_core::crash`'s format
+//! and directory (`%LOCALAPPDATA%\<id>\crashes` on Windows,
+//! `$XDG_STATE_HOME/<id>/crashes` on Linux). An Android application keeps
+//! its reports in its own files directory on the device.
 
-use std::path::{Path, PathBuf};
+use std::path::Path;
 
+use rustnative_core::crash::{directory, reports};
 use serde_json::Value;
 
 use crate::error::{Error, Result};
@@ -20,24 +24,6 @@ pub enum CrashCommand {
     },
 }
 
-/// Where the application's reports are (`%LOCALAPPDATA%\<id>\crashes`).
-fn directory(id: &str) -> PathBuf {
-    let base = std::env::var_os("LOCALAPPDATA").map_or_else(std::env::temp_dir, PathBuf::from);
-    base.join(id).join("crashes")
-}
-
-fn reports(directory: &Path) -> Vec<Value> {
-    let mut reports: Vec<Value> = std::fs::read_dir(directory)
-        .into_iter()
-        .flatten()
-        .filter_map(std::result::Result::ok)
-        .filter(|entry| entry.path().extension().is_some_and(|extension| extension == "json"))
-        .filter_map(|entry| serde_json::from_str(&std::fs::read_to_string(entry.path()).ok()?).ok())
-        .collect();
-    reports.sort_by_key(|report| std::cmp::Reverse(report["time"].as_u64().unwrap_or(0)));
-    reports
-}
-
 /// Runs a `crash` command.
 ///
 /// # Errors
@@ -53,31 +39,21 @@ pub fn run(here: &Path, command: &CrashCommand) -> Result<()> {
                 println!("crash: no reports in {}", directory.display());
             }
             for report in &reports {
-                println!(
-                    "{}  {}  {}",
-                    report["id"].as_str().unwrap_or_default(),
-                    report["app_version"].as_str().unwrap_or_default(),
-                    report["message"].as_str().unwrap_or_default()
-                );
+                println!("{}  {}  {}", report.id, report.app_version, report.message);
             }
             Ok(())
         }
         CrashCommand::Show { id } => {
-            let report =
-                reports.iter().find(|report| report["id"] == id.as_str()).ok_or_else(|| {
-                    Error::Usage(format!("no crash report {id} in {}", directory.display()))
-                })?;
-            println!("{}", report["message"].as_str().unwrap_or_default());
-            println!(
-                "version {}  {}",
-                report["app_version"].as_str().unwrap_or_default(),
-                report["os"].as_str().unwrap_or_default()
-            );
-            if let Some(dump) = report["dump"].as_str() {
-                println!("minidump {dump}");
+            let report = reports.iter().find(|report| report.id == *id).ok_or_else(|| {
+                Error::Usage(format!("no crash report {id} in {}", directory.display()))
+            })?;
+            println!("{}", report.message);
+            println!("version {}  {}", report.app_version, report.os);
+            if let Some(dump) = &report.dump {
+                println!("dump {dump}");
             }
-            println!("\n{}", report["backtrace"].as_str().unwrap_or_default());
-            if let Some(tree) = report["tree"].as_str() {
+            println!("\n{}", report.backtrace);
+            if let Some(tree) = report.tree.as_deref() {
                 let pretty = serde_json::from_str::<Value>(tree)
                     .ok()
                     .and_then(|tree| serde_json::to_string_pretty(&tree).ok())

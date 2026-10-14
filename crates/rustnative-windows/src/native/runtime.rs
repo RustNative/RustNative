@@ -95,12 +95,6 @@ impl Runtime {
         self.renderer.set_host_settings(host);
         let direction_changed = self.renderer.direction.set_base(direction);
         self.renderer.render(&tree, self.window, &theme)?;
-        // ponytail: serializes the whole tree per render while crash capture
-        // is on; keep a dirty flag and serialize on crash if this shows up.
-        crate::crash::record_tree(|| {
-            serde_json::to_string(&rustnative_core::wire::WireNode::from_node(&tree))
-                .unwrap_or_default()
-        });
         if direction_changed {
             // Nothing in the tree moved, but every position now reads from
             // the other edge.

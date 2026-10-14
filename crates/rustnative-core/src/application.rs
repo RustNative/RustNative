@@ -469,7 +469,13 @@ impl Application {
     /// open.
     #[must_use]
     pub fn view_for(&self, id: WindowId) -> Option<Node> {
-        self.windows.get(&id).map(|entry| entry.components.view())
+        let view = self.windows.get(&id).map(|entry| entry.components.view())?;
+        // ponytail: serializes the whole tree per view while crash capture
+        // is on; keep a dirty flag and serialize on crash if this shows up.
+        crate::crash::record_tree(|| {
+            serde_json::to_string(&crate::wire::WireNode::from_node(&view)).unwrap_or_default()
+        });
+        Some(view)
     }
 
     /// Re-renders the primary window's tree explicitly (outside of an event

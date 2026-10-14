@@ -200,6 +200,14 @@ pub fn conditions() -> Arc<dyn rustnative_data::Conditions> {
     host::conditions()
 }
 
+/// Turns crash capture on for application `app` at `version`: a panic —
+/// and, where the host has them, its own failures (an unhandled exception on
+/// Windows, with a minidump) — leaves a report in the application's crash
+/// directory, which `rustnative crash list` reads (`rustnative_core::crash`).
+pub fn install_crash_capture(app: &AppIdentity, version: &str) {
+    host::install_crash_capture(app, version);
+}
+
 /// The host's image decoder (`rustnative_data::ImageLoader`).
 #[must_use]
 pub fn image_decoder() -> Arc<dyn rustnative_data::ImageDecoder> {
@@ -236,6 +244,10 @@ mod host {
 
     pub(super) fn image_decoder() -> Arc<dyn rustnative_data::ImageDecoder> {
         Arc::new(backend::WicDecoder)
+    }
+
+    pub(super) fn install_crash_capture(app: &super::AppIdentity, version: &str) {
+        backend::crash::install(&app.id, version);
     }
 
     pub(super) fn run_catalogue(
@@ -276,6 +288,11 @@ mod host {
 
     pub(super) fn image_decoder() -> Arc<dyn rustnative_data::ImageDecoder> {
         Arc::new(backend::PixbufDecoder)
+    }
+
+    pub(super) fn install_crash_capture(app: &super::AppIdentity, version: &str) {
+        // `$XDG_STATE_HOME/<id>/crashes`.
+        rustnative_core::crash::install(&app.id, version);
     }
 
     pub(super) fn run_catalogue(
@@ -322,6 +339,12 @@ mod host {
         Arc::new(backend::BitmapDecoder)
     }
 
+    pub(super) fn install_crash_capture(_app: &super::AppIdentity, version: &str) {
+        // The package's own files directory: `getFilesDir()/crashes`. Before
+        // the activity starts there is none, and nothing to report from.
+        let _ = backend::crash::install(version);
+    }
+
     pub(super) fn run_catalogue(
         previews: Vec<rustnative_core::preview::Preview>,
         first: &str,
@@ -347,6 +370,10 @@ mod host {
 
     pub(super) fn image_decoder() -> Arc<dyn rustnative_data::ImageDecoder> {
         Arc::new(rustnative_data::PortableDecoder)
+    }
+
+    pub(super) fn install_crash_capture(app: &super::AppIdentity, version: &str) {
+        rustnative_core::crash::install(&app.id, version);
     }
 
     pub(super) fn run_catalogue(

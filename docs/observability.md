@@ -45,16 +45,23 @@ Nothing leaves the machine unless the person agrees
 
 ## Crash reports
 
-On Windows, `rustnative_windows::crash::install(app_id, version)` writes a
-report to `%LOCALAPPDATA%\<id>\crashes\` for a panic or an unhandled
-exception. Each report holds:
+`rustnative_host::install_crash_capture(&app, version)` turns crash capture on
+for whichever backend the target uses; the report format and its reader are
+`rustnative_core::crash`, the same everywhere. Each report holds:
 
-- a minidump;
 - the message;
-- a backtrace, symbolicated in process when the PDB is beside the
-  executable;
-- the versions;
-- **the UI tree as it stood**: the last rendered tree, as wire JSON.
+- a backtrace, symbolicated in process where symbols are available;
+- the application version and the operating system;
+- **the UI tree as it stood**: the last viewed tree, as wire JSON;
+- on Windows, a minidump beside it.
+
+Where reports go, and what each host adds:
+
+| Host | Directory | Beyond a panic |
+|---|---|---|
+| Windows | `%LOCALAPPDATA%\<id>\crashes\` | a minidump per report, and a report for an unhandled structured exception |
+| Linux | `$XDG_STATE_HOME/<id>/crashes/` (`~/.local/state/…`) | none: a fatal signal is not caught |
+| Android | the package's `getFilesDir()/crashes/` | none: a native signal or an ANR is Android's own report (Play Console) |
 
 `rustnative crash list` and `rustnative crash show <id>` read the reports.
 Reports stay on the machine. Sending them is the application's choice,

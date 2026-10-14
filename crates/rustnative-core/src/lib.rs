@@ -322,6 +322,7 @@ pub mod clock;
 pub mod command;
 pub mod component;
 pub mod control;
+pub mod crash;
 pub mod dev;
 pub mod environment;
 pub mod event;

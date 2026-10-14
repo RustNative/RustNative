@@ -68,6 +68,7 @@
 mod accessibility;
 mod canvas;
 mod capabilities;
+pub mod crash;
 mod environment;
 mod error;
 mod host_traits;
