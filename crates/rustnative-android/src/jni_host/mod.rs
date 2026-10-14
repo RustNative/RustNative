@@ -286,6 +286,19 @@ pub(crate) fn call_static(
     })
 }
 
+/// Calls static method `name` for its effect, on a path where failing is
+/// survivable — the view keeps its previous state — and logs the failure to
+/// logcat rather than dropping it, so a broken call is visible on a device.
+/// The counterpart of the Windows backend's `best_effort`.
+pub(crate) fn best_effort(class_id: Class, name: &str, signature: &str, args: &[Arg<'_>]) {
+    if let Err(error) = call_static(class_id, name, signature, args) {
+        crate::log::warn(&format!(
+            "{}.{name} failed ({error}); continuing",
+            short(class_id.name())
+        ));
+    }
+}
+
 /// Calls instance method `name` with signature `signature` on `object`.
 #[cfg_attr(
     not(feature = "device-tests"),

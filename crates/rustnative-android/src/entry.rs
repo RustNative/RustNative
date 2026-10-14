@@ -89,7 +89,7 @@ pub(crate) fn activity_created(
                 crate::backend::window_id(window_raw)
             };
             let Some(window) = window else {
-                let _ = call_static(
+                crate::jni_host::best_effort(
                     Class::Bridge,
                     "finishWindow",
                     "(Landroid/app/Activity;)V",
@@ -122,7 +122,7 @@ pub(crate) fn activity_created(
     if take_pending().is_some() {
         // `main` returned without `run`: there is nothing to show.
         crate::log::error("the application's main returned without calling AndroidPlatform::run");
-        let _ = call_static(
+        crate::jni_host::best_effort(
             Class::Bridge,
             "finishWindow",
             "(Landroid/app/Activity;)V",

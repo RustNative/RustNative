@@ -217,7 +217,7 @@ impl WindowRegistry {
     pub(crate) fn finish_activities(&self) {
         for runtime in self.windows.values() {
             if let Some(activity) = &runtime.activity {
-                let _ = call_static(
+                crate::jni_host::best_effort(
                     Class::Bridge,
                     "finishWindow",
                     "(Landroid/app/Activity;)V",
@@ -234,7 +234,7 @@ impl WindowRegistry {
             runtime.input.release();
             if runtime.back_claimed {
                 if let Some(activity) = &runtime.activity {
-                    let _ = call_static(
+                    crate::jni_host::best_effort(
                         Class::Bridge,
                         "setBackHandled",
                         "(Landroid/app/Activity;Z)V",
@@ -714,7 +714,7 @@ impl WindowRegistry {
             renderer.release();
         }
         if let Some(activity) = runtime.activity.take() {
-            let _ = call_static(
+            crate::jni_host::best_effort(
                 Class::Bridge,
                 "finishWindow",
                 "(Landroid/app/Activity;)V",

@@ -6,9 +6,11 @@
 //! See `memory` for the deterministic in-memory implementations used by
 //! tests and previews.
 
+mod file_state;
 mod hosted;
 mod memory;
 
+pub use file_state::FileStateStore;
 pub use hosted::{
     DocumentService, FileDocuments, ShareRequest, ShareService, WorkConstraints, WorkScheduler,
 };

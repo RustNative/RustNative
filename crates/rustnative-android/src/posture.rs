@@ -58,7 +58,7 @@ mod platform {
     pub(crate) fn watch(runtime: &WindowRuntime) {
         if let Some(activity) = &runtime.activity {
             let window = i64::try_from(runtime.id.get()).unwrap_or(0);
-            let _ = call_static(
+            crate::jni_host::best_effort(
                 Class::Posture,
                 "watch",
                 "(Landroid/app/Activity;J)V",

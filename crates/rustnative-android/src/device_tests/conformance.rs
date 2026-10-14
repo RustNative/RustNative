@@ -5,7 +5,7 @@
 use rustnative_core::{Application, Component, Cursor, Event, Node, NodeKind, Size, Window};
 
 use super::harness::{Harness, Instrumentation, java, on_main};
-use crate::jni_host::{Arg, Class, call_static};
+use crate::jni_host::{Arg, Class};
 use crate::{MappedProperty, MapperMode, MapperTarget, register_mapper};
 
 struct Panel;
@@ -74,7 +74,7 @@ pub(super) fn mappers_extend_and_replace_what_the_backend_applies(_: &Instrument
             MappedProperty::Text,
             MapperMode::Extend,
             |context| {
-                let _ = call_static(
+                crate::jni_host::best_effort(
                     Class::Views,
                     "setTooltip",
                     "(Landroid/view/View;Ljava/lang/String;)V",
@@ -87,7 +87,7 @@ pub(super) fn mappers_extend_and_replace_what_the_backend_applies(_: &Instrument
             MappedProperty::Text,
             MapperMode::Replace,
             |context| {
-                let _ = call_static(
+                crate::jni_host::best_effort(
                     Class::Views,
                     "setText",
                     "(Landroid/view/View;Ljava/lang/String;)V",

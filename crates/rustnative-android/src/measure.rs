@@ -40,7 +40,7 @@ pub(crate) struct Measurements {
 impl Measurements {
     pub(crate) fn forget(&self) {
         self.measured.borrow_mut().clear();
-        let _ = call_static(Class::Measure, "forget", "()V", &[]);
+        crate::jni_host::best_effort(Class::Measure, "forget", "()V", &[]);
     }
 }
 

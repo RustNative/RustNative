@@ -51,7 +51,11 @@ impl std::fmt::Debug for Watchers {
 /// primary window's tree hears it.
 pub(crate) fn report(lifecycle: Lifecycle) {
     post(Work::Call(Box::new(|registry| {
-        let _ = registry.with_application(rustnative_core::Application::flush_state);
+        super::best_effort(
+            registry.with_application(rustnative_core::Application::flush_state),
+            "flushing state",
+            "the last changes may be lost if the process is ended",
+        );
     })));
     post(Work::Event(WindowId::PRIMARY, Event::Lifecycle(lifecycle)));
 }
@@ -108,7 +112,11 @@ impl Watchers {
         let source = glib::timeout_add_local_once(IDLE_FLUSH, || {
             post(Work::Call(Box::new(|registry| {
                 registry.lifecycle_watchers().flush.borrow_mut().take();
-                let _ = registry.with_application(rustnative_core::Application::flush_state);
+                super::best_effort(
+                    registry.with_application(rustnative_core::Application::flush_state),
+                    "flushing state when idle",
+                    "the next flush retries",
+                );
             })));
         });
         *self.flush.borrow_mut() = Some(source);
@@ -200,7 +208,11 @@ pub(crate) fn save_placement(window: &gtk::Window, store: &dyn StateStore) {
         maximized: window.is_maximized(),
         position: x11_position(window),
     };
-    let _ = store.save(PLACEMENT_KEY, &placement.encode());
+    super::best_effort(
+        store.save(PLACEMENT_KEY, &placement.encode()),
+        "saving the window placement",
+        "the window opens at its default place next time",
+    );
 }
 
 /// The saved placement, if any.

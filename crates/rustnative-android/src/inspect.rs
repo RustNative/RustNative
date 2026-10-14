@@ -172,7 +172,7 @@ pub(crate) fn poll(registry: &mut WindowRegistry, window: WindowId) -> bool {
         }
         if quit {
             if let Some(activity) = &runtime.activity {
-                let _ = call_static(
+                crate::jni_host::best_effort(
                     Class::Bridge,
                     "finish",
                     "(Landroid/app/Activity;)V",

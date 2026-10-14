@@ -129,6 +129,11 @@ impl NativeRegistry {
 
 /// Takes `view` out of whichever container holds it.
 pub(crate) fn detach(view: &JavaRef) {
-    use crate::jni_host::{Arg, Class, call_static};
-    let _ = call_static(Class::Layout, "detach", "(Landroid/view/View;)V", &[Arg::Obj(view)]);
+    use crate::jni_host::{Arg, Class};
+    crate::jni_host::best_effort(
+        Class::Layout,
+        "detach",
+        "(Landroid/view/View;)V",
+        &[Arg::Obj(view)],
+    );
 }

@@ -327,7 +327,7 @@ mod platform {
                             .clone()
                             .or_else(|| next.strings[2].clone())
                             .unwrap_or_default();
-                        let _ = call_static(
+                        crate::jni_host::best_effort(
                             Class::Access,
                             "announce",
                             "(Landroid/view/View;Ljava/lang/String;)V",
@@ -393,7 +393,7 @@ mod platform {
                 ]);
                 floats.extend(spec.floats);
             }
-            let _ = call_static(
+            crate::jni_host::best_effort(
                 Class::Access,
                 "setElements",
                 "(Landroid/view/View;JI[Ljava/lang/String;[I[I[F)V",

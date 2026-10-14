@@ -45,7 +45,11 @@ pub(crate) fn run_application(
             // Another instance runs: it gets this launch's link (or just
             // comes forward) and this one ends.
             Claim::AlreadyRunning => {
-                let _ = forward(app_id, options.launch_url.as_deref(), launch_token().as_deref());
+                if !forward(app_id, options.launch_url.as_deref(), launch_token().as_deref()) {
+                    eprintln!(
+                        "rustnative: the running instance could not be reached; this launch ends"
+                    );
+                }
                 return Ok(());
             }
             Claim::First(instance) => _instance = Some(instance),
@@ -91,7 +95,11 @@ pub(crate) fn run_application(
     drop(backend);
     // Every window is gone: the application is terminating. State is
     // flushed whether the loop ended cleanly or not.
-    let _ = application.lifecycle(rustnative_core::Lifecycle::Terminating);
+    super::best_effort(
+        application.lifecycle(rustnative_core::Lifecycle::Terminating),
+        "flushing state at exit",
+        "the last changes are lost",
+    );
     failure.map_or(Ok(()), Err)
 }
 

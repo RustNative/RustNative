@@ -133,3 +133,17 @@ pub(crate) fn decorated_by_server(session: &Session) -> bool {
         _ => false,
     }
 }
+
+/// A failure on a path where carrying on is right — the state flush on
+/// suspend, a window's saved placement — reported on standard error, where
+/// GLib's own warnings go, rather than dropped. The counterpart of the
+/// Windows backend's `best_effort` and the Android backend's logged calls.
+pub(crate) fn best_effort<T, E: std::fmt::Display>(
+    result: Result<T, E>,
+    operation: &str,
+    consequence: &str,
+) {
+    if let Err(error) = result {
+        eprintln!("rustnative: {operation} failed ({error}); {consequence}");
+    }
+}

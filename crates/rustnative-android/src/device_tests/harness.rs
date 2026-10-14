@@ -101,7 +101,7 @@ impl Harness {
     pub(crate) fn settle(&self) {
         self.pump();
         if let Some(root) = self.root() {
-            let _ = call_static(
+            crate::jni_host::best_effort(
                 Class::Views,
                 "layoutNow",
                 "(Landroid/view/View;)V",

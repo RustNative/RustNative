@@ -74,7 +74,7 @@ impl Platform for AndroidPlatform {
         if attached.is_some() {
             rustnative_core::perf::mark(rustnative_core::perf::StartupPhase::FirstFrame);
             // The first idle after this marks content and interaction.
-            let _ = crate::jni_host::call_static(
+            crate::jni_host::best_effort(
                 crate::jni_host::Class::Bridge,
                 "scheduleIdle",
                 "()V",
