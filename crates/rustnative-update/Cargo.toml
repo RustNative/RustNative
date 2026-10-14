@@ -1,0 +1,22 @@
+[package]
+name = "rustnative-update"
+version = "0.1.0"
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+description = "The signed update manifest, its verifier, and the update decision every self-updating Rust Native host shares"
+repository.workspace = true
+homepage.workspace = true
+readme.workspace = true
+keywords = ["update", "ed25519", "rollout", "native", "framework"]
+categories = ["cryptography", "gui"]
+
+[lints]
+workspace = true
+
+[dependencies]
+# Ed25519 over the manifest's published bytes, and the package's SHA-256.
+ed25519-dalek = "2"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+sha2 = "0.10"

@@ -346,7 +346,8 @@ contract it is held to.
 | `rustnative-style` | the style vocabulary, the Tailwind v4.1.13 utility table, `app.css`, and every backend's capability table and unit mapping |
 | `rustnative-build` | build-script helpers: resources and manifests, `compile_rsx()`, `compile_styles()`, `compile_messages()`, Android project files |
 | `rustnative-host` | the native backend for the target being compiled, and its default services — the one place a platform is named |
-| `rustnative-windows` | the Win32 backend: HWNDs, common controls, UI Automation, Direct2D canvases, WinHTTP, crash capture, signed updates |
+| `rustnative-update` | the signed update manifest, its verifier, and the update decision (rollout, pinning, payload compatibility, expiry) every self-updating host shares |
+| `rustnative-windows` | the Win32 backend: HWNDs, common controls, UI Automation, Direct2D canvases, WinHTTP, crash capture, installing signed updates |
 | `rustnative-linux` | the GTK 4 backend behind a toolkit seam: Wayland and X11, AT-SPI2, the desktop portals, libsoup, packaging for three distribution families |
 | `rustnative-android` | the Android backend: platform `View`s over one JNI module, `AccessibilityNodeInfo`, the activity lifecycle, the Android services and surfaces |
 | `rustnative-web`, `rustnative-webgen`, `rustnative-web-macros` | the Web backend: the DOM mapping, CSS, the browser runtime, client components compiled to JavaScript, WebAssembly subtrees |

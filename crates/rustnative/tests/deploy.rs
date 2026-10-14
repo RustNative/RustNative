@@ -98,7 +98,9 @@ fn a_manifest_is_signed_only_with_the_trusted_key() {
     #[cfg(windows)]
     {
         use rustnative_windows::update::{Decision, UpdateError, Updater};
-        let updater = Updater::new(project.join("install"), &public, "1.0.0").unwrap();
+        let updater =
+            Updater::new(project.join("install"), "dev.rustnative.notes", &public, "1.0.0")
+                .unwrap();
         let Ok(Decision::Update(taken)) = updater.check(signed.as_bytes()) else {
             panic!("the updater accepts what the CLI signed: {signed}")
         };
@@ -106,6 +108,12 @@ fn a_manifest_is_signed_only_with_the_trusted_key() {
         assert!(
             updater.stage(&taken, b"the package").is_ok(),
             "the digest the CLI wrote is the package's"
+        );
+        let other =
+            Updater::new(project.join("other"), "dev.rustnative.other", &public, "1.0.0").unwrap();
+        assert!(
+            matches!(other.check(signed.as_bytes()), Err(UpdateError::WrongApplication { .. })),
+            "another application signed with the same key refuses it"
         );
     }
     #[cfg(not(windows))]

@@ -296,6 +296,9 @@ pub enum UpdateCommand {
         /// The share of installations offered it.
         #[arg(long, default_value_t = 100)]
         rollout: u8,
+        /// How long installations believe the manifest; republish before then.
+        #[arg(long, default_value_t = 30)]
+        expires_in_days: u64,
         /// The secret key file.
         #[arg(long)]
         key: PathBuf,
@@ -336,15 +339,22 @@ pub fn run_update(here: &Path, command: UpdateCommand) -> Result<()> {
             );
             Ok(())
         }
-        UpdateCommand::Manifest { version, url, package, rollout, key } => {
+        UpdateCommand::Manifest { version, url, package, rollout, expires_in_days, key } => {
             let project = Project::find(here)?;
             let bytes =
                 std::fs::read(&package).map_err(io(format!("read {}", package.display())))?;
-            let digest: String = sha2_hex(&bytes);
-            let mut manifest = serde_json::json!({
-                "app": project.config.app.id, "version": version, "url": url, "sha256": digest, "rollout": rollout,
-                "payload": { "kind": "application" }, "signature": "",
-            });
+            let now = std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .map_or(0, |since| since.as_secs());
+            let manifest = rustnative_update::UpdateManifest {
+                app: project.config.app.id.clone(),
+                version,
+                url,
+                sha256: rustnative_update::sha256_hex(&bytes),
+                rollout: rollout.min(100),
+                payload: rustnative_update::PayloadKind::Application,
+                expires: now.saturating_add(expires_in_days.saturating_mul(86_400)),
+            };
             let secret = secret(&key)?;
             let trusted = project.config.update.as_ref().map(|update| update.public_key.as_str());
             if trusted != Some(update_key(&secret).as_str()) {
@@ -353,9 +363,7 @@ pub fn run_update(here: &Path, command: UpdateCommand) -> Result<()> {
                     key.display()
                 )));
             }
-            let signature = sign(&secret, &manifest);
-            manifest["signature"] = serde_json::Value::String(signature);
-            println!("{}", serde_json::to_string_pretty(&manifest).unwrap_or_default());
+            println!("{}", String::from_utf8_lossy(&manifest.sign(&secret)));
             Ok(())
         }
     }
@@ -369,28 +377,6 @@ fn hex(bytes: &[u8]) -> String {
     })
 }
 
-fn sha2_hex(bytes: &[u8]) -> String {
-    use sha2::Digest;
-    hex(&sha2::Sha256::digest(bytes))
-}
-
 fn update_key(secret: &[u8; 32]) -> String {
-    hex(ed25519_dalek::SigningKey::from_bytes(secret).verifying_key().as_bytes())
-}
-
-/// Signs `manifest` (with an empty signature field) the way the updater
-/// verifies it: Ed25519 over its JSON in field order.
-fn sign(secret: &[u8; 32], manifest: &serde_json::Value) -> String {
-    use ed25519_dalek::Signer;
-    // The updater serializes its struct in declaration order: app,
-    // version, url, sha256, rollout, payload, signature.
-    let ordered = format!(
-        r#"{{"app":{},"version":{},"url":{},"sha256":{},"rollout":{},"payload":{{"kind":"application"}},"signature":""}}"#,
-        manifest["app"],
-        manifest["version"],
-        manifest["url"],
-        manifest["sha256"],
-        manifest["rollout"]
-    );
-    hex(&ed25519_dalek::SigningKey::from_bytes(secret).sign(ordered.as_bytes()).to_bytes())
+    rustnative_update::public_key(secret)
 }

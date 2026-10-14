@@ -102,8 +102,8 @@ windows-numerics = { version = "0.3", default-features = false }
 # macro must depend on it by that name. Version-locked to `windows` above,
 # which re-exports it.
 windows-core = { version = "0.62", default-features = false }
-# Signed update manifests (Milestone 50).
-ed25519-dalek = "2"
+# Signed update manifests (Milestone 50), shared with every self-updating host.
+rustnative-update.workspace = true
 
 [dev-dependencies]
 # The shared guarantee suites (Milestone 41), run here over the native

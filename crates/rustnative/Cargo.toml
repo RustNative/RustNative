@@ -41,9 +41,10 @@ syn = { version = "2", features = ["full", "visit", "extra-traits"] }
 # needs SHA-256. Both are small, dependency-free, and widely audited.
 crc32fast = "1"
 # `deploy local` runs the traffic-splitting proxy; `update` signs
-# manifests with the publisher's key (Milestone 50).
+# manifests with the publisher's key (Milestone 50), in the format every
+# self-updating host reads.
 tokio = { workspace = true, features = ["rt-multi-thread", "net"] }
-ed25519-dalek = "2"
+rustnative-update.workspace = true
 getrandom = "0.2"
 sha2 = "0.10"
 serde = { version = "1", features = ["derive"] }

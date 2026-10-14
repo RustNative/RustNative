@@ -2294,7 +2294,6 @@ name = "rustnative-android"
 version = "0.1.0"
 dependencies = [
  "async-trait",
- "ed25519-dalek",
  "jni",
  "libc",
  "raw-window-handle",
@@ -2302,9 +2301,8 @@ dependencies = [
  "rustnative-core",
  "rustnative-data",
  "rustnative-style",
- "serde",
+ "rustnative-update",
  "serde_json",
- "sha2",
  "tokio",
 ]
 
@@ -2327,7 +2325,6 @@ version = "0.1.0"
 dependencies = [
  "clap",
  "crc32fast",
- "ed25519-dalek",
  "getrandom 0.2.17",
  "prettyplease",
  "proc-macro2",
@@ -2339,6 +2336,7 @@ dependencies = [
  "rustnative-markup",
  "rustnative-server",
  "rustnative-style",
+ "rustnative-update",
  "rustnative-web-testing",
  "rustnative-windows",
  "serde",
@@ -2595,6 +2593,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "rustnative-update"
+version = "0.1.0"
+dependencies = [
+ "ed25519-dalek",
+ "serde",
+ "serde_json",
+ "sha2",
+]
+
+[[package]]
 name = "rustnative-web"
 version = "0.1.0"
 dependencies = [
@@ -2646,13 +2654,13 @@ name = "rustnative-windows"
 version = "0.1.0"
 dependencies = [
  "async-trait",
- "ed25519-dalek",
  "raw-window-handle",
  "rustnative-components",
  "rustnative-conformance",
  "rustnative-core",
  "rustnative-data",
  "rustnative-style",
+ "rustnative-update",
  "serde",
  "serde_json",
  "tokio",
