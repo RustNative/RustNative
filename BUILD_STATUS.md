@@ -66,9 +66,10 @@ list of coherence gaps; all of it was fixed, in these commits:
 Verified: clippy (stable and 1.99) and the Windows workspace tests; the Linux
 gate in WSL (fmt, clippy, the portable tests, the GTK backend on Wayland, X11,
 and Xvfb, docs, the MSRV, `cargo deny`); the Android backend linted for the
-device target. **Not verified here:** the Android device suite on the phone
-for these changes, and the new CI legs (budgets for Linux, the Web,
-serverless, and Android; the Apple check) until CI runs them. **Still owed,
+device target; CI green on `b9ff181`, its new legs included (budgets for
+Linux, the Web, serverless, and Android on the emulator; the Apple check).
+**Not verified here:** the Android device suite on the phone for these
+changes (CI ran it on the emulator). **Still owed,
 by decision:** the Web checklist rows `PLAN.md` lists for the Web (safe areas,
 gesture arbitration, inspection, and others), browser delivery of virtual
 elements' actions, and the remaining iPadOS Phase 0 items (the `ipados:` style
