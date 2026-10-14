@@ -10,7 +10,8 @@ what it describes is **built** or **planned**, and which milestone owns it:
 | The portable range, both spellings, capability tables, unit mappings | built (Windows, Linux, Android, Web, headless) | 58 |
 | Declared targets (`[style] targets`) | built | 58, 2026-10-12 review |
 | Guards, the extended range, structural variants, `approximations` | planned | 67 |
-| Windows scaling and composition | planned | 69 |
+| Windows per-monitor scaling | built | 69 (first part) |
+| Windows composition for framework-owned boxes | planned | 69 |
 | Relationships on another node's state or size, generated content, host passthrough | optional | 68 |
 
 ## The model

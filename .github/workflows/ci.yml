@@ -241,7 +241,9 @@ jobs:
             os: ubuntu-latest
             bench: cargo run --release -p rustnative-cli -- bench --target web --check
           - target: serverless
-            os: ubuntu-latest
+            # The reference machine's OS: the budgets are a Windows build's
+            # sizes (no symbol table in the binary) and its peak working set.
+            os: windows-latest
             bench: cargo run --release -p rustnative-cli -- bench --target serverless --check
     runs-on: ${{ matrix.os }}
     steps:
