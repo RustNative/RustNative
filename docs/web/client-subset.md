@@ -68,7 +68,8 @@ field names.
 `&str`, `Vec<T>`, `Option<T>`, `Result<T, E>`, tuples, the module's own
 structs and enums, and the framework types a view uses (`Node`, `NodeId`,
 `Event` and its payloads, `LayoutStyle`, `SizeMode`, `EdgeInsets`,
-`Typography`, `AccessibilityInfo` and its roles, `KeyCode`, `CalendarDate`,
+`Typography`, `AccessibilityInfo` and its roles, `InputInterest` and
+`GesturePolicy` (`Node::with_input`), `KeyCode`, `CalendarDate`,
 and the other types in `rustnative_core`'s view vocabulary).
 
 **Statements and expressions.** `let` (with patterns and `else`), `if`,

@@ -478,6 +478,7 @@ body{display:flex;flex-direction:column;min-height:100vh}\
 .rn-check{display:inline-flex;align-items:center;gap:6px}\
 .rn-canvas>svg{display:block;width:100%;height:100%}\
 .rn-virtual{position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%);white-space:nowrap}\
+[data-gestures=exclusive]{touch-action:none;user-select:none;-webkit-user-select:none;-webkit-touch-callout:none}\
 dialog.rn{position:static;border:0;padding:0}";
 
 /// The theme's rules: its per-kind defaults, one class per kind.

@@ -866,6 +866,14 @@ const ARIA_ROLES = {
   ComboBox: "combobox", SpinButton: "spinbutton", Separator: "separator", Alert: "alert",
 };
 
+/// A node's gesture policy as the page states it (`data-gestures`), when it
+/// takes pointer input or gestures itself — the browser's side of the
+/// arbitration table (`rustnative_core::input::arbitration`).
+function gesturePolicy(input) {
+  if (!input || !(input.pointer || input.gestures)) return null;
+  return { Exclusive: "exclusive", DeferToHost: "defer", Simultaneous: "simultaneous" }[input.policy] ?? "exclusive";
+}
+
 function roleKey(a11y) { return a11y.role === "Heading" ? "Heading" + a11y.level : a11y.role; }
 
 /// Converts runtime nodes to elements (`dom::Realizer`).
@@ -1083,6 +1091,8 @@ export class Realizer {
       if (FORM_CONTROLS.has(element.t)) setAttr(element, "disabled", "");
       else setAttr(element, "aria-disabled", "true");
     }
+    const policy = gesturePolicy(node.input);
+    if (policy) setAttr(element, "data-gestures", policy);
     if (element.t === "input" || element.t === "select") {
       native = nativeRole(element.t, getAttr(element, "type"), getAttr(element, "size") !== null);
     }
@@ -1298,6 +1308,8 @@ export function withStyle(node, style) { node.style = style; return node; }
 export function withStateStyle(node, state, style) { node.states = node.states ?? { hover: null, focus: null, active: null, disabled: null }; node.states[state] = style; return node; }
 export function withOpacity(node, value) { node.opacity = Math.fround(Math.min(1, Math.max(0, value))); return node; }
 export function withCursor(node, cursor) { node.cursor = cursor; return node; }
+export function withInput(node, input) { node.input = input; return node; }
+export function inputInterest() { return { pointer: false, wheel: false, gestures: false, drop_target: false, gamepad: false, policy: "Exclusive" }; }
 export function withItemIndex(node, index) { node.index = index; return node; }
 export function withSharedId(node, key) { node.shared = String(key); return node; }
 
@@ -1683,6 +1695,11 @@ export class Island {
       this.dispatch({ type, target: found ? found.key : null, key: keyCode(event), modifiers: { shift: event.shiftKey, ctrl: event.ctrlKey, alt: event.altKey, meta: event.metaKey } });
     };
     on("keydown", key("KeyDown"));
+    // A node whose gestures win (`data-gestures="exclusive"`) keeps the
+    // host's long-press menu from taking its long press.
+    on("contextmenu", (event) => {
+      if (event.target.closest && event.target.closest("[data-gestures=exclusive]")) event.preventDefault();
+    });
     on("keyup", key("KeyUp"));
     on("focusin", (event) => { const found = this.keyOf(event.target); if (found) this.dispatch({ type: "FocusGained", target: found.key }); });
     on("focusout", (event) => { const found = this.keyOf(event.target); if (found) this.dispatch({ type: "FocusLost", target: found.key }); });

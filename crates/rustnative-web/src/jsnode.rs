@@ -105,6 +105,7 @@ pub fn from_node(node: &Node) -> Value {
         "states": states(node.state_styles()),
         "opacity": node.opacity(),
         "cursor": node.cursor().map(|cursor| format!("{cursor:?}")),
+        "input": input(node.input()),
         "hidden": node.is_hidden(),
         "disabled": node.is_disabled(),
         "command": node.command().map(|command| command.name().to_owned()),
@@ -154,4 +155,19 @@ pub fn from_node(node: &Node) -> Value {
         out.extend(fields);
     }
     out
+}
+
+/// A node's input interest as the runtime reads it, when it declares any.
+fn input(input: rustnative_core::InputInterest) -> Value {
+    if input == rustnative_core::InputInterest::default() {
+        return Value::Null;
+    }
+    json!({
+        "pointer": input.wants_pointer(),
+        "wheel": input.wants_wheel(),
+        "gestures": input.wants_gestures(),
+        "drop_target": input.wants_drop(),
+        "gamepad": input.wants_gamepad(),
+        "policy": format!("{:?}", input.policy()),
+    })
 }

@@ -31,6 +31,11 @@ fn corpus() -> Vec<Node> {
     };
     vec![
         Node::label("title", "Notes"),
+        Node::label("pad", "Drag").with_input(
+            rustnative_core::InputInterest::new()
+                .pointer()
+                .gesture_policy(rustnative_core::GesturePolicy::DeferToHost),
+        ),
         Node::label("h", "Heading")
             .with_accessibility(AccessibilityInfo::new(AccessibilityRole::Heading { level: 3 })),
         Node::label("deep", "Deep")

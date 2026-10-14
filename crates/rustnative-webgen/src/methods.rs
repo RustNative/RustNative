@@ -156,6 +156,9 @@ fn unit_variant(owner: &str, name: &str) -> Option<(String, Ty)> {
         "Track" if name == "Auto" => (quoted(), Ty::Track),
         "Axis" => (quoted(), Ty::Axis),
         "Cursor" => (quoted(), Ty::Cursor),
+        "GesturePolicy" if matches!(name, "Exclusive" | "DeferToHost" | "Simultaneous") => {
+            (quoted(), Ty::Policy)
+        }
         "ControlState" => (
             string(match name {
                 "Hovered" => "hover",
@@ -939,6 +942,7 @@ impl Cx<'_> {
                 simple(self, call, &[Ty::Role], &|a| format!("rn.a11yOf({})", a[0]), Ty::A11y)
             }
             ("VisualStyle", "new" | "default") => Ok(V::new("rn.visual()", Ty::Visual)),
+            ("InputInterest", "new" | "default") => Ok(V::new("rn.inputInterest()", Ty::Input)),
             ("Color", "rgb") => simple(
                 self,
                 call,
@@ -1718,7 +1722,7 @@ impl Cx<'_> {
             Ty::Iter(element) => self.iter_method(all, &r, *element, method, turbofish, call, expect, span),
             Ty::Tuple(_) => unknown(self, &ty),
             Ty::Node => self.node_method(all, &r, method, call, span),
-            Ty::Layout | Ty::Container | Ty::Grid | Ty::Constraints | Ty::VirtualList | Ty::A11y | Ty::Visual | Ty::Placement => {
+            Ty::Layout | Ty::Container | Ty::Grid | Ty::Constraints | Ty::VirtualList | Ty::A11y | Ty::Visual | Ty::Placement | Ty::Input => {
                 self.builder_method(all, &r, &ty, method, call, span)
             }
             Ty::Opaque(_) => self.fail(span, &format!("`.{method}()` on data from outside the module"), "the subset cannot see its type; bind it with a type annotation or declare the type in the client module"),
@@ -2222,6 +2226,7 @@ impl Cx<'_> {
             "with_state_style" => (vec![Ty::ControlState, Ty::Visual], "withStateStyle"),
             "with_opacity" => (vec![Ty::Float(true)], "withOpacity"),
             "with_cursor" => (vec![Ty::Cursor], "withCursor"),
+            "with_input" => (vec![Ty::Input], "withInput"),
             "with_item_index" => (vec![USIZE], "withItemIndex"),
             "with_shared_id" => (vec![Ty::Str], "withSharedId"),
             other => {
@@ -2330,6 +2335,12 @@ impl Cx<'_> {
                 (vec![Ty::Int(IntK::U16)], format!("rn.w({r}, \"radius\", $0)"))
             }
             (Ty::Visual, "padding") => (vec![Ty::Insets], format!("rn.w({r}, \"padding\", $0)")),
+            (Ty::Input, "pointer" | "wheel" | "gestures" | "drop_target" | "gamepad") => {
+                (vec![], format!("rn.w({r}, \"{method}\", true)"))
+            }
+            (Ty::Input, "gesture_policy") => {
+                (vec![Ty::Policy], format!("rn.w({r}, \"policy\", $0)"))
+            }
             (Ty::Visual, "typography") => {
                 (vec![Ty::Typography], format!("rn.w({r}, \"font\", $0)"))
             }

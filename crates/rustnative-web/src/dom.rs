@@ -177,6 +177,22 @@ const fn action_name(kind: rustnative_core::AccessibleActionKind) -> &'static st
     }
 }
 
+/// A node's gesture policy as the page states it (`data-gestures`), when it
+/// takes pointer input or gestures itself: the browser's side of the
+/// arbitration table (`rustnative_core::input::arbitration`), applied by the
+/// base style sheet and the runtime.
+const fn gesture_policy(input: rustnative_core::InputInterest) -> Option<&'static str> {
+    use rustnative_core::GesturePolicy;
+    if !(input.wants_pointer() || input.wants_gestures()) {
+        return None;
+    }
+    Some(match input.policy() {
+        GesturePolicy::Exclusive => "exclusive",
+        GesturePolicy::DeferToHost => "defer",
+        GesturePolicy::Simultaneous => "simultaneous",
+    })
+}
+
 /// A role's ARIA name, for an element whose own role differs.
 const fn aria_role(role: AccessibilityRole) -> Option<&'static str> {
     Some(match role {
@@ -904,6 +920,9 @@ impl<'a> Realizer<'a> {
                 element.set("aria-disabled", "true");
             }
         }
+        if let Some(policy) = gesture_policy(node.input()) {
+            element.set("data-gestures", policy);
+        }
         let native = if element.tag == "input" || element.tag == "select" {
             native_role(&element.tag, element.get("type"), element.get("size").is_some())
         } else {
@@ -1293,6 +1312,21 @@ mod tests {
             Some("-1"),
             "focusable by assistive technology, no tab stop"
         );
+    }
+
+    #[test]
+    fn a_nodes_gesture_policy_is_stated_for_the_browser() {
+        use rustnative_core::{GesturePolicy, InputInterest};
+        let with = |policy| {
+            realize(
+                &Node::label("pad", "Pad")
+                    .with_input(InputInterest::new().pointer().gesture_policy(policy)),
+            )
+            .0
+        };
+        assert_eq!(with(GesturePolicy::Exclusive).get("data-gestures"), Some("exclusive"));
+        assert_eq!(with(GesturePolicy::DeferToHost).get("data-gestures"), Some("defer"));
+        assert_eq!(realize(&Node::label("plain", "Plain")).0.get("data-gestures"), None);
     }
 
     #[test]

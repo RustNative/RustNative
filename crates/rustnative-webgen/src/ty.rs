@@ -111,6 +111,10 @@ pub enum Ty {
     Typography,
     ControlState,
     Cursor,
+    /// `InputInterest`: what input a node wants, and its gesture policy.
+    Input,
+    /// `GesturePolicy`.
+    Policy,
     Control,
     Decl,
     ServerFnError,
@@ -296,6 +300,8 @@ pub fn read(ty: &syn::Type, local: &dyn Fn(&str) -> bool) -> Ty {
                 "Typography" => Ty::Typography,
                 "ControlState" => Ty::ControlState,
                 "Cursor" => Ty::Cursor,
+                "InputInterest" => Ty::Input,
+                "GesturePolicy" => Ty::Policy,
                 "Control" => Ty::Control,
                 "DeclarationSet" => Ty::Decl,
                 "ServerFnError" => Ty::ServerFnError,

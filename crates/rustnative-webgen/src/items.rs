@@ -96,6 +96,7 @@ impl Module {
             Ty::Layout => "rn.layout()".into(),
             Ty::Container => "rn.containerStyle()".into(),
             Ty::Visual => "{ fg: null, bg: null, border: null, radius: null, font: null, padding: null, shadow: null }".into(),
+            Ty::Input => "rn.inputInterest()".into(),
             Ty::Typography => "{ family: \"system-ui\", size: 14, weight: 400 }".into(),
             Ty::Insets => "{ top: 0, end: 0, bottom: 0, start: 0 }".into(),
             Ty::Constraints => "{ min_width: 0, max_width: null, min_height: 0, max_height: null }".into(),

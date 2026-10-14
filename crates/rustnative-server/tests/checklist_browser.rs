@@ -6,7 +6,8 @@
 //! its pointer capture — while the page's other islands keep working
 //! (row 10); and an island re-renders by patching the elements it owns,
 //! none replaced and none leaked (row 8); and the page answers the
-//! inspection protocol (row 26).
+//! inspection protocol (row 26); and a node whose gestures win keeps the
+//! browser's scrolling, selection, and long-press menu off it (row 6).
 
 #![allow(
     clippy::unwrap_used,
@@ -30,7 +31,9 @@ use serde_json::{Value, json};
 
 #[rustnative_web::client]
 pub mod faulty {
-    use rustnative_core::{Event, LayoutStyle, Node, NodeId, SizeMode};
+    use rustnative_core::{
+        Event, GesturePolicy, InputInterest, LayoutStyle, Node, NodeId, SizeMode,
+    };
     use rustnative_web::Effects;
     use serde::{Deserialize, Serialize};
 
@@ -57,6 +60,8 @@ pub mod faulty {
                 "Grab",
                 LayoutStyle::new().width(SizeMode::Fixed(120)).height(SizeMode::Fixed(120)),
             )
+            // Its drag wins over the browser's scrolling and selection.
+            .with_input(InputInterest::new().pointer().gesture_policy(GesturePolicy::Exclusive))
         }
     }
 }
@@ -246,6 +251,13 @@ fn the_web_column_of_the_checklist_in_a_browser() {
     assert!(names("refused").iter().any(|name| name.contains("Surface(TrayExtra)")));
     assert!(!capabilities["style"].as_array().unwrap().is_empty(), "the style table");
     assert!(capabilities["units"]["host_unit"].is_string());
+
+    // Row 6: the arbitration table, as the browser applies it. A node whose
+    // gestures win takes touch moves from the browser's scrolling and its
+    // presses from text selection.
+    assert_eq!(computed(&page, "grab", "touch-action"), "none");
+    assert_eq!(computed(&page, "grab", "user-select"), "none");
+    assert_eq!(computed(&page, "more", "touch-action"), "auto", "a node without gestures");
 
     // Row 10: the drag handler panics while it holds the pointer. The
     // island fails, the capture is given back, and the other island works.
