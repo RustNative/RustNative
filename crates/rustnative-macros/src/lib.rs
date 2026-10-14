@@ -93,11 +93,11 @@ fn declared_targets() -> Option<Vec<String>> {
 }
 
 /// Targets with a shipped backend and capability table.
-const SHIPPED_TARGETS: &[&str] = &["windows", "linux", "android", "web", "headless"];
+const SHIPPED_TARGETS: &[&str] = &["windows", "linux", "android", "web", "headless", "tui"];
 
 /// Targets on the roadmap with no backend yet: accepted in `[style]
 /// targets` and checked once their tables exist.
-const PLANNED_TARGETS: &[&str] = &["macos", "ios", "ipados", "tui", "embedded"];
+const PLANNED_TARGETS: &[&str] = &["macos", "ios", "ipados", "embedded"];
 
 /// One backend a style is checked against: its table, the operating system
 /// whose `cfg` the error is emitted under (`None`: unconditionally, for a
@@ -127,8 +127,10 @@ fn checked_targets(declared: Option<&[String]>) -> Result<Vec<CheckedTarget>, St
     }
     Ok(declared
         .iter()
-        .filter_map(|target| table_for(target))
-        .map(|table| (table, None, table.backend.to_ascii_uppercase()))
+        .filter_map(|target| table_for(target).map(|table| (table, target)))
+        // The constant is named for the target (`TUI` for `tui`), not for
+        // the backend's display name ("terminal").
+        .map(|(table, target)| (table, None, target.to_ascii_uppercase()))
         .collect())
 }
 
@@ -140,6 +142,7 @@ fn table_for(target: &str) -> Option<rustnative_style::StyleCapabilities> {
         "android" => Some(ANDROID),
         "web" => Some(rustnative_style::WEB),
         "headless" => Some(rustnative_style::HEADLESS),
+        "tui" => Some(rustnative_style::TUI),
         _ => None,
     }
 }
@@ -331,6 +334,21 @@ mod tests {
             names(&targets),
             [("Windows", Some("windows")), ("Linux", Some("linux")), ("Android", Some("android"))]
         );
+    }
+
+    #[test]
+    fn a_declared_terminal_target_refuses_what_a_cell_cannot_show() {
+        let declared = vec!["tui".to_owned()];
+        let targets = checked_targets(Some(&declared)).unwrap();
+        assert_eq!(names(&targets), [("terminal", None)]);
+        assert_eq!(targets[0].2, "TUI", "the message names `rustnative_style::TUI`");
+        for property in [
+            rustnative_style::StyleProperty::Shadow,
+            rustnative_style::StyleProperty::BorderRadius,
+            rustnative_style::StyleProperty::FontSize,
+        ] {
+            assert!(matches!(targets[0].0.support(property), StyleSupport::Unavailable(_)));
+        }
     }
 
     #[test]

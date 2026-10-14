@@ -186,6 +186,42 @@ table!(HEADLESS, "headless", [
     Display => StyleSupport::Realized,
 ]);
 
+table!(TUI, "terminal", [
+    // The terminal is the host (`PLAN.md` Milestone 38): its cell grid has
+    // colours at its own depth and text attributes, and nothing else. What
+    // a cell has no notion of is unavailable rather than imitated (2.14).
+    Foreground => StyleSupport::Approximated(
+        "the terminal's colour depth, detected rather than assumed: true colour exactly, otherwise the nearest \
+         colour of the 256- or 16-colour palette; none at all under `NO_COLOR`. A colour equal to the default \
+         theme's is the terminal's own default colour"
+    ),
+    Background => StyleSupport::Approximated(
+        "as `color`: the cells' background at the terminal's colour depth; translucent colours are blended over \
+         what is beneath before they reach the terminal"
+    ),
+    BorderColor => StyleSupport::Approximated(
+        "box-drawing characters in the colour (`┌─┐│└┘`) on the edge cells of a box that declares a border, over \
+         whatever content reaches its edge — give the box a cell of padding to keep content clear; where the \
+         terminal's font has no box drawing they are still written, and look as that font draws them"
+    ),
+    BorderRadius => StyleSupport::Unavailable("a character cell has no corner radius"),
+    FontSize => StyleSupport::Unavailable(
+        "a terminal draws every cell in one font at one size, both chosen by the person, not the application"
+    ),
+    FontWeight => StyleSupport::Approximated(
+        "600 and above is bold (SGR 1), 300 and below is faint (SGR 2), everything between is the terminal's \
+         normal weight"
+    ),
+    FontFamily => StyleSupport::Unavailable("the terminal's font is the person's choice, one for every cell"),
+    Shadow => StyleSupport::Unavailable("a character cell casts no shadow, and drawing one would fake a window"),
+    Overflow => StyleSupport::Realized,
+    Opacity => StyleSupport::Approximated(
+        "zero draws nothing; below one half the content is faint (SGR 2); otherwise it is opaque — a cell has \
+         no partial transparency"
+    ),
+    Display => StyleSupport::Realized,
+]);
+
 table!(WEB, "Web", [
     // The one backend whose host speaks the declaration vocabulary
     // natively: every property is a CSS property, applied by the browser
@@ -263,13 +299,26 @@ pub const HEADLESS_UNITS: UnitMapping = UnitMapping {
     rounding: "half away from zero, once, where a length becomes whole pixels",
 };
 
+/// The terminal backend's unit mapping.
+pub const TUI_UNITS: UnitMapping = UnitMapping {
+    backend: "terminal",
+    host_unit: "character cells",
+    pixel: "one cell is 8 logical pixels wide and 16 high by default (`TuiPlatform::with_cell_size` sets another \
+            ratio); terminals do not reliably report their font's pixel size, so the ratio is the backend's \
+            documented one rather than measured, and text is measured in cells by Unicode display width",
+    rem: "one line: 16 logical pixels. A terminal's text size is the person's own setting, applied by the terminal \
+          to every cell and never reported, so the text scale is 1",
+    rounding: "half away from zero where a length becomes cells, with a rectangle's two edges snapped separately \
+               so touching boxes still touch, and a nonzero length at least one cell",
+};
+
 #[cfg(test)]
 mod tests {
     use super::*;
 
     #[test]
     fn every_shipped_table_answers_every_property() {
-        for table in [WINDOWS, LINUX, ANDROID, HEADLESS, WEB] {
+        for table in [WINDOWS, LINUX, ANDROID, HEADLESS, WEB, TUI] {
             for property in StyleProperty::ALL {
                 assert!(
                     table.entries.iter().any(|(entry, _)| entry == property),

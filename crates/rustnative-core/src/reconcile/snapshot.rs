@@ -292,6 +292,86 @@ impl TreeSnapshot {
         Ok(snapshot)
     }
 
+    /// Passes every layout length in the snapshot through `horizontal` or
+    /// `vertical`, by the axis it lies on: fixed widths and heights,
+    /// margins, size constraints, container padding and gaps, grid tracks
+    /// and gaps, and a leaf's own padding.
+    ///
+    /// This is the conversion a host whose space is a grid applies at its
+    /// boundary (`PLAN.md` 2.11 and Milestone 38): rounding each declared
+    /// length to whole units *before* layout keeps a 12-pixel gap one row
+    /// everywhere, instead of positions that alternate between rounding up
+    /// and down after it. The geometry model is unchanged — lengths stay in
+    /// logical pixels, each now a whole number of units. A grid's single
+    /// gap serves both axes and is passed through `vertical`.
+    ///
+    /// ```
+    /// use rustnative_core::{ColumnStyle, EdgeInsets, LayoutStyle, Node, TreeSnapshot};
+    ///
+    /// let view = Node::column_with_layout("root", [], LayoutStyle::new(), ColumnStyle::new().gap(12));
+    /// let mut snapshot = TreeSnapshot::from_node(&view).unwrap();
+    /// snapshot.map_lengths(|x| x, |y| (y + 8) / 16 * 16);
+    /// let root = snapshot.ordered_nodes()[0];
+    /// assert_eq!(root.column_style.unwrap().gap, 16);
+    /// assert_eq!(root.column_style.unwrap().padding, EdgeInsets { top: 32, end: 24, bottom: 32, start: 24 });
+    /// ```
+    pub fn map_lengths(&mut self, horizontal: impl Fn(i32) -> i32, vertical: impl Fn(i32) -> i32) {
+        use crate::layout::{Constraints, EdgeInsets, SizeMode, Track};
+        let insets = |insets: EdgeInsets| EdgeInsets {
+            top: vertical(insets.top),
+            end: horizontal(insets.end),
+            bottom: vertical(insets.bottom),
+            start: horizontal(insets.start),
+        };
+        let size = |mode: SizeMode, axis: &dyn Fn(i32) -> i32| match mode {
+            SizeMode::Fixed(value) => SizeMode::Fixed(axis(value)),
+            other => other,
+        };
+        for node in self.nodes.values_mut() {
+            let layout = &mut node.layout;
+            layout.width = size(layout.width, &horizontal);
+            layout.height = size(layout.height, &vertical);
+            layout.margin = insets(layout.margin);
+            let old = layout.constraints;
+            let mut constraints = Constraints::new()
+                .with_min_width(horizontal(old.min_width()))
+                .with_min_height(vertical(old.min_height()));
+            if let Some(max) = old.max_width() {
+                constraints = constraints.with_max_width(horizontal(max));
+            }
+            if let Some(max) = old.max_height() {
+                constraints = constraints.with_max_height(vertical(max));
+            }
+            layout.constraints = constraints;
+            if let Some(style) = &mut node.column_style {
+                style.padding = insets(style.padding);
+                style.gap = vertical(style.gap);
+            }
+            if let Some(style) = &mut node.row_style {
+                style.padding = insets(style.padding);
+                style.gap = horizontal(style.gap);
+            }
+            if let Some(grid) = &mut node.grid {
+                grid.padding = insets(grid.padding);
+                grid.gap = vertical(grid.gap);
+                for track in &mut grid.columns {
+                    if let Track::Fixed(value) = track {
+                        *value = horizontal(*value);
+                    }
+                }
+                for track in &mut grid.rows {
+                    if let Track::Fixed(value) = track {
+                        *value = vertical(*value);
+                    }
+                }
+            }
+            if let Some(padding) = node.visual_style.properties().padding_override() {
+                let style = node.visual_style.properties().clone().padding(insets(padding));
+                node.visual_style = ResolvedStyle::new(style, node.visual_style.state());
+            }
+        }
+    }
+
     /// Returns node `id`'s resolved data, if it exists in this snapshot.
     #[must_use]
     pub fn get(&self, id: NodeId) -> Option<&TreeNode> {

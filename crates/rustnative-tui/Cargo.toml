@@ -1,0 +1,42 @@
+[package]
+name = "rustnative-tui"
+version = "0.1.0"
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+description = "The terminal backend for Rust Native: the terminal's cell grid as the host, with its own colour depth, key and mouse protocols, and restoration"
+repository.workspace = true
+homepage.workspace = true
+readme.workspace = true
+keywords = ["gui", "terminal", "tui", "native", "framework"]
+categories = ["command-line-interface", "gui"]
+
+[lints]
+workspace = true
+
+[dependencies]
+rustnative-core.workspace = true
+rustnative-drawlist.workspace = true
+rustnative-style.workspace = true
+async-trait.workspace = true
+parking_lot.workspace = true
+serde_json = "1"
+# Grapheme clusters (UAX #29), at the Unicode version the display-width
+# table is generated from (17.0).
+unicode-segmentation = "1.13"
+
+[target.'cfg(unix)'.dependencies]
+libc = "0.2"
+
+[target.'cfg(windows)'.dependencies]
+windows-sys = { workspace = true, features = ["Win32_System_Console", "Win32_System_IO"] }
+
+[dev-dependencies]
+rustnative-conformance.workspace = true
+rustnative-headless.workspace = true
+
+[target.'cfg(unix)'.dev-dependencies]
+libc = "0.2"
+
+[target.'cfg(windows)'.dev-dependencies]
+windows-sys = { workspace = true, features = ["Win32_System_Console", "Win32_System_IO", "Win32_System_Threading", "Win32_System_Pipes"] }

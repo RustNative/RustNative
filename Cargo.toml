@@ -31,6 +31,8 @@ rustnative-android = { path = "crates/rustnative-android", version = "0.1.0" }
 rustnative-types = { path = "crates/rustnative-types", version = "0.1.0" }
 rustnative-update = { path = "crates/rustnative-update", version = "0.1.0" }
 rustnative-headless = { path = "crates/rustnative-headless", version = "0.1.0" }
+rustnative-drawlist = { path = "crates/rustnative-drawlist", version = "0.1.0" }
+rustnative-tui = { path = "crates/rustnative-tui", version = "0.1.0" }
 rustnative-host = { path = "crates/rustnative-host", version = "0.1.0" }
 rustnative-markup = { path = "crates/rustnative-markup", version = "0.1.0" }
 rustnative-macros = { path = "crates/rustnative-macros", version = "0.1.0" }

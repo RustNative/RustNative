@@ -1,0 +1,18 @@
+[package]
+name = "rustnative-drawlist"
+version = "0.1.0"
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+description = "Rust Native's draw-list platform group: rasterizing a DrawList onto a host grid, the geometry between logical pixels and that grid, a focus and hit-test model for hosts without native controls, and damage tracking"
+repository.workspace = true
+homepage.workspace = true
+readme.workspace = true
+keywords = ["gui", "terminal", "embedded", "rasterization", "framework"]
+categories = ["gui", "graphics"]
+
+[lints]
+workspace = true
+
+[dependencies]
+rustnative-core.workspace = true

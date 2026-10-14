@@ -64,7 +64,7 @@ pub mod web;
 
 pub use capability::{
     ANDROID, ANDROID_UNITS, HEADLESS, HEADLESS_UNITS, LINUX, LINUX_UNITS, StyleCapabilities,
-    StyleSupport, UnitMapping, WEB, WEB_UNITS, WINDOWS, WINDOWS_UNITS,
+    StyleSupport, TUI, TUI_UNITS, UnitMapping, WEB, WEB_UNITS, WINDOWS, WINDOWS_UNITS,
 };
 pub use model::{
     Color, Condition, ConditionEnv, ConditionalDeclaration, Declaration, DeclarationSet, Direction,
