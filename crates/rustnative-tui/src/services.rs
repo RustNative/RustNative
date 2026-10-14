@@ -232,50 +232,120 @@ fn clean(text: &str) -> String {
     text.chars().filter(|c| !c.is_control() && *c != ';').collect()
 }
 
-/// Whether URLs can be opened from here, and the opener that would.
+/// How URLs are opened from here.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum UrlOpener {
+    /// `ShellExecuteW` (Windows): the URL's registered handler, with no
+    /// command interpreter in between.
+    ShellExecute,
+    /// A program given the URL as its one argument (`open`, `xdg-open`).
+    Program(&'static str),
+}
+
+/// Whether URLs can be opened from here, and how. Never over SSH (it would
+/// open on the far machine), and on Linux only with a desktop session.
 #[must_use]
-pub fn url_opener(remote: bool) -> Option<(&'static str, Vec<&'static str>)> {
+pub fn url_opener(remote: bool) -> Option<UrlOpener> {
     if remote {
         return None;
     }
     if cfg!(windows) {
-        Some(("cmd", vec!["/C", "start", ""]))
+        Some(UrlOpener::ShellExecute)
     } else if cfg!(target_os = "macos") {
-        Some(("open", Vec::new()))
+        Some(UrlOpener::Program("open"))
     } else if std::env::var_os("DISPLAY").is_some() || std::env::var_os("WAYLAND_DISPLAY").is_some()
     {
-        Some(("xdg-open", Vec::new()))
+        Some(UrlOpener::Program("xdg-open"))
     } else {
         None
     }
+}
+
+/// Accepts only an `http`, `https`, or `mailto` URL with no whitespace,
+/// control characters, quotes, or shell metacharacters — so whatever opens
+/// it receives one well-formed URL and nothing it could read as more.
+///
+/// # Errors
+///
+/// The URL is not one of those, or carries such a character.
+pub fn checked_url(url: &str) -> Result<&str, ServiceError> {
+    let scheme = ["http://", "https://", "mailto:"]
+        .iter()
+        .any(|scheme| url.len() > scheme.len() && url[..scheme.len()].eq_ignore_ascii_case(scheme));
+    if !scheme {
+        return Err(ServiceError::new(format!("`{url}` is not an http, https, or mailto URL")));
+    }
+    if let Some(bad) = url.chars().find(|c| {
+        c.is_whitespace()
+            || c.is_control()
+            || matches!(c, '"' | '\'' | '`' | '<' | '>' | '|' | '^' | '\\')
+    }) {
+        return Err(ServiceError::new(format!(
+            "the URL contains {bad:?}, which a URL carries only percent-encoded"
+        )));
+    }
+    Ok(url)
+}
+
+#[cfg(windows)]
+fn shell_execute(url: &str) -> Result<(), ServiceError> {
+    use windows_sys::Win32::UI::Shell::ShellExecuteW;
+    use windows_sys::Win32::UI::WindowsAndMessaging::SW_SHOWNORMAL;
+    let wide = |text: &str| text.encode_utf16().chain(std::iter::once(0)).collect::<Vec<u16>>();
+    let (operation, file) = (wide("open"), wide(url));
+    // SAFETY: NUL-terminated wide strings; no window, parameters, or
+    // directory.
+    let result = unsafe {
+        ShellExecuteW(
+            std::ptr::null_mut(),
+            operation.as_ptr(),
+            file.as_ptr(),
+            std::ptr::null(),
+            std::ptr::null(),
+            SW_SHOWNORMAL,
+        )
+    };
+    // Values above 32 are success (the documented convention).
+    if result as isize > 32 {
+        Ok(())
+    } else {
+        Err(ServiceError::new(format!(
+            "ShellExecute could not open the URL (code {})",
+            result as isize
+        )))
+    }
+}
+
+#[cfg(not(windows))]
+fn shell_execute(_url: &str) -> Result<(), ServiceError> {
+    Err(ServiceError::new("ShellExecute is a Windows facility"))
 }
 
 #[async_trait::async_trait]
 impl SystemService for TerminalSystem {
     async fn open_url(&self, url: String) -> Result<(), ServiceError> {
         let remote = self.channel.profile().is_some_and(|profile| profile.remote);
-        let Some((program, arguments)) = url_opener(remote) else {
+        let Some(opener) = url_opener(remote) else {
             return Err(ServiceError::new(if remote {
                 "the session runs over SSH: a URL opened here would open on the far machine"
             } else {
                 "there is no desktop session to open a URL in"
             }));
         };
-        if !(url.starts_with("http://")
-            || url.starts_with("https://")
-            || url.starts_with("mailto:"))
-        {
-            return Err(ServiceError::new(format!("`{url}` is not an http, https, or mailto URL")));
+        let url = checked_url(&url)?;
+        match opener {
+            UrlOpener::ShellExecute => shell_execute(url),
+            UrlOpener::Program(program) => std::process::Command::new(program)
+                .arg(url)
+                .stdin(std::process::Stdio::null())
+                .stdout(std::process::Stdio::null())
+                .stderr(std::process::Stdio::null())
+                .spawn()
+                .map(drop)
+                .map_err(|error| {
+                    ServiceError::new(format!("{program} could not be started: {error}"))
+                }),
         }
-        std::process::Command::new(program)
-            .args(arguments)
-            .arg(&url)
-            .stdin(std::process::Stdio::null())
-            .stdout(std::process::Stdio::null())
-            .stderr(std::process::Stdio::null())
-            .spawn()
-            .map(drop)
-            .map_err(|error| ServiceError::new(format!("{program} could not be started: {error}")))
     }
 
     async fn notify(&self, title: String, body: String) -> Result<(), ServiceError> {
@@ -405,6 +475,25 @@ mod tests {
         assert!(poll_once(read.as_mut()).is_none());
         terminal.expire_reads(Instant::now() + CLIPBOARD_READ_TIMEOUT * 2);
         assert_eq!(poll_once(read.as_mut()), Some(Ok(Some("from the terminal".to_owned()))));
+    }
+
+    #[test]
+    fn a_url_reaches_its_opener_only_whole_and_well_formed() {
+        assert!(checked_url("https://example.com/search?q=a&lang=en#top").is_ok());
+        assert!(checked_url("mailto:someone@example.com").is_ok());
+        for refused in [
+            "https://example.com/\" & calc.exe",
+            "https://example.com/a b",
+            "https://example.com/|whoami",
+            "https://example.com/^&x",
+            "https://example.com/\nnext",
+            "file:///etc/passwd",
+            "javascript:alert(1)",
+            "--help",
+            "https://",
+        ] {
+            assert!(checked_url(refused).is_err(), "{refused:?} was refused");
+        }
     }
 
     #[test]
