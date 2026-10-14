@@ -58,6 +58,7 @@
 //! ```
 #![deny(missing_docs)]
 
+pub mod answers;
 pub mod capability;
 pub mod client;
 pub mod css;
@@ -81,6 +82,7 @@ pub mod runtime;
 pub mod svg;
 pub mod wasm;
 
+pub use answers::capabilities;
 pub use client::{Client, ClientLogic, ClientModule, Effects};
 pub use head::Head;
 pub use page::{Page, PageContext, Strategy};

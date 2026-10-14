@@ -2,9 +2,10 @@
 //! (`docs/conformance/new-backend-checklist.md`, the Web column): a node's
 //! cursor is the element's (row 19); a token or scheme change restyles the
 //! elements already on the page, none re-rendered and nothing reloaded
-//! (row 22); and an island that panics gives back what it held of the host —
+//! (row 22); an island that panics gives back what it held of the host —
 //! its pointer capture — while the page's other islands keep working
-//! (row 10).
+//! (row 10); and an island re-renders by patching the elements it owns,
+//! none replaced and none leaked (row 8).
 
 #![allow(
     clippy::unwrap_used,
@@ -228,4 +229,30 @@ fn the_web_column_of_the_checklist_in_a_browser() {
     page.mouse("mouseReleased", x + 40.0, y + 40.0, 1).unwrap();
     page.click("#i1-more").unwrap();
     page.wait_until("document.getElementById('i1-value').textContent === '1'", WAIT).unwrap();
+
+    // Row 8: an island owns its subtree and re-renders it in place. The
+    // button is the same element after three renders, and the island's
+    // census of elements is what it was.
+    page.eval(
+        "window.__more = document.getElementById('i1-more'); \
+         window.__census = document.querySelectorAll('[id^=\"i1-\"]').length; true",
+    )
+    .unwrap();
+    for count in 2..=4 {
+        page.click("#i1-more").unwrap();
+        page.wait_until(
+            &format!("document.getElementById('i1-value').textContent === '{count}'"),
+            WAIT,
+        )
+        .unwrap();
+    }
+    assert_eq!(
+        page.eval(
+            "window.__more === document.getElementById('i1-more') \
+             && window.__census === document.querySelectorAll('[id^=\"i1-\"]').length"
+        )
+        .unwrap(),
+        Value::Bool(true),
+        "the same elements, patched in place, none leaked"
+    );
 }

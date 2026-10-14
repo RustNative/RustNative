@@ -378,6 +378,9 @@ impl Session {
             services = services.with_extension(Arc::new(request.clone()));
         }
         let mut tree = build(services, theme.clone(), scheduler);
+        // A component rendered for a page asks the Web backend's question:
+        // what a browser realizes (`crate::answers`).
+        tree.set_environment(&rustnative_core::keys::CAPABILITIES, crate::answers::capabilities());
         let _ = tree.render();
         Self {
             tree,
