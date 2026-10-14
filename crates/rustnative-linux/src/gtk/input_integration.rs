@@ -117,6 +117,8 @@ fn sample(
         buttons,
         modifiers: KeyModifiers::default(),
         pressure: None,
+        tilt: None,
+        rotation: None,
     }
 }
 
