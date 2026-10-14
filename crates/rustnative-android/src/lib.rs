@@ -127,10 +127,10 @@ pub use platform::AndroidPlatform;
 pub use services::FileStateStore;
 #[cfg(target_os = "android")]
 pub use services::{
-    AndroidClipboard, AndroidConditions, AndroidFileDialogs, AndroidHttp, AndroidLocale,
-    AndroidPermissions, AndroidPrinting, AndroidPush, AndroidSecureStorage, AndroidSerial,
-    AndroidStore, AndroidSystem, AndroidWork, BitmapDecoder, JobHandler, read_document,
-    write_document,
+    AndroidClipboard, AndroidConditions, AndroidDocuments, AndroidFileDialogs, AndroidHttp,
+    AndroidLocale, AndroidPermissions, AndroidPrinting, AndroidPush, AndroidSecureStorage,
+    AndroidSerial, AndroidStore, AndroidSystem, AndroidWork, BitmapDecoder, JobHandler,
+    read_document, write_document,
 };
 pub use surface::{SurfaceHandle, native_surface};
 

@@ -1,0 +1,30 @@
+[package]
+name = "rustnative-host"
+version = "0.1.0"
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+description = "Rust Native's host selection: the native backend for the target being compiled, and its default services, chosen in one place so applications name capabilities rather than platforms"
+repository.workspace = true
+homepage.workspace = true
+readme.workspace = true
+keywords = ["gui", "native", "cross-platform", "framework"]
+categories = ["gui"]
+
+[lints]
+workspace = true
+
+[dependencies]
+rustnative-core.workspace = true
+# The constrained-work conditions and image decoding contracts the
+# backends' services implement.
+rustnative-data.workspace = true
+
+[target.'cfg(target_os = "windows")'.dependencies]
+rustnative-windows.workspace = true
+
+[target.'cfg(target_os = "linux")'.dependencies]
+rustnative-linux.workspace = true
+
+[target.'cfg(target_os = "android")'.dependencies]
+rustnative-android.workspace = true

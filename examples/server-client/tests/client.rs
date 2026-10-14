@@ -76,15 +76,16 @@ fn the_client_signs_in_writes_and_shows_the_servers_answer() {
     assert_eq!(text(&app, "note-1"), "Water the plants", "indexed by the server's job");
 }
 
-/// The host's own HTTP stack (Windows' `WinHttp`, libsoup on Linux) calls
-/// the typed functions of a server listening on a real socket.
+/// The host's own HTTP stack (Windows' `WinHttp`, libsoup on Linux), as
+/// `rustnative-host` provides it, calls the typed functions of a server
+/// listening on a real socket.
 #[cfg(any(windows, target_os = "linux"))]
 #[test]
 fn the_host_http_stack_calls_the_server_over_a_socket() {
-    #[cfg(target_os = "linux")]
-    use rustnative_linux::SoupHttp as Http;
-    #[cfg(windows)]
-    use rustnative_windows::WinHttp as Http;
+    let identity = rustnative_host::AppIdentity::new("dev.rustnative.notes-client-tests", "Notes");
+    let services = rustnative_host::services(&identity).unwrap();
+    let http = services.http().cloned().expect("the host has HTTP");
+    let http = &*http;
 
     let runtime = tokio::runtime::Builder::new_multi_thread().enable_all().build().unwrap();
     let (service, _) = {
@@ -95,10 +96,9 @@ fn the_host_http_stack_calls_the_server_over_a_socket() {
     let base = format!("http://{}", listener.local_addr().unwrap());
     runtime.spawn(service.serve(listener, std::future::pending()));
 
-    let http = Http::new();
     let result = runtime.block_on(async {
         let token = call::<SignIn>(
-            &http,
+            http,
             &base,
             &Credentials { name: "ada".into(), password: "analytical engine".into() },
             &[],
@@ -106,8 +106,8 @@ fn the_host_http_stack_calls_the_server_over_a_socket() {
         .await?;
         let bearer = format!("Bearer {token}");
         let auth = [("authorization", bearer.as_str())];
-        call::<CreateNote>(&http, &base, &NewNote { title: "From the host".into() }, &auth).await?;
-        call::<ListNotes>(&http, &base, &(), &auth).await
+        call::<CreateNote>(http, &base, &NewNote { title: "From the host".into() }, &auth).await?;
+        call::<ListNotes>(http, &base, &(), &auth).await
     });
     let notes = result.unwrap();
     assert_eq!(notes.len(), 1);

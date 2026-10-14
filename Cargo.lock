@@ -455,10 +455,9 @@ version = "0.1.0"
 dependencies = [
  "rustnative-core",
  "rustnative-headless",
- "rustnative-linux",
+ "rustnative-host",
  "rustnative-server",
  "rustnative-sync",
- "rustnative-windows",
  "serde",
  "serde_json",
  "tokio",
@@ -639,8 +638,7 @@ dependencies = [
  "rustnative-core",
  "rustnative-data",
  "rustnative-headless",
- "rustnative-linux",
- "rustnative-windows",
+ "rustnative-host",
  "serde",
  "serde_json",
  "tokio",
@@ -856,8 +854,7 @@ version = "0.1.0"
 dependencies = [
  "rustnative-core",
  "rustnative-headless",
- "rustnative-linux",
- "rustnative-windows",
+ "rustnative-host",
 ]
 
 [[package]]
@@ -965,8 +962,7 @@ dependencies = [
  "rustnative-components",
  "rustnative-core",
  "rustnative-headless",
- "rustnative-linux",
- "rustnative-windows",
+ "rustnative-host",
 ]
 
 [[package]]
@@ -1388,8 +1384,7 @@ dependencies = [
  "rustnative-android",
  "rustnative-build",
  "rustnative-core",
- "rustnative-linux",
- "rustnative-windows",
+ "rustnative-host",
  "serde_json",
 ]
 
@@ -1504,8 +1499,7 @@ dependencies = [
  "rustnative-build",
  "rustnative-core",
  "rustnative-headless",
- "rustnative-linux",
- "rustnative-windows",
+ "rustnative-host",
 ]
 
 [[package]]
@@ -1694,9 +1688,8 @@ version = "0.1.0"
 dependencies = [
  "rustnative-core",
  "rustnative-headless",
- "rustnative-linux",
+ "rustnative-host",
  "rustnative-sync",
- "rustnative-windows",
  "serde_json",
  "tokio",
 ]
@@ -2028,8 +2021,7 @@ dependencies = [
  "rustnative-android",
  "rustnative-core",
  "rustnative-headless",
- "rustnative-linux",
- "rustnative-windows",
+ "rustnative-host",
  "serde_json",
 ]
 
@@ -2214,8 +2206,7 @@ dependencies = [
  "rustnative-android",
  "rustnative-conformance",
  "rustnative-core",
- "rustnative-linux",
- "rustnative-windows",
+ "rustnative-host",
 ]
 
 [[package]]
@@ -2442,6 +2433,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "rustnative-host"
+version = "0.1.0"
+dependencies = [
+ "rustnative-android",
+ "rustnative-core",
+ "rustnative-data",
+ "rustnative-linux",
+ "rustnative-windows",
+]
+
+[[package]]
 name = "rustnative-i18n"
 version = "0.1.0"
 
@@ -2485,6 +2487,7 @@ dependencies = [
  "rustnative-markup",
  "rustnative-style",
  "syn 2.0.119",
+ "toml",
 ]
 
 [[package]]
@@ -2777,9 +2780,8 @@ dependencies = [
  "notes-shared",
  "rustnative-core",
  "rustnative-headless",
- "rustnative-linux",
+ "rustnative-host",
  "rustnative-server",
- "rustnative-windows",
  "serde_json",
  "server-demo",
  "tokio",
@@ -2912,8 +2914,7 @@ version = "0.1.0"
 dependencies = [
  "rustnative-core",
  "rustnative-headless",
- "rustnative-linux",
- "rustnative-windows",
+ "rustnative-host",
 ]
 
 [[package]]

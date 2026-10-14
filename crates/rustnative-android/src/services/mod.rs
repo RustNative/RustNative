@@ -65,7 +65,8 @@ pub use product::{AndroidPush, AndroidStore};
 pub use secure_storage::AndroidSecureStorage;
 #[cfg(target_os = "android")]
 pub use system::{
-    AndroidClipboard, AndroidFileDialogs, AndroidSystem, read_document, write_document,
+    AndroidClipboard, AndroidDocuments, AndroidFileDialogs, AndroidSystem, read_document,
+    write_document,
 };
 #[cfg(all(target_os = "android", feature = "device-tests"))]
 pub(crate) use work::job_id;

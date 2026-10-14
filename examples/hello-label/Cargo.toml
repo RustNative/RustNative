@@ -16,16 +16,13 @@ workspace = true
 
 [dependencies]
 rustnative-core.workspace = true
+# The backend for each target and its services, chosen in one place.
+rustnative-host.workspace = true
 serde_json = "1"
 
 [build-dependencies]
 rustnative-build.workspace = true
 
-[target.'cfg(target_os = "linux")'.dependencies]
-rustnative-linux.workspace = true
-
+# `export_main!`, the entry Android's launcher activity calls.
 [target.'cfg(target_os = "android")'.dependencies]
 rustnative-android.workspace = true
-
-[target.'cfg(not(any(target_os = "linux", target_os = "android")))'.dependencies]
-rustnative-windows.workspace = true

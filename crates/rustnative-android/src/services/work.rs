@@ -105,6 +105,22 @@ impl AndroidWork {
     }
 }
 
+/// The portable contract, so a component schedules work through
+/// `Services::work` without naming Android.
+impl rustnative_core::services::WorkScheduler for AndroidWork {
+    fn schedule(&self, name: &str, constraints: Constraints) -> Result<(), ServiceError> {
+        Self::schedule(name, constraints)
+    }
+
+    fn cancel(&self, name: &str) -> Result<(), ServiceError> {
+        Self::cancel(name)
+    }
+
+    fn is_pending(&self, name: &str) -> bool {
+        Self::is_pending(name)
+    }
+}
+
 /// `RnJobService` runs job `name` (on its own thread): its handler's
 /// answer, or `false` when none is registered.
 pub(crate) fn run(name: &str) -> bool {

@@ -97,6 +97,22 @@ pub fn write_document(uri: &str, bytes: &[u8]) -> Result<(), ServiceError> {
     )?)
 }
 
+/// Documents through the Storage Access Framework: the `content://` URIs
+/// [`AndroidFileDialogs`](super::AndroidFileDialogs) answers with.
+#[derive(Debug, Clone, Copy, Default)]
+pub struct AndroidDocuments;
+
+#[async_trait::async_trait]
+impl rustnative_core::services::DocumentService for AndroidDocuments {
+    async fn read(&self, location: String) -> Result<Vec<u8>, ServiceError> {
+        off_thread(move || read_document(&location)).await?
+    }
+
+    async fn write(&self, location: String, bytes: Vec<u8>) -> Result<(), ServiceError> {
+        off_thread(move || write_document(&location, &bytes)).await?
+    }
+}
+
 /// URLs, notifications, and the share sheet.
 #[derive(Debug, Default)]
 pub struct AndroidSystem {
@@ -153,6 +169,24 @@ impl AndroidSystem {
             "(Ljava/lang/String;Ljava/lang/String;)Ljava/lang/String;",
             &[Arg::Str(text), Arg::OptStr(subject)],
         )?)
+    }
+}
+
+#[async_trait::async_trait]
+impl rustnative_core::services::ShareService for AndroidSystem {
+    async fn share(
+        &self,
+        request: rustnative_core::services::ShareRequest,
+    ) -> Result<(), ServiceError> {
+        // The share sheet is an activity of its own; no anchor is needed.
+        let text = match &request.url {
+            Some(url) if !request.text.is_empty() => format!("{}\n{url}", request.text),
+            Some(url) => url.clone(),
+            None => request.text.clone(),
+        };
+        let channel = self.channel.clone();
+        off_thread(move || AndroidSystem { channel }.share(&text, request.subject.as_deref()))
+            .await?
     }
 }
 

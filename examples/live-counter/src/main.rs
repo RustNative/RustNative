@@ -8,11 +8,8 @@ use std::time::Duration;
 
 use live_counter::CounterApp;
 use rustnative_core::{Application, Component, Platform, Size, Window};
-#[cfg(target_os = "linux")]
-use rustnative_linux::LinuxPlatform as HostPlatform;
+use rustnative_host::HostPlatform;
 use rustnative_sync::live::{LiveClient, LiveServer, RemoteView};
-#[cfg(not(target_os = "linux"))]
-use rustnative_windows::WindowsPlatform as HostPlatform;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut arguments = std::env::args().skip(1);

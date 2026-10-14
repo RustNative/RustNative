@@ -18,17 +18,9 @@ use rustnative_core::{Background, TaskHandle};
 
 use crate::query::LocalFuture;
 
-/// What must hold before a job runs.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
-pub struct Constraints {
-    /// The network is reachable.
-    pub network: bool,
-    /// The device is on external power.
-    pub charging: bool,
-    /// Run by this time (on the scheduler's clock) even if the other
-    /// constraints never hold.
-    pub deadline: Option<Duration>,
-}
+/// What must hold before a job runs: the core's portable statement of it,
+/// shared with the host schedulers (`rustnative_core::services::WorkScheduler`).
+pub use rustnative_core::services::WorkConstraints as Constraints;
 
 /// The host's answers about the device.
 pub trait Conditions: Send + Sync {

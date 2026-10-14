@@ -62,18 +62,20 @@ pub enum FrameworkSource {
 impl FrameworkSource {
     fn dependencies(&self) -> String {
         match self {
+            // The host crate picks the backend for each target; the Android
+            // crate is named too because its `export_main!` is the entry
+            // the launcher activity calls.
             Self::Published(version) => {
                 format!(
-                    "rustnative-core = \"{version}\"\nrustnative-windows = \"{version}\"\n\
-                     rustnative-linux = \"{version}\"\nrustnative-android = \"{version}\"\n"
+                    "rustnative-core = \"{version}\"\nrustnative-host = \"{version}\"\n\
+                     rustnative-android = \"{version}\"\n"
                 )
             }
             Self::Path(path) => {
                 let path = normalized(path);
                 format!(
                     "rustnative-core = {{ path = \"{path}/crates/rustnative-core\" }}\n\
-                     rustnative-windows = {{ path = \"{path}/crates/rustnative-windows\" }}\n\
-                     rustnative-linux = {{ path = \"{path}/crates/rustnative-linux\" }}\n\
+                     rustnative-host = {{ path = \"{path}/crates/rustnative-host\" }}\n\
                      rustnative-android = {{ path = \"{path}/crates/rustnative-android\" }}\n"
                 )
             }
@@ -210,6 +212,9 @@ pub fn create_web(parent: &Path, name: &str, framework: &FrameworkSource) -> Res
         address: Some("127.0.0.1:3000".to_owned()),
         ..crate::web::WebConfig::default()
     });
+    // A web application is realized in the browser whatever machine builds
+    // its server, so its styles are checked against the Web's table only.
+    config.style = Some(crate::config::Style { file: None, targets: vec!["web".to_owned()] });
     let root = parent.join(name);
     if root.exists() {
         return Err(Error::Usage(format!("{} already exists", root.display())));
@@ -293,7 +298,8 @@ mod tests {
         }
         let manifest = std::fs::read_to_string(root.join("Cargo.toml")).unwrap();
         assert!(manifest.contains("name = \"demo-app\""));
-        assert!(manifest.contains("rustnative-windows = \"0.1\""));
+        assert!(manifest.contains("rustnative-host = \"0.1\""), "one crate picks the backend");
+        assert!(!manifest.contains("rustnative-windows"), "the project names no desktop backend");
         assert!(
             manifest.contains("[build-dependencies]\nrustnative-build = \"0.1\""),
             "{manifest}"
@@ -301,7 +307,7 @@ mod tests {
         let lib = std::fs::read_to_string(root.join("src/lib.rs")).unwrap();
         assert!(lib.contains("com.example.demoapp"), "the app id reaches the source");
         let main = std::fs::read_to_string(root.join("src/main.rs")).unwrap();
-        assert!(main.contains("use demo_app::"), "the shell names the library: {main}");
+        assert!(main.contains("demo_app::"), "the shell names the library: {main}");
         for text in [&lib, &main] {
             assert!(!text.contains("{{"), "every placeholder is filled: {text}");
         }

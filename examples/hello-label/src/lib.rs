@@ -1,25 +1,18 @@
 //! The Rust Native framework's example application: the desktop binary
 //! (`main.rs`) and the Android library both run [`run`].
 
-use std::sync::Arc;
 use std::time::Duration;
 
-#[cfg(target_os = "android")]
-use rustnative_android::{AndroidPlatform as HostPlatform, FileStateStore};
 use rustnative_core::{
     AccessibilityInfo, AccessibilityRole, AccessibleAction, AccessibleActionKind, Alignment,
     AnimatedProperty, AnimatedValue, Animation, AnimationRequests, Application, Callback,
     CheckedState, Color, ColumnStyle, Component, ComponentContext, DrawList, DropEffect,
     EdgeInsets, Event, InputInterest, InputRequests, ItemExtent, LayoutStyle, LiveRegion, MenuBar,
     MenuItem, NavigationCommand, NavigationStack, Navigator, Node, NodeId, Overflow, Paint,
-    PanicPolicy, Persisted, Platform, Point, RectF, RowStyle, Services, Size, SizeMode, TaskHandle,
-    Transition, Vec2, VirtualListStyle, VirtualRange, Window, classes,
+    PanicPolicy, Persisted, Point, RectF, RowStyle, Size, SizeMode, TaskHandle, Transition, Vec2,
+    VirtualListStyle, VirtualRange, Window, classes,
 };
 use rustnative_core::{ColorScheme, environment::keys};
-#[cfg(target_os = "linux")]
-use rustnative_linux::{FileStateStore, LinuxPlatform as HostPlatform};
-#[cfg(not(any(target_os = "linux", target_os = "android")))]
-use rustnative_windows::{FileStateStore, WindowsPlatform as HostPlatform};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 enum AppMessage {
@@ -1106,7 +1099,10 @@ pub fn run() -> Result<(), Box<dyn std::error::Error>> {
         MenuItem::submenu("view", "View", [MenuItem::action("view.toggle-panel", "Toggle Panel")]),
     ]);
 
-    let services = Services::default().with_state_store(Arc::new(FileStateStore::for_app(APP_ID)?));
+    // The backend for this target, and every service it provides, from the
+    // one crate that knows which platform this is.
+    let identity = rustnative_host::AppIdentity::new(APP_ID, "Rust Native UI");
+    let services = rustnative_host::services(&identity)?;
     let mut application = Application::with_services(
         AppShell::new(),
         Window::new("Rust Native UI", Size::new(640, 360)).with_menu(menu),
@@ -1132,7 +1128,7 @@ pub fn run() -> Result<(), Box<dyn std::error::Error>> {
         None,
     );
 
-    HostPlatform::new().with_app_id(APP_ID).run(&mut application)?;
+    rustnative_host::run(&mut application, &identity)?;
 
     Ok(())
 }

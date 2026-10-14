@@ -19,12 +19,8 @@ workspace = true
 # device.
 [dependencies]
 rustnative-core.workspace = true
+# The backend for each target, and its services (one place picks them).
+rustnative-host.workspace = true
 
 [dev-dependencies]
 rustnative-headless.workspace = true
-
-[target.'cfg(target_os = "linux")'.dependencies]
-rustnative-linux.workspace = true
-
-[target.'cfg(not(target_os = "linux"))'.dependencies]
-rustnative-windows.workspace = true

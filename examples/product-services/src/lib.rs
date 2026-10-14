@@ -143,23 +143,22 @@ impl Component for Product {
 /// answering why they are unavailable here.
 #[cfg(target_os = "android")]
 mod android {
-    use std::sync::Arc;
-
     use rustnative_core::product::Flags;
-    use rustnative_core::{Application, Component, Platform, Services, Size, Window};
+    use rustnative_core::{Application, Component, Size, Window};
 
-    fn main() -> Result<(), rustnative_android::Error> {
-        let services = Services::default()
-            .with_flags(Flags::new())
-            .with_secure_storage(Arc::new(rustnative_android::AndroidSecureStorage))
-            .with_push(Arc::new(rustnative_android::AndroidPush))
-            .with_commerce(Arc::new(rustnative_android::AndroidStore));
+    fn main() -> Result<(), Box<dyn std::error::Error>> {
+        let identity = rustnative_host::AppIdentity::new(
+            "dev.rustnative.product-services",
+            "Product services",
+        );
+        let services = rustnative_host::services(&identity)?.with_flags(Flags::new());
         let mut application = Application::with_services(
             super::Product::new(()),
             Window::new("Product services", Size::new(480, 320)),
             services,
         );
-        rustnative_android::AndroidPlatform::new().run(&mut application)
+        rustnative_host::run(&mut application, &identity)?;
+        Ok(())
     }
 
     rustnative_android::export_main!(main);

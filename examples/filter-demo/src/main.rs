@@ -2,10 +2,7 @@
 
 use filter_demo::App;
 use rustnative_core::{Application, Component, Platform, Size, Window};
-#[cfg(target_os = "linux")]
-use rustnative_linux::LinuxPlatform as HostPlatform;
-#[cfg(not(target_os = "linux"))]
-use rustnative_windows::WindowsPlatform as HostPlatform;
+use rustnative_host::HostPlatform;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut application =

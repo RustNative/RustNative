@@ -557,6 +557,10 @@ impl<M: Send + 'static> ComponentContext<'_, M> {
     /// // What a backend does before its first render:
     /// application.set_environment(&keys::CAPABILITIES, PlatformCapabilities::new([Capability::Clipboard]));
     /// assert!(matches!(application.view(), Node::Button(_)));
+    ///
+    /// // The same two answers, in markup:
+    /// assert_eq!(rustnative_core::rsx! { <Button key="copy" text="Copy" /> }, application.view());
+    /// let _ = rustnative_core::rsx! { <Label key="copy" text="Select the text to copy it" /> };
     /// ```
     pub fn capabilities(&mut self) -> crate::capability::PlatformCapabilities {
         self.env(&crate::environment::keys::CAPABILITIES)

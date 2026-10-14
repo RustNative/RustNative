@@ -20,6 +20,8 @@ workspace = true
 # and retried — against an in-process server.
 [dependencies]
 rustnative-core.workspace = true
+# The backend for each target, and its services (one place picks them).
+rustnative-host.workspace = true
 rustnative-data.workspace = true
 async-trait.workspace = true
 parking_lot.workspace = true
@@ -29,9 +31,3 @@ tokio.workspace = true
 
 [dev-dependencies]
 rustnative-headless.workspace = true
-
-[target.'cfg(target_os = "linux")'.dependencies]
-rustnative-linux.workspace = true
-
-[target.'cfg(not(target_os = "linux"))'.dependencies]
-rustnative-windows.workspace = true

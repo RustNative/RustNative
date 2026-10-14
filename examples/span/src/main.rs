@@ -1,10 +1,7 @@
 #![cfg_attr(windows, windows_subsystem = "windows")]
 
 use rustnative_core::{Application, Component, Platform, Window};
-#[cfg(target_os = "linux")]
-use rustnative_linux::LinuxPlatform as HostPlatform;
-#[cfg(not(target_os = "linux"))]
-use rustnative_windows::WindowsPlatform as HostPlatform;
+use rustnative_host::HostPlatform;
 use span::{DESKTOP_WINDOW, Thermostat};
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {

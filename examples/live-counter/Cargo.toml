@@ -18,15 +18,11 @@ workspace = true
 # Milestone 55's server-interactive example.
 [dependencies]
 rustnative-core.workspace = true
+# The backend for each target, and its services (one place picks them).
+rustnative-host.workspace = true
 rustnative-sync.workspace = true
 serde_json = "1"
 tokio = { workspace = true, features = ["net", "rt-multi-thread", "macros"] }
 
 [dev-dependencies]
 rustnative-headless.workspace = true
-
-[target.'cfg(target_os = "linux")'.dependencies]
-rustnative-linux.workspace = true
-
-[target.'cfg(not(target_os = "linux"))'.dependencies]
-rustnative-windows.workspace = true

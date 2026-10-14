@@ -6,8 +6,12 @@
 //! See `memory` for the deterministic in-memory implementations used by
 //! tests and previews.
 
+mod hosted;
 mod memory;
 
+pub use hosted::{
+    DocumentService, FileDocuments, ShareRequest, ShareService, WorkConstraints, WorkScheduler,
+};
 pub use memory::{MemoryClipboard, MemoryStorage};
 
 use std::error::Error;
@@ -398,6 +402,9 @@ pub struct Services {
     secure_storage: Option<Arc<dyn crate::product::SecureStorage>>,
     push: Option<Arc<dyn crate::product::PushService>>,
     commerce: Option<Arc<dyn crate::product::CommerceService>>,
+    share: Option<Arc<dyn ShareService>>,
+    work: Option<Arc<dyn WorkScheduler>>,
+    documents: Option<Arc<dyn DocumentService>>,
     packages: Arc<std::collections::BTreeMap<String, Arc<dyn std::any::Any + Send + Sync>>>,
     extensions:
         Arc<std::collections::BTreeMap<std::any::TypeId, Arc<dyn std::any::Any + Send + Sync>>>,
@@ -421,6 +428,9 @@ impl fmt::Debug for Services {
             .field("secure_storage", &self.secure_storage.is_some())
             .field("push", &self.push.is_some())
             .field("commerce", &self.commerce.is_some())
+            .field("share", &self.share.is_some())
+            .field("work", &self.work.is_some())
+            .field("documents", &self.documents.is_some())
             .field("surfaces", &self.surfaces)
             .field("flags", &self.flags)
             .field("packages", &self.packages.keys().collect::<Vec<_>>())
@@ -557,6 +567,45 @@ impl Services {
     #[must_use]
     pub fn commerce(&self) -> Option<&Arc<dyn crate::product::CommerceService>> {
         self.commerce.as_ref()
+    }
+
+    /// Returns `self` with the share sheet set.
+    #[must_use]
+    pub fn with_share(mut self, service: Arc<dyn ShareService>) -> Self {
+        self.share = Some(service);
+        self
+    }
+
+    /// Returns the share sheet, if the host has one.
+    #[must_use]
+    pub fn share(&self) -> Option<&Arc<dyn ShareService>> {
+        self.share.as_ref()
+    }
+
+    /// Returns `self` with the host's background-work scheduler set.
+    #[must_use]
+    pub fn with_work(mut self, service: Arc<dyn WorkScheduler>) -> Self {
+        self.work = Some(service);
+        self
+    }
+
+    /// Returns the host's background-work scheduler, if it has one.
+    #[must_use]
+    pub fn work(&self) -> Option<&Arc<dyn WorkScheduler>> {
+        self.work.as_ref()
+    }
+
+    /// Returns `self` with document access set.
+    #[must_use]
+    pub fn with_documents(mut self, service: Arc<dyn DocumentService>) -> Self {
+        self.documents = Some(service);
+        self
+    }
+
+    /// Returns document access, if set.
+    #[must_use]
+    pub fn documents(&self) -> Option<&Arc<dyn DocumentService>> {
+        self.documents.as_ref()
     }
 
     /// Returns `self` with the printing service set (Milestone 51).

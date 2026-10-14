@@ -1,15 +1,12 @@
 //! The reference application of the published comparison
 //! (`docs/comparison/methodology.md`): the layout conformance suite's
-//! reference screen, realized by the Windows backend. `--pseudo` shows it
+//! reference screen, realized by the host's backend. `--pseudo` shows it
 //! pseudo-localized; `--rtl` mirrored.
 #![cfg_attr(windows, windows_subsystem = "windows")]
 
 use rustnative_conformance::reference::{ReferenceScreen, Variant};
 use rustnative_core::{Application, Component, Platform, Size, Window};
-#[cfg(target_os = "linux")]
-use rustnative_linux::LinuxPlatform as HostPlatform;
-#[cfg(not(any(target_os = "linux", target_os = "android")))]
-use rustnative_windows::WindowsPlatform as HostPlatform;
+use rustnative_host::HostPlatform;
 
 fn main() {
     let arguments: Vec<String> = std::env::args().collect();

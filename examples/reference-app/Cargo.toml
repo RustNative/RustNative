@@ -18,12 +18,8 @@ workspace = true
 [dependencies]
 rustnative-conformance.workspace = true
 rustnative-core.workspace = true
-
-[target.'cfg(target_os = "linux")'.dependencies]
-rustnative-linux.workspace = true
+# The backend for each target, and its services (one place picks them).
+rustnative-host.workspace = true
 
 [target.'cfg(target_os = "android")'.dependencies]
 rustnative-android.workspace = true
-
-[target.'cfg(not(any(target_os = "linux", target_os = "android")))'.dependencies]
-rustnative-windows.workspace = true

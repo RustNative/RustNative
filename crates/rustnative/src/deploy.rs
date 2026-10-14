@@ -148,6 +148,7 @@ pub fn run(here: &Path, command: DeployCommand) -> Result<()> {
             let service = Service {
                 name: project.config.app.name.clone(),
                 binary: project.config.app.name.clone(),
+                version: project.config.app.version.clone(),
                 port,
                 environment: project
                     .config

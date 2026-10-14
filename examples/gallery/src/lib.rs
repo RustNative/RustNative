@@ -204,13 +204,14 @@ impl Component for Gallery {
 mod android {
     use rustnative_core::{Application, Component, Platform, Size, Window};
 
-    fn main() -> Result<(), rustnative_android::Error> {
+    fn main() -> Result<(), Box<dyn std::error::Error>> {
         let mut application = Application::new(
             super::Gallery::new(()),
             Window::new("Rust Native gallery", Size::new(900, 720)),
         );
         application.set_theme(super::theme());
-        rustnative_android::AndroidPlatform::new().run(&mut application)
+        rustnative_host::HostPlatform::new().run(&mut application)?;
+        Ok(())
     }
 
     rustnative_android::export_main!(main);

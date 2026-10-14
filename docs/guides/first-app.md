@@ -1,9 +1,9 @@
 # Your first application
 
-A task-oriented walk from an empty folder to a packaged Windows
-application (`PLAN.md` Milestone 52). Every tree on this page is shown in
-both syntaxes, side by side, and every style in both spellings. Neither
-is the "real" one: they produce the same tree.
+A task-oriented walk from an empty folder to a packaged application on
+Windows, Linux, or Android (`PLAN.md` Milestone 52). Every tree on this page
+is shown in both syntaxes, side by side, and every style in both spellings.
+Neither is the "real" one: they produce the same tree.
 
 ## Create it
 
@@ -12,12 +12,17 @@ rustnative new notes --syntax builder
 rustnative new notes --syntax markup    # src/app.rsx; there is no default
 cd notes
 rustnative dev windows          # run it; saving a file restarts it with its state kept
+                                # (`linux`, or `android` with a phone attached)
 ```
 
 The project has:
 
-- the application in `src/lib.rs` (or `src/app.rsx`), and a thin
-  `src/main.rs` that runs it;
+- the application in `src/lib.rs` (or `src/app.rsx`) with its `run`
+  function, and a thin `src/main.rs` that calls it — Android calls the same
+  `run` from its launcher activity;
+- no platform in its code: `rustnative-host` picks the backend for the
+  target being built and supplies its services, so the same source builds
+  for every host;
 - its style file, `app.css`;
 - `rustnative.toml`, which sets its identity;
 - a golden test for each preview.
@@ -105,8 +110,34 @@ assert_eq!(app.find(&Query::key("count")).unwrap().text.as_deref(), Some("Clicke
 
 ```sh
 rustnative package windows              # a ZIP and an MSIX in target/package/
+rustnative package linux                # .deb, .rpm, pacman, tarball, AppImage
+rustnative package android              # an APK and an App Bundle, signed
 rustnative compliance                   # SBOM, licenses, and privacy manifest, from the build
 ```
+
+## Ask for capabilities, not platforms
+
+When a feature depends on the host — a share sheet, a tray icon, a camera —
+ask the context, and give the host without it something that works:
+
+```rust
+if context.capabilities().supports(Capability::SystemShare) {
+    Node::button("share", "Share")
+} else {
+    Node::button("share", "Copy link")
+}
+```
+
+```rust
+if context.capabilities().supports(Capability::SystemShare) {
+    <Button key="share" text="Share" />
+} else {
+    <Button key="share" text="Copy link" />
+}
+```
+
+The service behind it is on `context.services()` (`share()`, here) where the
+host has one, and absent where it does not.
 
 - **Updates:** `docs/deploy.md`.
 - **Adding a capability** someone else wrote:

@@ -19,6 +19,8 @@ workspace = true
 # devices, converging through the sync service.
 [dependencies]
 rustnative-core.workspace = true
+# The backend for each target, and its services (one place picks them).
+rustnative-host.workspace = true
 rustnative-sync = { workspace = true, features = ["server"] }
 rustnative-server.workspace = true
 serde = { version = "1", features = ["derive"] }
@@ -27,9 +29,3 @@ tokio = { workspace = true, features = ["sync", "net", "rt-multi-thread", "macro
 
 [dev-dependencies]
 rustnative-headless.workspace = true
-
-[target.'cfg(target_os = "linux")'.dependencies]
-rustnative-linux.workspace = true
-
-[target.'cfg(not(target_os = "linux"))'.dependencies]
-rustnative-windows.workspace = true
