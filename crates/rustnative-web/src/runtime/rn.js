@@ -1556,6 +1556,12 @@ export class Island {
       step();
     } catch (error) {
       this.failed = error;
+      // What the island held of the host is given back: a pointer it
+      // captured would otherwise stay captured by a dead island.
+      for (const [pointer, element] of this.captures ?? []) {
+        try { element.releasePointerCapture(pointer); } catch (_) { /* already released */ }
+      }
+      this.captures?.clear();
       console.error(`rn: island ${this.index} (${this.module.name}) failed:`, error);
       this.root.setAttribute("data-rn-failed", "");
       document.dispatchEvent(new CustomEvent("rn:failure", { detail: { island: this.index, message: String(error && error.message || error) } }));
@@ -1816,9 +1822,15 @@ export function perform(island, kind, args) {
     }
     case "capturePointer": case "releasePointer": {
       const target = document.getElementById(island.scope + args[0]);
+      island.captures = island.captures ?? new Map();
       try {
-        if (kind === "capturePointer") target?.setPointerCapture(args[1]);
-        else target?.releasePointerCapture(args[1]);
+        if (kind === "capturePointer") {
+          target?.setPointerCapture(args[1]);
+          if (target) island.captures.set(args[1], target);
+        } else {
+          island.captures.delete(args[1]);
+          target?.releasePointerCapture(args[1]);
+        }
       } catch (_) { /* the pointer is no longer active */ }
       break;
     }
@@ -2190,13 +2202,40 @@ export class LiveIsland {
     const on = (type, handler) => document.addEventListener(type, (event) => {
       if (this.root.contains(event.target)) handler(event);
     }, { signal: this.listening.signal });
+    // A virtual element (a chart's bar) that declares actions: assistive
+    // technology activating it sends the action it asks for.
+    const act = (element, preferred) => {
+      const declared = (element.getAttribute("data-actions") || "").split(" ");
+      const action = preferred.find((name) => declared.includes(name));
+      const name = element.getAttribute("data-element") || "";
+      const at = name.lastIndexOf("~");
+      if (!action || at < 0) return false;
+      this.send({ event: "accessibility_action", target: name.slice(0, at), element: name.slice(at + 1), action });
+      return true;
+    };
+    const virtualOf = (target) => {
+      const element = target && target.closest ? target.closest("[data-element][data-actions]") : null;
+      return element && this.root.contains(element) ? element : null;
+    };
+    const activate = (element) => act(element, ["invoke", "toggle", "select", element.getAttribute("aria-expanded") === "true" ? "collapse" : "expand"]);
     on("click", (event) => {
+      const virtual = virtualOf(event.target);
+      if (virtual) { activate(virtual); return; }
       const found = this.keyOf(event.target);
       if (!found) return;
       const name = found.element.localName;
       if (name === "input" || name === "select" || name === "textarea") return;
       if (name === "a" && found.element.getAttribute("href") === "#") event.preventDefault();
       this.send({ event: "click", target: found.key });
+    });
+    on("keydown", (event) => {
+      const virtual = virtualOf(event.target);
+      if (!virtual) return;
+      const handled = event.key === "Enter" || event.key === " " ? activate(virtual)
+        : event.key === "ArrowUp" || event.key === "ArrowRight" ? act(virtual, ["increment"])
+        : event.key === "ArrowDown" || event.key === "ArrowLeft" ? act(virtual, ["decrement"])
+        : false;
+      if (handled) event.preventDefault();
     });
     on("input", (event) => {
       const found = this.keyOf(event.target);
@@ -2723,6 +2762,15 @@ if (typeof PerformanceObserver !== "undefined" && typeof document !== "undefined
 /// The page's user-centric metrics so far: largest contentful paint,
 /// cumulative layout shift, interaction to next paint (all in
 /// milliseconds but the shift), and when its islands were ready.
+/// Changes theme tokens in place, as a theme or scheme change does on the
+/// native backends: every element reading one restyles, none is re-rendered,
+/// and nothing reloads. `tokens` maps a token name (`color-blue-500`) to its
+/// new CSS value.
+export function applyTokens(tokens) {
+  const style = document.documentElement.style;
+  for (const [name, value] of Object.entries(tokens)) style.setProperty(`--${name}`, String(value));
+}
+
 export function metrics() {
   return { ...vitals };
 }

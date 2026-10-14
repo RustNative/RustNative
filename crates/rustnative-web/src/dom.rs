@@ -159,6 +159,24 @@ fn native_role(tag: &str, input_type: Option<&str>, size: bool) -> Accessibility
     }
 }
 
+/// An accessible action's name on the wire (`data-actions`, and the
+/// `accessibility_action` event a server-interactive session receives).
+const fn action_name(kind: rustnative_core::AccessibleActionKind) -> &'static str {
+    use rustnative_core::AccessibleActionKind as Kind;
+    match kind {
+        Kind::Invoke => "invoke",
+        Kind::Increment => "increment",
+        Kind::Decrement => "decrement",
+        Kind::Expand => "expand",
+        Kind::Collapse => "collapse",
+        Kind::Toggle => "toggle",
+        Kind::Select => "select",
+        Kind::SetValue => "set_value",
+        Kind::ScrollIntoView => "scroll_into_view",
+        Kind::Focus => "focus",
+    }
+}
+
 /// A role's ARIA name, for an element whose own role differs.
 const fn aria_role(role: AccessibilityRole) -> Option<&'static str> {
     Some(match role {
@@ -957,6 +975,12 @@ impl<'a> Realizer<'a> {
         if let Some(expanded) = info.expanded_state() {
             out = out.attr("aria-expanded", expanded.to_string());
         }
+        let actions: Vec<&str> = info.actions().map(action_name).collect();
+        if !actions.is_empty() {
+            // What a server-interactive session answers when assistive
+            // technology activates the element (`rn.js`, `LiveIsland`).
+            out = out.attr("data-actions", actions.join(" ")).attr("tabindex", "-1");
+        }
         for child in info.elements() {
             out = out.child(Self::virtual_element(owner, child));
         }
@@ -1247,6 +1271,27 @@ mod tests {
         assert_eq!(cell.get("role"), Some("cell"));
         assert_eq!(cell.get("aria-label"), Some("Costs 0.8M"));
         assert_eq!(cell.get("data-element"), Some("chart~costs"));
+        assert_eq!(cell.get("data-actions"), None, "an element with no actions declares none");
+
+        let bar = VirtualElement::new(
+            "q1",
+            AccessibilityInfo::new(AccessibilityRole::Button)
+                .name("Q1")
+                .action(rustnative_core::AccessibleActionKind::Invoke)
+                .action(rustnative_core::AccessibleActionKind::Increment),
+            rustnative_core::Rect::new(0, 0, 10, 10),
+        );
+        let chart = Node::column("chart", [])
+            .with_accessibility(AccessibilityInfo::new(AccessibilityRole::Canvas).element(bar));
+        let (element, _) = realize(&chart);
+        let Some(Child::Element(tree)) = element.children.last() else { panic!("the tree") };
+        let Child::Element(bar) = &tree.children[0] else { panic!("the bar") };
+        assert_eq!(bar.get("data-actions"), Some("invoke increment"));
+        assert_eq!(
+            bar.get("tabindex"),
+            Some("-1"),
+            "focusable by assistive technology, no tab stop"
+        );
     }
 
     #[test]

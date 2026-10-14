@@ -72,6 +72,19 @@ are the most likely place for a third member to share a host-level
 algorithm (menu diffing against a live native menu, say) with one of the
 other two.
 
+**The Web, decided (2026-10-14, recorded by the 2026-10-12 review).** The
+browser is the only host that realizes the tree as DOM and CSS and runs the
+client in JavaScript; no other target shares its runtime, its event model, or
+its styling language. What it shares with other targets is already shared in
+place: the portable model in `rustnative-core`, the style vocabulary and the
+class-name hash in `rustnative-style` (`rustnative_style::web`, which the
+compile-time JavaScript generator also uses), and the server it is served by.
+The Web's own crates (`rustnative-web`, `rustnative-webgen`,
+`rustnative-web-macros`, `rustnative-web-testing`) are one backend split by
+build stage, not a group, so no group crate is created. Revisited if a second
+DOM-realizing host appears (an embedded web view realizing the tree itself
+rather than hosting a page).
+
 **Android, decided at its first member (Milestone 35, 2026-10-09).**
 Android is the only member of the Android family: no other host runs its
 framework, its Java host library, or JNI. What it has in common with iOS

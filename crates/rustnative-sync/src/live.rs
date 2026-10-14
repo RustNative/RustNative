@@ -70,6 +70,51 @@ pub enum WireEvent {
         /// One past the last.
         last_exclusive: usize,
     },
+    /// Assistive technology activated one of a node's virtual elements (a
+    /// chart's bar).
+    AccessibilityAction {
+        /// The node's wire key.
+        target: String,
+        /// The element's key within it.
+        element: String,
+        /// What was asked: `invoke`, `toggle`, `select`, `expand`,
+        /// `collapse`, `increment`, `decrement`, `scroll_into_view`, or `focus`.
+        action: String,
+    },
+}
+
+/// An action's wire name, and the action a wire name stands for — the
+/// actions with no payload, the ones a browser element can be activated with.
+fn action_from_name(name: &str) -> Option<rustnative_core::AccessibleAction> {
+    use rustnative_core::AccessibleAction as Action;
+    Some(match name {
+        "invoke" => Action::Invoke,
+        "increment" => Action::Increment,
+        "decrement" => Action::Decrement,
+        "expand" => Action::Expand,
+        "collapse" => Action::Collapse,
+        "toggle" => Action::Toggle,
+        "select" => Action::Select,
+        "scroll_into_view" => Action::ScrollIntoView,
+        "focus" => Action::Focus,
+        _ => return None,
+    })
+}
+
+fn action_name(action: &rustnative_core::AccessibleAction) -> Option<&'static str> {
+    use rustnative_core::AccessibleAction as Action;
+    Some(match action {
+        Action::Invoke => "invoke",
+        Action::Increment => "increment",
+        Action::Decrement => "decrement",
+        Action::Expand => "expand",
+        Action::Collapse => "collapse",
+        Action::Toggle => "toggle",
+        Action::Select => "select",
+        Action::ScrollIntoView => "scroll_into_view",
+        Action::Focus => "focus",
+        Action::SetValue(_) | Action::SetRangeValue(_) => return None,
+    })
 }
 
 impl WireEvent {
@@ -91,14 +136,21 @@ impl WireEvent {
                 first: range.first,
                 last_exclusive: range.last_exclusive,
             },
+            Event::AccessibilityAction { target, element: Some(element), action } => {
+                Self::AccessibilityAction {
+                    target: key(*target),
+                    element: element.local_key()?,
+                    action: action_name(action)?.to_owned(),
+                }
+            }
             _ => return None,
         })
     }
 
-    /// The server-side event.
+    /// The server-side event; `None` for an action this side does not know.
     #[must_use]
-    pub fn into_event(self) -> Event {
-        match self {
+    pub fn into_event(self) -> Option<Event> {
+        Some(match self {
             Self::Click { target } => Event::Click { target: node_id(&target) },
             Self::TextChanged { target, value } => {
                 Event::TextChanged { target: node_id(&target), value }
@@ -113,7 +165,13 @@ impl WireEvent {
                     range: rustnative_core::VirtualRange { first, last_exclusive },
                 }
             }
-        }
+            Self::AccessibilityAction { target, element, action } => Event::AccessibilityAction {
+                target: node_id(&target),
+                // A virtual element's id is its key, unscoped.
+                element: Some(rustnative_core::NodeId::from_key(&element)),
+                action: action_from_name(&action)?,
+            },
+        })
     }
 }
 
@@ -330,7 +388,11 @@ fn run_session<A: LiveApp>(app: &A, snapshot: Option<Value>, commands: &mpsc::Re
             Ok(Command::Event(event, sequence)) => {
                 // Events are resent after a reconnect; each is applied once.
                 if sequence > acknowledged {
-                    tree.dispatch(event.into_event());
+                    // An action this side does not know is acknowledged and
+                    // dropped, so the client stops resending it.
+                    if let Some(event) = event.into_event() {
+                        tree.dispatch(event);
+                    }
                     acknowledged = sequence;
                 }
             }

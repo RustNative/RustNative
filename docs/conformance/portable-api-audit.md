@@ -37,3 +37,18 @@ Still Windows-shaped, recorded so the next backend does not rediscover it:
   as an escape hatch; each backend documents what the number means.
 - `Theme::default()` names a font family (`system-ui`) that each backend
   resolves to its own UI font.
+
+## 3. What the backends after Windows needed
+
+Each later backend was checked against the portable API before it was called
+done; what it needed went into the core, platform-free.
+
+| Backend | Needed in the portable API | Where |
+|---|---|---|
+| Linux (Milestone 34) | nothing beyond display-server capabilities: `WindowPlacement`, `ServerSideDecorations`, `GlobalMenuBar` | `rustnative-core/src/capability.rs` |
+| Android (Milestone 35) | the `BACK` command and `Event::BackProgress`, `Event::ShareReceived`, widget, tile, and ongoing-activity surface commands | `rustnative-core/tests/back.rs` |
+| Web (milestones A–K) | capabilities for what a browser offers a page: `Http`, `WebSocket`, `IndexedStorage`, `OfflineCache`, `FileSystemAccess`, `Microphone`, `Sensors`, `Downloads`, `History`, `BackgroundWorkers`, `ServiceWorker`, `Installable`; tasks that need not be `Send` (above); declarations kept unresolved so the browser resolves them itself (`ComponentTree::unresolved_view`) | `rustnative-core/src/capability.rs`; `rustnative-web/tests/runtime.rs` |
+
+The Web also showed that no portable type named a Windows concept the browser
+could not answer: physical edges, host settings, and shortcuts had already
+been made logical, typed, and declared by section 2.

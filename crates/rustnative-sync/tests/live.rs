@@ -232,7 +232,7 @@ fn a_scrolled_virtual_list_reaches_the_server_as_its_range() {
         "event": "visible_range_changed", "target": "rows", "first": 40, "last_exclusive": 62,
     }))
     .unwrap();
-    let event = wire.clone().into_event();
+    let event = wire.clone().into_event().unwrap();
     assert_eq!(
         event,
         Event::VisibleRangeChanged {
@@ -258,4 +258,29 @@ async fn sessions_stop_at_the_ceiling_and_a_reconnect_still_gets_in() {
     until("the first reconnects", || first.is_connected() && label(&first, "count").is_some())
         .await;
     assert_eq!(server.sessions(), 1, "its own session, not a new one");
+}
+
+#[test]
+fn a_virtual_elements_action_reaches_the_server() {
+    use rustnative_core::AccessibleAction;
+    use rustnative_sync::live::WireEvent;
+    let wire: WireEvent = serde_json::from_value(json!({
+        "event": "accessibility_action", "target": "chart", "element": "q2", "action": "invoke",
+    }))
+    .unwrap();
+    let event = wire.clone().into_event().unwrap();
+    assert_eq!(
+        event,
+        Event::AccessibilityAction {
+            target: NodeId::from_key("chart"),
+            element: Some(NodeId::from_key("q2")),
+            action: AccessibleAction::Invoke,
+        }
+    );
+    assert_eq!(WireEvent::from_event(&event), Some(wire), "and travels back the same");
+    let unknown: WireEvent = serde_json::from_value(json!({
+        "event": "accessibility_action", "target": "chart", "element": "q2", "action": "dance",
+    }))
+    .unwrap();
+    assert_eq!(unknown.into_event(), None, "an action this side does not know is dropped");
 }
