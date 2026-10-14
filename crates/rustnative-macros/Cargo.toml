@@ -23,3 +23,5 @@ proc-macro2 = "1"
 rustnative-style = { workspace = true, features = ["tokens"] }
 quote = "1"
 syn = { version = "2", features = ["full"] }
+# `rustnative.toml`'s `[style]` table: the style file and declared targets.
+toml = "1"

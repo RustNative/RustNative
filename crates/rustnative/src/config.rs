@@ -201,8 +201,24 @@ pub struct Update {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "kebab-case", deny_unknown_fields)]
 pub struct Style {
-    /// The style file, relative to the project.
-    pub file: String,
+    /// The style file, relative to the project (`app.css` when absent).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub file: Option<String>,
+    /// The backends the application is realized on (`targets = ["windows",
+    /// "web"]`): `classes!` and `styles!` reject a property any of them
+    /// cannot realize, whatever machine compiles the project. Without it,
+    /// the native backend of the operating system compiled for is checked.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub targets: Vec<String>,
+}
+
+impl Style {
+    /// Every name `targets` may hold: the shipped backends, then the
+    /// planned ones (accepted, and checked once their tables exist).
+    pub const TARGETS: &'static [&'static str] = &[
+        "windows", "linux", "android", "web", "headless", "macos", "ios", "ipados", "tui",
+        "embedded",
+    ];
 }
 
 /// The `[i18n]` table.
@@ -323,6 +339,14 @@ impl Config {
             "must be a dotted identifier like `com.example.app`",
         )?;
         invalid_if(app.display_name.trim().is_empty(), "app.display-name", "must not be empty")?;
+        if let Some(style) = &self.style {
+            invalid_if(
+                style.targets.iter().any(|target| !Style::TARGETS.contains(&target.as_str())),
+                "style.targets",
+                "names a target that does not exist: the targets are windows, linux, android, \
+                 web, headless, macos, ios, ipados, tui, and embedded",
+            )?;
+        }
         let parts = app.version.split('.').collect::<Vec<_>>();
         invalid_if(
             parts.len() != 3

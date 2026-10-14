@@ -56,27 +56,92 @@ fn error(span: Span, message: &str) -> proc_macro2::TokenStream {
     quote_spanned!(span=> ::core::compile_error!(#message))
 }
 
+/// The `[style]` table of the crate's `rustnative.toml`, if it has one.
+fn style_table() -> Option<toml::Table> {
+    let root = PathBuf::from(std::env::var_os("CARGO_MANIFEST_DIR")?);
+    let text = std::fs::read_to_string(root.join("rustnative.toml")).ok()?;
+    match text.parse::<toml::Table>().ok()?.remove("style")? {
+        toml::Value::Table(table) => Some(table),
+        _ => None,
+    }
+}
+
 /// The project's style file: `[style] file` in `rustnative.toml`, else
 /// `app.css`, beside the crate's manifest.
 fn style_file() -> Option<PathBuf> {
     let root = PathBuf::from(std::env::var_os("CARGO_MANIFEST_DIR")?);
-    let configured = std::fs::read_to_string(root.join("rustnative.toml")).ok().and_then(|text| {
-        let mut in_style = false;
-        for line in text.lines().map(str::trim) {
-            if line.starts_with('[') {
-                in_style = line == "[style]";
-            } else if in_style {
-                if let Some(value) =
-                    line.strip_prefix("file").map(str::trim).and_then(|rest| rest.strip_prefix('='))
-                {
-                    return Some(value.trim().trim_matches('"').to_owned());
-                }
-            }
-        }
-        None
-    });
+    let configured = style_table()
+        .and_then(|table| table.get("file").and_then(toml::Value::as_str).map(str::to_owned));
     let path = root.join(configured.as_deref().unwrap_or("app.css"));
     path.is_file().then_some(path)
+}
+
+/// The backends the project declares it is realized on: `[style] targets`
+/// in `rustnative.toml` (`targets = ["windows", "web"]`), or `None` when it
+/// declares none.
+fn declared_targets() -> Option<Vec<String>> {
+    let table = style_table()?;
+    let targets = table.get("targets")?.as_array()?;
+    Some(
+        targets
+            .iter()
+            .filter_map(toml::Value::as_str)
+            .map(str::to_ascii_lowercase)
+            .filter(|item| !item.is_empty())
+            .collect(),
+    )
+}
+
+/// Targets with a shipped backend and capability table.
+const SHIPPED_TARGETS: &[&str] = &["windows", "linux", "android", "web", "headless"];
+
+/// Targets on the roadmap with no backend yet: accepted in `[style]
+/// targets` and checked once their tables exist.
+const PLANNED_TARGETS: &[&str] = &["macos", "ios", "ipados", "tui", "embedded"];
+
+/// One backend a style is checked against: its table, the operating system
+/// whose `cfg` the error is emitted under (`None`: unconditionally, for a
+/// declared target), and the table's constant name for the message.
+type CheckedTarget = (rustnative_style::StyleCapabilities, Option<&'static str>, String);
+
+/// The backends to check a style against, given the project's declared
+/// targets: exactly those (the planned ones have no table yet), or — when
+/// none are declared — the native backend of the OS compiled for.
+fn checked_targets(declared: Option<&[String]>) -> Result<Vec<CheckedTarget>, String> {
+    let Some(declared) = declared else {
+        return Ok(vec![
+            (WINDOWS, Some("windows"), "WINDOWS".to_owned()),
+            (LINUX, Some("linux"), "LINUX".to_owned()),
+            (ANDROID, Some("android"), "ANDROID".to_owned()),
+        ]);
+    };
+    if let Some(unknown) = declared
+        .iter()
+        .find(|target| table_for(target).is_none() && !PLANNED_TARGETS.contains(&target.as_str()))
+    {
+        return Err(format!(
+            "`[style] targets` in rustnative.toml names `{unknown}`, which is not a target; \
+             the targets are {}",
+            SHIPPED_TARGETS.iter().chain(PLANNED_TARGETS).copied().collect::<Vec<_>>().join(", ")
+        ));
+    }
+    Ok(declared
+        .iter()
+        .filter_map(|target| table_for(target))
+        .map(|table| (table, None, table.backend.to_ascii_uppercase()))
+        .collect())
+}
+
+/// The capability table of the backend named `target`, if one is shipped.
+fn table_for(target: &str) -> Option<rustnative_style::StyleCapabilities> {
+    match target {
+        "windows" => Some(WINDOWS),
+        "linux" => Some(LINUX),
+        "android" => Some(ANDROID),
+        "web" => Some(rustnative_style::WEB),
+        "headless" => Some(rustnative_style::HEADLESS),
+        _ => None,
+    }
 }
 
 type Cache = HashMap<PathBuf, (Option<SystemTime>, Result<Vocabulary, String>)>;
@@ -164,28 +229,36 @@ fn style_macro(input: proc_macro2::TokenStream, kind: Kind) -> proc_macro2::Toke
             std::iter::repeat_n(piece.clone(), count)
         })
         .collect();
-    // One native backend per operating system today, so the target OS
-    // selects the table; the error is emitted under that OS's `cfg`, which
-    // the *application's* build evaluates.
-    let targets = [
-        (WINDOWS, "windows", "WINDOWS"),
-        (LINUX, "linux", "LINUX"),
-        (ANDROID, "android", "ANDROID"),
-    ];
+    // Which backends to check against. A project that declares its targets
+    // (`[style] targets` in `rustnative.toml`) is checked against exactly
+    // those, whatever machine compiles it — a server-rendered web project
+    // built on Windows is a web project, not a Windows one. A project that
+    // declares none is checked against the native backend of the operating
+    // system it is compiled for: the error is emitted under that OS's
+    // `cfg`, which the *application's* build evaluates.
+    let targets = match checked_targets(declared_targets().as_deref()) {
+        Ok(targets) => targets,
+        Err(message) => return error(span, &message),
+    };
     let unavailable = pieces.iter().flat_map(|piece| {
         let declarations = resolve(piece).unwrap_or_default();
+        let targets = &targets;
         declarations.into_iter().flat_map(move |declaration| {
             let property = declaration.declaration.property;
             // "No shadow" is realized by every backend.
             let nothing = matches!(&declaration.declaration.value, StyleValue::Shadow(layers) if layers.is_empty());
-            targets.into_iter().filter_map(move |(table, os, name)| match table.support(property) {
+            targets.iter().filter_map(move |(table, os, name)| match table.support(property) {
                 StyleSupport::Unavailable(reason) if !nothing => {
                     let message = format!(
                         "`{piece}` sets `{property}`, which the {} backend cannot realize: {reason} \
                          (its capability table, `rustnative_style::{name}`)",
                         table.backend
                     );
-                    Some(quote_spanned!(span=> #[cfg(target_os = #os)] ::core::compile_error!(#message);))
+                    Some(if let Some(os) = os {
+                        quote_spanned!(span=> #[cfg(target_os = #os)] ::core::compile_error!(#message);)
+                    } else {
+                        quote_spanned!(span=> ::core::compile_error!(#message);)
+                    })
                 }
                 _ => None,
             })
@@ -198,7 +271,18 @@ fn style_macro(input: proc_macro2::TokenStream, kind: Kind) -> proc_macro2::Toke
             const _: &str = ::core::include_str!(#path);
         )
     });
-    let prelude = quote_spanned!(span=> #tracking #(#unavailable)*);
+    // The declared targets decide what fails to build, so a change to them
+    // must rebuild what uses the macro.
+    let manifest_tracking = std::env::var_os("CARGO_MANIFEST_DIR")
+        .map(|root| PathBuf::from(root).join("rustnative.toml"))
+        .filter(|path| path.is_file())
+        .map(|path| {
+            let path = path.display().to_string();
+            quote!(
+                const _: &str = ::core::include_str!(#path);
+            )
+        });
+    let prelude = quote_spanned!(span=> #tracking #manifest_tracking #(#unavailable)*);
     rustnative_style::tokens::declaration_set(
         &declarations,
         &sources,
@@ -206,4 +290,53 @@ fn style_macro(input: proc_macro2::TokenStream, kind: Kind) -> proc_macro2::Toke
         &quote!(::rustnative_core),
         &prelude,
     )
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn names(targets: &[CheckedTarget]) -> Vec<(&'static str, Option<&'static str>)> {
+        targets.iter().map(|(table, os, _)| (table.backend, *os)).collect()
+    }
+
+    #[test]
+    fn a_declared_web_project_is_checked_against_the_web_alone_on_any_machine() {
+        let declared = vec!["web".to_owned()];
+        let targets = checked_targets(Some(&declared)).unwrap();
+        assert_eq!(names(&targets), [("Web", None)]);
+        // The Web realizes shadows, so nothing fails — even compiled on
+        // Windows, whose table would refuse them.
+        assert!(matches!(
+            targets[0].0.support(rustnative_style::StyleProperty::Shadow),
+            StyleSupport::Realized
+        ));
+    }
+
+    #[test]
+    fn declared_native_targets_fail_wherever_the_project_compiles() {
+        let declared = vec!["windows".to_owned(), "android".to_owned(), "ipados".to_owned()];
+        let targets = checked_targets(Some(&declared)).unwrap();
+        assert_eq!(
+            names(&targets),
+            [("Windows", None), ("Android", None)],
+            "ipados has no table yet"
+        );
+    }
+
+    #[test]
+    fn without_declared_targets_the_compiled_for_os_is_checked() {
+        let targets = checked_targets(None).unwrap();
+        assert_eq!(
+            names(&targets),
+            [("Windows", Some("windows")), ("Linux", Some("linux")), ("Android", Some("android"))]
+        );
+    }
+
+    #[test]
+    fn an_unknown_target_is_refused_by_name() {
+        let declared = vec!["mars".to_owned()];
+        let message = checked_targets(Some(&declared)).unwrap_err();
+        assert!(message.contains("`mars`") && message.contains("windows"), "{message}");
+    }
 }
