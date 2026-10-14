@@ -46,7 +46,17 @@ for serial in $serials; do
     accessibility="$(adb -s "$serial" shell settings get secure accessibility_enabled | tr -d '\r')"
     adb -s "$serial" shell svc power stayon usb
     log="$(mktemp)"
-    adb -s "$serial" shell am instrument -r -w -e filter "'$filter'" "$runner" > "$log" 2>&1
+    # A run takes a few minutes; an emulator whose graphics stall can leave
+    # `am instrument -w` waiting forever. Bound it, say which test it stopped
+    # in, and give a stalled run one more try.
+    for attempt in 1 2; do
+        timeout 600 adb -s "$serial" shell am instrument -r -w -e filter "'$filter'" "$runner" > "$log" 2>&1
+        code=$?
+        [ "$code" -ne 124 ] && break
+        last="$(grep '^INSTRUMENTATION_STATUS: test=' "$log" | tail -1 | cut -d= -f2-)"
+        echo "android-device-test: the run stalled for 10 minutes (attempt $attempt) in ${last:-its first test}" >&2
+        adb -s "$serial" shell am force-stop "${runner%%/*}" > /dev/null 2>&1
+    done
     adb -s "$serial" shell settings put global stay_on_while_plugged_in "${stay_on:-0}"
     # The accessibility suite starts TalkBack and restores it; a run that
     # crashed partway cannot, so the services the device had are put back.
