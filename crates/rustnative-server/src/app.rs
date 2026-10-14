@@ -360,9 +360,9 @@ impl AppService {
             return fail(ServerError::not_found());
         }
 
+        let address = app.security.client_address(client.map(|peer| peer.ip()), &parts.headers);
         if let Some(limit) = app.security.rate_limit {
-            let key =
-                client.map_or_else(|| "unknown".to_owned(), |address| address.ip().to_string());
+            let key = address.map_or_else(|| "unknown".to_owned(), |address| address.to_string());
             if let Err(wait) = self.0.limiter.take(&key, limit) {
                 let mut response =
                     fail(ServerError::new(StatusCode::TOO_MANY_REQUESTS, "Too many requests"));
@@ -439,6 +439,7 @@ impl AppService {
             values: TypeMap::default(),
             scope: scope.clone(),
             client,
+            address,
         };
         let existing = context.cookie(CSRF_COOKIE).map(str::to_owned);
         let issued = existing.is_none();
@@ -471,7 +472,9 @@ impl AppService {
         let cache_key = (context.method == Method::GET && router.access == "public")
             .then_some(router.cache)
             .flatten()
-            .map(|(tags, ttl)| (format!("{}?{}", context.path, context.query), tags, ttl));
+            .map(|(tags, ttl)| {
+                (crate::cache::key(&context.path, &context.query, &context.headers), tags, ttl)
+            });
         let after_context = RequestContext {
             method: context.method.clone(),
             path: context.path.clone(),
@@ -484,6 +487,7 @@ impl AppService {
             values: context.values.clone(),
             scope: scope.clone(),
             client,
+            address,
         };
         let guard = ScopeGuard(scope);
         let cached = cache_key.as_ref().and_then(|(key, _, _)| app.cache.get(key));

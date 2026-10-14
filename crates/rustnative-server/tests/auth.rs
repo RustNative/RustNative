@@ -143,6 +143,91 @@ fn the_route_listing_names_each_routes_access() {
     assert_eq!(access, ["signed in", "admins"]);
 }
 
+fn session_service(sessions: Sessions) -> AppService {
+    let (before, after) = sessions.middleware();
+    ServerApp::new()
+        .before(before)
+        .after(after)
+        .before(Authentication::<User>::sessions().middleware())
+        .route("/sign-in", post(sign_in).csrf_exempt().public())
+        .route("/me", get(me).signed_in::<User>())
+        .into_service()
+}
+
+fn session_cookie(response: &http::Response<Bytes>) -> Option<String> {
+    response
+        .headers()
+        .get_all("set-cookie")
+        .iter()
+        .map(|value| value.to_str().unwrap())
+        .find(|value| value.starts_with("__Host-session="))
+        .map(|value| value.split(';').next().unwrap().to_owned())
+}
+
+#[tokio::test]
+async fn a_rotated_key_keeps_sessions_and_reseals_them() {
+    let old = Sessions::new(&Secret::new([1; 32]), Duration::from_secs(3600));
+    let signed_in = session_service(old)
+        .handle(Request::post("/sign-in").body(Bytes::new()).unwrap(), None)
+        .await;
+    let cookie = session_cookie(&signed_in).unwrap();
+
+    let rotated = Sessions::new(&Secret::new([2; 32]), Duration::from_secs(3600))
+        .with_previous_keys(&[Secret::new([1; 32])]);
+    let service = session_service(rotated);
+    let answered = get_with(&service, "/me", Some(("cookie", cookie.clone()))).await;
+    assert_eq!(answered.status(), StatusCode::OK, "the old key's session still opens");
+    let resealed = session_cookie(&answered).expect("resealed with the current key");
+    assert_ne!(resealed, cookie);
+
+    let without_old =
+        session_service(Sessions::new(&Secret::new([2; 32]), Duration::from_secs(3600)));
+    assert_eq!(
+        get_with(&without_old, "/me", Some(("cookie", cookie))).await.status(),
+        StatusCode::UNAUTHORIZED
+    );
+    assert_eq!(
+        get_with(&without_old, "/me", Some(("cookie", resealed))).await.status(),
+        StatusCode::OK
+    );
+}
+
+#[tokio::test]
+async fn a_revoked_session_opens_as_none() {
+    let revoked = std::sync::Arc::new(std::sync::Mutex::new(Vec::<String>::new()));
+    let check = revoked.clone();
+    let sessions = Sessions::new(&Secret::new([3; 32]), Duration::from_secs(3600))
+        .with_revocation(std::sync::Arc::new(move |info| check.lock().unwrap().contains(&info.id)));
+    let service = session_service(sessions);
+    let signed_in =
+        service.handle(Request::post("/sign-in").body(Bytes::new()).unwrap(), None).await;
+    let cookie = session_cookie(&signed_in).unwrap();
+    assert_eq!(
+        get_with(&service, "/me", Some(("cookie", cookie.clone()))).await.status(),
+        StatusCode::OK
+    );
+
+    // Revoke every session there is: the record names ids, which only the
+    // server could learn from a cookie it opened.
+    let id = {
+        let probe = Sessions::new(&Secret::new([3; 32]), Duration::from_secs(3600))
+            .with_revocation(std::sync::Arc::new({
+                let revoked = revoked.clone();
+                move |info| {
+                    revoked.lock().unwrap().push(info.id.clone());
+                    false
+                }
+            }));
+        let _ = get_with(&session_service(probe), "/me", Some(("cookie", cookie.clone()))).await;
+        revoked.lock().unwrap().last().cloned().unwrap()
+    };
+    assert!(!id.is_empty());
+    assert_eq!(
+        get_with(&service, "/me", Some(("cookie", cookie))).await.status(),
+        StatusCode::UNAUTHORIZED
+    );
+}
+
 // --- Passkeys ------------------------------------------------------------
 
 fn cbor_head(major: u8, value: usize) -> Vec<u8> {
@@ -195,9 +280,10 @@ fn a_passkey_registers_then_signs_in_once_per_counter() {
     let point = key.verifying_key().to_encoded_point(false);
     let passkeys = Passkeys::new("example.com", "https://example.com");
 
-    // Registration: authData with the attested credential and its COSE key.
-    let challenge = Passkeys::challenge();
-    let mut registration = auth_data(0x41, 0);
+    // Registration: authData with the attested credential and its COSE key
+    // (flags: present, verified, attested).
+    let challenge = passkeys.challenge();
+    let mut registration = auth_data(0x45, 0);
     registration.extend_from_slice(&[0; 16]); // AAGUID
     registration.extend_from_slice(&[0, 4]);
     registration.extend_from_slice(b"cred");
@@ -230,26 +316,67 @@ fn a_passkey_registers_then_signs_in_once_per_counter() {
     );
 
     // Sign-in.
-    let sign = |count: u32, challenge: &str| {
-        let data = auth_data(0x01, count);
+    let sign = |flags: u8, count: u32, challenge: &str| {
+        let data = auth_data(flags, count);
         let client = client_data("webauthn.get", challenge);
         let mut signed = data.clone();
         signed.extend_from_slice(&Sha256::digest(&client));
         let signature: DerSignature = key.sign(&signed);
         (client, data, signature.as_bytes().to_vec())
     };
-    let challenge = Passkeys::challenge();
-    let (client, data, signature) = sign(1, &challenge);
+    let challenge = passkeys.challenge();
+    let (client, data, signature) = sign(0x05, 1, &challenge);
     passkeys.verify(&mut credential, &client, &data, &signature, &challenge).unwrap();
     assert_eq!(credential.sign_count, 1);
     assert!(
         passkeys.verify(&mut credential, &client, &data, &signature, &challenge).is_err(),
-        "a replayed assertion (the counter did not move)"
+        "a replayed assertion"
     );
-    let (client, data, mut signature) = sign(2, &challenge);
+    let challenge = passkeys.challenge();
+    let (client, data, signature) = sign(0x05, 1, &challenge);
+    assert!(
+        passkeys.verify(&mut credential, &client, &data, &signature, &challenge).is_err(),
+        "a counter that did not move"
+    );
+    let challenge = passkeys.challenge();
+    let (client, data, mut signature) = sign(0x05, 2, &challenge);
     let last = signature.len() - 1;
     signature[last] ^= 1;
     assert!(passkeys.verify(&mut credential, &client, &data, &signature, &challenge).is_err());
+    let challenge = passkeys.challenge();
+    let (client, data, signature) = sign(0x01, 3, &challenge);
+    assert!(
+        passkeys.verify(&mut credential, &client, &data, &signature, &challenge).is_err(),
+        "present but not verified"
+    );
+}
+
+#[test]
+fn a_synced_passkey_s_assertion_cannot_be_replayed() {
+    // A synced passkey reports a zero counter every time, so only the
+    // server's record of issued challenges stops a replay — however the
+    // client kept its session.
+    let key = SigningKey::from_slice(&[5; 32]).unwrap();
+    let point = key.verifying_key().to_encoded_point(false);
+    let passkeys = Passkeys::new("example.com", "https://example.com");
+    let mut credential = rustnative_server::auth::passkey::Credential {
+        id: b"synced".to_vec(),
+        public_key: point.as_bytes().to_vec(),
+        sign_count: 0,
+    };
+    let challenge = passkeys.challenge();
+    let data = auth_data(0x05, 0);
+    let client = client_data("webauthn.get", &challenge);
+    let mut signed = data.clone();
+    signed.extend_from_slice(&Sha256::digest(&client));
+    let signature: DerSignature = key.sign(&signed);
+    let signature = signature.as_bytes().to_vec();
+    passkeys.verify(&mut credential, &client, &data, &signature, &challenge).unwrap();
+    assert!(passkeys.verify(&mut credential, &client, &data, &signature, &challenge).is_err());
+    assert!(
+        passkeys.verify(&mut credential, &client, &data, &signature, "never-issued").is_err(),
+        "a challenge the server did not issue"
+    );
 }
 
 // --- Federation -------------------------------------------------------------

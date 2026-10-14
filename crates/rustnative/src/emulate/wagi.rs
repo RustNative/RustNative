@@ -684,6 +684,9 @@ fn cgi_env(
         format!("RUSTNATIVE_LIMIT_RESPONSE_BYTES={}", options.response_bytes),
         format!("RUSTNATIVE_LIMIT_FUEL={}", options.fuel_for(request.path())),
     ];
+    if let Some(peer) = request.peer {
+        env.push(format!("REMOTE_ADDR={}", peer.ip()));
+    }
     for (name, value) in &request.headers {
         if name == "content-type" || name == "content-length" {
             continue;

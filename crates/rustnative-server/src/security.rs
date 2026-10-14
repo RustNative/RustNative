@@ -47,6 +47,14 @@ pub struct Security {
     /// `Permissions-Policy`; every other powerful feature stays closed
     /// (`C69-1`).
     pub capabilities: Vec<rustnative_core::Capability>,
+    /// The proxies whose `X-Forwarded-For` is believed (default: loopback,
+    /// so a proxy on the same machine — `rustnative deploy local`, a local
+    /// nginx — is). A request arriving from one of these is keyed by the
+    /// nearest address in its `X-Forwarded-For` that is not itself a
+    /// trusted proxy; from anywhere else, by its peer address, so a client
+    /// cannot choose its own rate-limit bucket. Add the load balancer's
+    /// addresses when the server runs behind one.
+    pub trusted_proxies: Vec<std::net::IpAddr>,
 }
 
 impl Default for Security {
@@ -58,7 +66,42 @@ impl Default for Security {
             hsts: true,
             cross_origin_isolation: false,
             capabilities: Vec::new(),
+            trusted_proxies: vec![
+                std::net::IpAddr::V4(std::net::Ipv4Addr::LOCALHOST),
+                std::net::IpAddr::V6(std::net::Ipv6Addr::LOCALHOST),
+            ],
         }
+    }
+}
+
+impl Security {
+    /// The client a request came from: the peer, or — when the peer is a
+    /// trusted proxy — the nearest untrusted address it forwarded. `None`
+    /// when the host told the application nothing about the peer.
+    #[must_use]
+    pub fn client_address(
+        &self,
+        peer: Option<std::net::IpAddr>,
+        headers: &HeaderMap,
+    ) -> Option<std::net::IpAddr> {
+        let peer = peer?;
+        if !self.trusted_proxies.contains(&peer) {
+            return Some(peer);
+        }
+        let forwarded = headers
+            .get_all("x-forwarded-for")
+            .iter()
+            .filter_map(|value| value.to_str().ok())
+            .flat_map(|value| value.split(','))
+            .filter_map(|part| part.trim().parse::<std::net::IpAddr>().ok())
+            .collect::<Vec<_>>();
+        Some(
+            forwarded
+                .into_iter()
+                .rev()
+                .find(|address| !self.trusted_proxies.contains(address))
+                .unwrap_or(peer),
+        )
     }
 }
 
@@ -94,14 +137,19 @@ pub(crate) fn is_unsafe(method: &Method) -> bool {
 }
 
 /// Double-submit check: an unsafe request must carry the token its cookie
-/// holds, in `X-CSRF-Token` or the form's `_csrf` field. A request
-/// authenticated by a bearer token carries no ambient credential, so it is
-/// not a forgery risk.
+/// holds, in `X-CSRF-Token` or the form's `_csrf` field. A request that
+/// presents a bearer token *and no cookies at all* carries no ambient
+/// credential, so it is not a forgery risk and is exempt; one that also
+/// carries cookies is checked like any other, because a page on another
+/// site can add an `Authorization` header to a credentialed request
+/// wherever cross-origin requests are allowed.
 pub(crate) fn check_csrf(request: &RequestContext) -> Result<(), ServerError> {
     if !is_unsafe(request.method()) {
         return Ok(());
     }
-    if request.header("authorization").is_some_and(|value| value.starts_with("Bearer ")) {
+    if request.header("authorization").is_some_and(|value| value.starts_with("Bearer "))
+        && request.header("cookie").is_none()
+    {
         return Ok(());
     }
     let Some(expected) = request.cookie(CSRF_COOKIE) else {
@@ -292,9 +340,16 @@ impl RateLimiter {
         let now = Instant::now();
         let mut buckets = self.buckets.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
         if buckets.len() > 100_000 {
-            // ponytail: drops every bucket when the table is huge, a brief
-            // amnesty; an LRU keeps the busy ones if that ever matters.
-            buckets.clear();
+            // A bucket that has refilled says nothing a fresh one would not:
+            // drop those, and keep every client still being limited.
+            buckets.retain(|_, (tokens, last)| {
+                *tokens + now.duration_since(*last).as_secs_f64() * rate < capacity
+            });
+            if buckets.len() > 100_000 {
+                // ponytail: past this many clients all mid-limit, a brief
+                // amnesty; a sharded table if that ever matters.
+                buckets.clear();
+            }
         }
         let (tokens, last) = buckets.entry(client.to_owned()).or_insert((capacity, now));
         *tokens = (*tokens + now.duration_since(*last).as_secs_f64() * rate).min(capacity);
@@ -305,5 +360,56 @@ impl RateLimiter {
         } else {
             Err(Duration::from_secs_f64((1.0 - *tokens) / rate))
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::net::IpAddr;
+
+    use super::*;
+
+    fn forwarded(value: &'static str) -> HeaderMap {
+        let mut headers = HeaderMap::new();
+        headers.insert("x-forwarded-for", HeaderValue::from_static(value));
+        headers
+    }
+
+    #[test]
+    fn a_trusted_proxy_s_forwarded_client_keys_the_request() {
+        let security = Security::default();
+        let local: IpAddr = "127.0.0.1".parse().unwrap();
+        let client: IpAddr = "203.0.113.7".parse().unwrap();
+        assert_eq!(security.client_address(Some(local), &forwarded("203.0.113.7")), Some(client));
+        // A spoofed entry on the left is not believed: the nearest
+        // untrusted address is the one the trusted proxy saw.
+        assert_eq!(
+            security.client_address(Some(local), &forwarded("198.51.100.1, 203.0.113.7")),
+            Some(client)
+        );
+    }
+
+    #[test]
+    fn an_untrusted_peer_cannot_choose_its_bucket() {
+        let security = Security::default();
+        let peer: IpAddr = "203.0.113.9".parse().unwrap();
+        assert_eq!(security.client_address(Some(peer), &forwarded("10.0.0.1")), Some(peer));
+        assert_eq!(security.client_address(None, &forwarded("10.0.0.1")), None);
+    }
+
+    #[test]
+    fn refilled_buckets_are_dropped_before_any_amnesty() {
+        let limiter = RateLimiter::default();
+        let limit = (1, Duration::from_secs(3600));
+        assert!(limiter.take("busy", limit).is_ok());
+        assert!(limiter.take("busy", limit).is_err());
+        {
+            let mut buckets = limiter.buckets.lock().unwrap();
+            for index in 0..100_001 {
+                buckets.insert(format!("idle-{index}"), (1.0, Instant::now()));
+            }
+        }
+        assert!(limiter.take("someone", limit).is_ok());
+        assert!(limiter.take("busy", limit).is_err(), "still limited: its bucket was kept");
     }
 }

@@ -41,8 +41,16 @@ pub fn block_on<F: Future>(future: F) -> F::Output {
     builder.enable_time().build().expect("the invocation's runtime").block_on(future)
 }
 
+/// The client address a serverless host reported for a request (the
+/// function runtime's `sourceIp`, WAGI's `REMOTE_ADDR`), carried as a
+/// request extension so [`answer`] keys the rate limit by it rather than
+/// putting every caller in one bucket.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct Peer(pub std::net::SocketAddr);
+
 /// Answers one request: what both shapes do with the request they decoded.
-/// A streamed page is answered whole — neither shape streams.
+/// A streamed page is answered whole — neither shape streams. The client is
+/// the request's [`Peer`] extension, when the host reported one.
 #[must_use]
 pub fn answer(
     service: &AppService,
@@ -50,8 +58,9 @@ pub fn answer(
     limits: HostLimits,
 ) -> crate::Response {
     request.extensions_mut().insert(limits);
+    let client = request.extensions().get::<Peer>().map(|peer| peer.0);
     block_on(async {
-        let response = service.handle(request, None).await;
+        let response = service.handle(request, client).await;
         let stream = response.extensions().get::<Streaming>().and_then(Streaming::take);
         let Some(mut chunks) = stream else { return response };
         let mut body = Vec::new();
@@ -174,7 +183,15 @@ pub mod lambda {
         } else {
             body.as_bytes().to_vec()
         };
-        builder.body(Bytes::from(body)).ok()
+        let mut request = builder.body(Bytes::from(body)).ok()?;
+        if let Some(ip) = http
+            .get("sourceIp")
+            .and_then(Value::as_str)
+            .and_then(|ip| ip.parse::<std::net::IpAddr>().ok())
+        {
+            request.extensions_mut().insert(super::Peer(std::net::SocketAddr::new(ip, 0)));
+        }
+        Some(request)
     }
 
     /// A response as the function runtime returns it.
@@ -355,7 +372,11 @@ pub mod wagi {
         if let Some(kind) = var("CONTENT_TYPE") {
             builder = builder.header("content-type", kind);
         }
-        builder.body(Bytes::from(body)).ok()
+        let mut request = builder.body(Bytes::from(body)).ok()?;
+        if let Some(ip) = var("REMOTE_ADDR").and_then(|ip| ip.parse::<std::net::IpAddr>().ok()) {
+            request.extensions_mut().insert(super::Peer(std::net::SocketAddr::new(ip, 0)));
+        }
+        Some(request)
     }
 
     /// What the host allows this request, as the emulator (or a host that

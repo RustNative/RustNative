@@ -299,11 +299,21 @@ fn a_partial_page_caches_its_shell_and_streams_its_hole() {
     assert!(!shell.html.contains("Hello"));
     assert_eq!(shell.holes, vec!["greeting".to_owned()]);
 
+    // Rendered with no request, the shell's inline style carries the
+    // placeholder — never an empty nonce, which the policy would block —
+    // and each response that sends it carries its own.
+    assert!(shell.html.contains(&format!("nonce=\"{}\"", page::SHELL_NONCE)), "{}", shell.html);
+    assert!(!shell.html.contains("nonce=\"\""));
+
     let mut chunks = Vec::new();
     let rendered = render_streamed(page, &cx("/greet?name=Ada"), Some(&shell), &mut |chunk| {
         chunks.push(chunk);
     });
-    assert!(chunks[0].starts_with(&shell.html), "the cached shell goes first");
+    assert!(
+        chunks[0].starts_with(&shell.html.replace(page::SHELL_NONCE, "n0nce")),
+        "the cached shell goes first, with this response's nonce"
+    );
+    assert!(!chunks[0].contains(page::SHELL_NONCE));
     assert!(chunks.concat().contains(">Hello, Ada</span>"));
     assert!(rendered.dynamic, "the greeting read the request");
 

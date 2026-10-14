@@ -5,15 +5,30 @@
 //! every platform authenticator supports) with `none` attestation (what
 //! passkeys send):
 //!
-//! 1. [`Passkeys::challenge`] makes a single-use challenge; keep it in the
-//!    session and send it to the browser or app.
-//! 2. Registration: [`Passkeys::register`] checks the client data (type,
-//!    challenge, origin), the relying party, and user presence, and returns
+//! 1. [`Passkeys::challenge`] issues a challenge and records it in the
+//!    server's [`ChallengeStore`]; send it to the browser or app.
+//! 2. Registration: [`Passkeys::register`] consumes the challenge, checks
+//!    the client data (type, challenge, origin), the relying party, user
+//!    presence and — unless turned off — user verification, and returns
 //!    the [`Credential`] to store.
-//! 3. Sign-in: [`Passkeys::verify`] checks the same, then the signature
-//!    over `authenticatorData || SHA-256(clientDataJSON)` with the stored
-//!    key, and that the signature counter moved forward (a cloned
-//!    authenticator is refused).
+//! 3. Sign-in: [`Passkeys::verify`] consumes the challenge, checks the
+//!    same, then the signature over `authenticatorData ||
+//!    SHA-256(clientDataJSON)` with the stored key, and that the signature
+//!    counter moved forward (a cloned authenticator is refused).
+//!
+//! **Why the server remembers challenges.** Sessions here are encrypted
+//! cookies the client holds ([`crate::auth::session`]), so a challenge kept
+//! only in the session could be replayed: an attacker holding the
+//! pre-sign-in cookie and one captured assertion would present both again.
+//! The counter does not stop it either — synced passkeys always report
+//! zero. So a challenge is valid once, for a few minutes, as recorded on
+//! the server: [`MemoryChallenges`] for one instance, or any
+//! [`ChallengeStore`] the instances share (a database table) when there are
+//! several.
+
+use std::collections::HashMap;
+use std::sync::{Arc, Mutex, PoisonError};
+use std::time::{Duration, Instant};
 
 use base64::Engine;
 use p256::ecdsa::signature::Verifier;
@@ -44,11 +59,59 @@ impl std::fmt::Display for PasskeyError {
 
 impl std::error::Error for PasskeyError {}
 
-/// The relying party: its id (a domain) and the origin pages come from.
-#[derive(Debug, Clone, PartialEq, Eq)]
+/// Where issued challenges are remembered until used, so each is accepted
+/// once (see the module documentation for why the session cannot hold
+/// them).
+pub trait ChallengeStore: Send + Sync {
+    /// Records `challenge` as issued, valid for `lifetime`.
+    fn issue(&self, challenge: &str, lifetime: Duration);
+    /// Consumes `challenge`: `true` exactly once for an issued, unexpired
+    /// challenge, `false` for anything else.
+    fn take(&self, challenge: &str) -> bool;
+}
+
+/// Challenges remembered in this process — right for one server instance.
+#[derive(Debug, Default)]
+pub struct MemoryChallenges {
+    issued: Mutex<HashMap<String, Instant>>,
+}
+
+impl ChallengeStore for MemoryChallenges {
+    fn issue(&self, challenge: &str, lifetime: Duration) {
+        let now = Instant::now();
+        let mut issued = self.issued.lock().unwrap_or_else(PoisonError::into_inner);
+        // Abandoned ceremonies expire; drop them as new ones start.
+        issued.retain(|_, expires| *expires > now);
+        issued.insert(challenge.to_owned(), now + lifetime);
+    }
+
+    fn take(&self, challenge: &str) -> bool {
+        let mut issued = self.issued.lock().unwrap_or_else(PoisonError::into_inner);
+        issued.remove(challenge).is_some_and(|expires| expires > Instant::now())
+    }
+}
+
+/// The relying party: its id (a domain), the origin pages come from, and
+/// the challenges it has issued.
+#[derive(Clone)]
 pub struct Passkeys {
     rp_id: String,
     origin: String,
+    challenges: Arc<dyn ChallengeStore>,
+    lifetime: Duration,
+    user_verification: bool,
+}
+
+impl std::fmt::Debug for Passkeys {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        formatter
+            .debug_struct("Passkeys")
+            .field("rp_id", &self.rp_id)
+            .field("origin", &self.origin)
+            .field("lifetime", &self.lifetime)
+            .field("user_verification", &self.user_verification)
+            .finish_non_exhaustive()
+    }
 }
 
 #[derive(Deserialize)]
@@ -60,6 +123,7 @@ struct ClientData {
 }
 
 const USER_PRESENT: u8 = 0x01;
+const USER_VERIFIED: u8 = 0x04;
 const ATTESTED: u8 = 0x40;
 
 fn fail<T>(reason: &'static str) -> Result<T, PasskeyError> {
@@ -68,16 +132,44 @@ fn fail<T>(reason: &'static str) -> Result<T, PasskeyError> {
 
 impl Passkeys {
     /// The relying party `rp_id` (`example.com`) serving `origin`
-    /// (`https://example.com`).
+    /// (`https://example.com`), remembering its challenges in this process
+    /// for five minutes each and requiring user verification.
     #[must_use]
     pub fn new(rp_id: impl Into<String>, origin: impl Into<String>) -> Self {
-        Self { rp_id: rp_id.into(), origin: origin.into() }
+        Self {
+            rp_id: rp_id.into(),
+            origin: origin.into(),
+            challenges: Arc::new(MemoryChallenges::default()),
+            lifetime: Duration::from_secs(300),
+            user_verification: true,
+        }
     }
 
-    /// A fresh challenge, base64url, to keep in the session and send.
+    /// Remembers challenges in `store` instead — one every instance shares,
+    /// when there is more than one.
     #[must_use]
-    pub fn challenge() -> String {
-        crate::security::random_token(32)
+    pub fn with_challenge_store(mut self, store: Arc<dyn ChallengeStore>) -> Self {
+        self.challenges = store;
+        self
+    }
+
+    /// Whether a ceremony must show the person was verified (a biometric or
+    /// the device's PIN) rather than merely present. On by default: a
+    /// passkey that is the only factor must be verified. Turn it off only
+    /// where the passkey is a second factor after a password.
+    #[must_use]
+    pub const fn require_user_verification(mut self, required: bool) -> Self {
+        self.user_verification = required;
+        self
+    }
+
+    /// A fresh challenge, base64url, recorded as issued; send it to the
+    /// browser or app. It is accepted by one ceremony, within its lifetime.
+    #[must_use]
+    pub fn challenge(&self) -> String {
+        let challenge = crate::security::random_token(32);
+        self.challenges.issue(&challenge, self.lifetime);
+        challenge
     }
 
     fn check_client(
@@ -97,6 +189,12 @@ impl Passkeys {
         if data.origin != self.origin {
             return fail("origin");
         }
+        // Consumed once the client data agrees, and before anything else is
+        // checked: whatever happens next, this challenge is spent, so a
+        // replayed ceremony fails here.
+        if !self.challenges.take(challenge) {
+            return fail("challenge not issued, already used, or expired");
+        }
         Ok(())
     }
 
@@ -111,6 +209,9 @@ impl Passkeys {
         let flags = auth_data[32];
         if flags & USER_PRESENT == 0 {
             return fail("user not present");
+        }
+        if self.user_verification && flags & USER_VERIFIED == 0 {
+            return fail("user not verified");
         }
         let count =
             u32::from_be_bytes([auth_data[33], auth_data[34], auth_data[35], auth_data[36]]);

@@ -43,6 +43,7 @@ pub struct RequestContext {
     pub(crate) values: TypeMap,
     pub(crate) scope: RequestScope,
     pub(crate) client: Option<SocketAddr>,
+    pub(crate) address: Option<std::net::IpAddr>,
 }
 
 impl RequestContext {
@@ -111,10 +112,19 @@ impl RequestContext {
         &self.scope
     }
 
-    /// The client's address, when served over a socket.
+    /// The peer's address — the client, or the proxy in front of it — when
+    /// the host reported one.
     #[must_use]
     pub const fn client(&self) -> Option<SocketAddr> {
         self.client
+    }
+
+    /// The client's address as [`crate::Security::client_address`] decides
+    /// it: the peer, or the nearest untrusted address a trusted proxy
+    /// forwarded. What the rate limit is keyed by.
+    #[must_use]
+    pub const fn client_address(&self) -> Option<std::net::IpAddr> {
+        self.address
     }
 
     /// Whether the client prefers JSON to HTML.

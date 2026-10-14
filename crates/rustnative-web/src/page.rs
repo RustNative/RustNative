@@ -239,7 +239,18 @@ pub struct PageContext {
     /// A development server's page: the runtime listens for rebuilds
     /// (`/_rn/dev`) and reloads, or shows the build's errors.
     pub dev: bool,
+    /// Rendering a prerendered shell: its inline `<style>` and `<script>`
+    /// carry [`SHELL_NONCE`], which each request's nonce replaces when the
+    /// cached shell is sent.
+    shell: bool,
 }
+
+/// What a prerendered shell's inline elements carry in place of a nonce:
+/// the shell is rendered once with no request, and each response that sends
+/// it substitutes its own CSP nonce, so the cached shell never carries one
+/// visitor's nonce to another and is never blocked by the policy. Text in
+/// the shell is escaped, so the marker cannot open an element of its own.
+pub const SHELL_NONCE: &str = "rn-shell-nonce-placeholder";
 
 impl std::fmt::Debug for PageContext {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -266,6 +277,7 @@ impl PageContext {
             images: None,
             fonts: Vec::new(),
             dev: false,
+            shell: false,
         }
     }
 
@@ -285,7 +297,11 @@ impl PageContext {
     }
 
     fn nonce(&self) -> &str {
-        self.request.as_ref().map_or("", |request| request.nonce.as_str())
+        match &self.request {
+            Some(request) => request.nonce.as_str(),
+            None if self.shell => SHELL_NONCE,
+            None => "",
+        }
     }
 }
 
@@ -649,7 +665,7 @@ fn boundary_ids(render: &ServerRender) -> Vec<(NodeId, String)> {
 /// route's cache.
 #[must_use]
 pub fn prerender_shell(page: &Page, cx: &PageContext) -> Shell {
-    let cx = PageContext { request: None, ..cx.clone() };
+    let cx = PageContext { request: None, shell: true, ..cx.clone() };
     let document = Document { head: page.head.clone(), lang: page.lang.clone(), rtl: page.rtl };
     let mut session = Session::start(&page.build, page.theme.clone(), page.strategy, &cx);
     // The shell is what renders without waiting: whatever a component
@@ -687,7 +703,7 @@ pub fn render_streamed(
     // The shell: sent before anything is awaited.
     let (mut first, mut sent, mut open): (String, BTreeSet<String>, Vec<String>);
     if let Some(shell) = shell {
-        first = shell.html.clone();
+        first = shell.html.replace(SHELL_NONCE, &nonce);
         sent = shell.classes.clone();
         open = shell.holes.clone();
     } else {

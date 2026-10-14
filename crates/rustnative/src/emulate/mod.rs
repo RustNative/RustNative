@@ -31,6 +31,9 @@ pub struct HttpRequest {
     pub headers: Vec<(String, String)>,
     /// The body.
     pub body: Vec<u8>,
+    /// The client's address, which a host hands the function (WAGI's
+    /// `REMOTE_ADDR`, a function runtime's `sourceIp`).
+    pub peer: Option<std::net::SocketAddr>,
 }
 
 impl HttpRequest {
@@ -79,7 +82,7 @@ pub fn read_request(stream: &mut TcpStream) -> Option<HttpRequest> {
         .unwrap_or(0);
     let mut body = vec![0; length.min(64 * 1024 * 1024)];
     stream.read_exact(&mut body).ok()?;
-    Some(HttpRequest { method, target, headers, body })
+    Some(HttpRequest { method, target, headers, body, peer: stream.peer_addr().ok() })
 }
 
 /// Writes a whole response and closes the exchange.

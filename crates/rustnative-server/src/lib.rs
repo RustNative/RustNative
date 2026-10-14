@@ -71,3 +71,19 @@ pub use security::{Cookie, CspNonce, CsrfToken, Security, constant_time_eq, rand
 pub use rustnative_server_macros::query;
 #[doc(hidden)]
 pub use serde;
+
+/// Where the application keeps its state — its database, job queue, and
+/// workflows: `RUSTNATIVE_DATA_DIR`, which every description `rustnative
+/// deploy export` writes sets to a writable volume (or systemd's state
+/// directory), else the working directory.
+///
+/// ```
+/// let database = rustnative_server::data_dir().join("app.db");
+/// # let _ = database;
+/// ```
+#[must_use]
+pub fn data_dir() -> std::path::PathBuf {
+    std::env::var_os("RUSTNATIVE_DATA_DIR")
+        .filter(|value| !value.is_empty())
+        .map_or_else(|| std::path::PathBuf::from("."), std::path::PathBuf::from)
+}

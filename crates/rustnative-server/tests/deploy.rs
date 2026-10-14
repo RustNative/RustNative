@@ -142,6 +142,77 @@ async fn cached_pages_are_reused_until_their_tag_is_invalidated() {
     assert_eq!(renders.load(Ordering::SeqCst), 2);
 }
 
+#[tokio::test]
+async fn a_response_carrying_one_visitor_s_secrets_is_never_replayed_to_another() {
+    // A rendered page is `no-store`: it carries its request's CSP nonce and
+    // request-forgery token. Declaring its route cached must not replay it.
+    let renders = Arc::new(AtomicU32::new(0));
+    let counted = renders.clone();
+    let app = ServerApp::new().route(
+        "/page",
+        get(move || {
+            let renders = counted.clone();
+            async move {
+                let mut response = rustnative_server::Response::new(Bytes::from(format!(
+                    "nonce {}",
+                    renders.fetch_add(1, Ordering::SeqCst)
+                )));
+                response.headers_mut().insert(
+                    http::header::CACHE_CONTROL,
+                    http::HeaderValue::from_static("no-store"),
+                );
+                response
+            }
+        })
+        .public()
+        .cached(&["pages"], Duration::from_secs(60)),
+    );
+    let cache = app.response_cache();
+    let service = app.into_service();
+    for _ in 0..2 {
+        let _ =
+            service.handle(Request::builder().uri("/page").body(Bytes::new()).unwrap(), None).await;
+    }
+    assert_eq!(renders.load(Ordering::SeqCst), 2, "rendered for each visitor");
+    assert!(cache.entries().is_empty());
+}
+
+#[tokio::test]
+async fn cached_responses_vary_by_language() {
+    let app = ServerApp::new().route(
+        "/hello",
+        get(|headers: http::HeaderMap| async move {
+            headers
+                .get("accept-language")
+                .and_then(|value| value.to_str().ok())
+                .unwrap_or("en")
+                .to_owned()
+        })
+        .public()
+        .cached(&["hello"], Duration::from_secs(60)),
+    );
+    let service = app.into_service();
+    let fetch = |language: &'static str| {
+        let service = service.clone();
+        async move {
+            let response = service
+                .handle(
+                    Request::builder()
+                        .uri("/hello")
+                        .header("accept-language", language)
+                        .body(Bytes::new())
+                        .unwrap(),
+                    None,
+                )
+                .await;
+            String::from_utf8(response.body().to_vec()).unwrap()
+        }
+    };
+    assert_eq!(fetch("de").await, "de");
+    assert_eq!(fetch("fr").await, "fr", "not the German visitor's page");
+    assert_eq!(fetch("de").await, "de");
+}
+
 static ASSETS: &[Asset] = &[Asset {
     path: "app.css",
     hashed: "app.2c26b46b.css",
@@ -176,18 +247,31 @@ fn container_descriptions_ask_only_for_what_is_declared() {
     let service = container::Service {
         name: "notes".into(),
         binary: "notes".into(),
+        version: "1.4.2".into(),
         port: 8080,
         environment: vec!["RUSTNATIVE_RESOURCE_DATA".into()],
         resources: vec!["data".into()],
     };
     let dockerfile = container::dockerfile(&service);
     assert!(dockerfile.contains("USER nonroot") && dockerfile.contains("EXPOSE 8080"));
+    assert!(dockerfile.contains("WORKDIR /data") && dockerfile.contains("--chown=nonroot:nonroot"));
     let kubernetes = container::kubernetes(&service);
     assert!(
         kubernetes.contains("readOnlyRootFilesystem: true") && kubernetes.contains("path: /readyz")
     );
     assert!(kubernetes.contains("key: RUSTNATIVE_RESOURCE_DATA"));
-    assert!(container::systemd(&service).contains("DynamicUser=yes"));
+    // The state has somewhere to live, it belongs to one instance, and the
+    // image is the revision it names.
+    assert!(
+        kubernetes.contains("mountPath: /data")
+            && kubernetes.contains("kind: PersistentVolumeClaim")
+    );
+    assert!(kubernetes.contains("replicas: 1") && kubernetes.contains("image: notes:1.4.2"));
+    assert!(!kubernetes.contains(":latest"));
+    let compose = container::compose(&service);
+    assert!(compose.contains("read_only: true") && compose.contains("notes-data:/data"));
+    let systemd = container::systemd(&service);
+    assert!(systemd.contains("DynamicUser=yes") && systemd.contains("StateDirectory=notes"));
 }
 
 #[test]
