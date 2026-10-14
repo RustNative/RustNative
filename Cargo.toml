@@ -10,11 +10,11 @@ edition = "2024"
 rust-version = "1.85"
 license = "MIT OR Apache-2.0"
 description = "A Rust-first, native-control-oriented cross-platform application framework"
-repository = "https://github.com/<org>/RustNative"
-homepage = "https://github.com/<org>/RustNative"
+repository = "https://github.com/RustNative/RustNative"
+homepage = "https://github.com/RustNative/RustNative"
 readme = "README.md"
-keywords = ["gui", "windows", "native", "framework", "ui"]
-categories = ["gui", "os::windows-apis"]
+keywords = ["gui", "native", "cross-platform", "framework", "ui"]
+categories = ["gui"]
 
 [workspace.dependencies]
 # `version` alongside `path` is not redundant: a path-only dependency is a

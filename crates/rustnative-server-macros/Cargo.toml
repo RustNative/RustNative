@@ -8,8 +8,8 @@ description = "Compile-time-checked SQL for Rust Native's server: query!"
 repository.workspace = true
 homepage.workspace = true
 readme.workspace = true
-keywords.workspace = true
-categories.workspace = true
+keywords = ["web", "server", "macros", "framework", "native"]
+categories = ["web-programming::http-server"]
 
 [lib]
 proc-macro = true

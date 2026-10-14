@@ -101,8 +101,14 @@ fn a_new_project_has_a_valid_config_and_is_found_from_inside_it() {
 #[test]
 fn every_platform_without_a_backend_is_refused_by_name() {
     let project = new_project("no-backend");
-    let expected =
-        [("macos", "Milestone 33"), ("ios", "Milestone 36"), ("embedded", "Milestone 37")];
+    let expected = [
+        ("macos", "Milestone 33"),
+        ("ios", "Milestone 36"),
+        ("ipados", "Milestone 70"),
+        ("embedded-linux", "Milestone 37"),
+        ("embedded", "Milestone 37"),
+        ("tui", "Milestone 38"),
+    ];
     for (platform, mention) in expected {
         let output = rustnative()
             .current_dir(&project)

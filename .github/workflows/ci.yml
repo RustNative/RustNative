@@ -7,10 +7,9 @@ name: CI
 # simply excluded from the build. `cargo check`/`cargo test` on Linux only
 # ever validated `rustnative-core` and the small `#[cfg(windows)]`-free
 # surface of `rustnative-windows` (errors, the `Platform` trait impl
-# signature, service traits). `test-windows` (a real Windows runner) and
-# `windows-cross-wine` (a fast, Linux-hosted signal using this repository's
-# own `tools/windows-cross-test.sh`) are what actually build and test the
-# real Win32 window backend.
+# signature, service traits). `test-windows` (a real Windows runner) is what
+# builds and tests the real Win32 window backend; the Linux-hosted
+# `windows-cross-wine` signal is disabled below until it works.
 on:
   push:
   pull_request:
@@ -174,7 +173,7 @@ jobs:
           target: google_apis_playstore
           # The transition tests need motion: off, they would see reduced motion.
           disable-animations: false
-          script: ANDROID_NDK_HOME="$ANDROID_NDK_LATEST_HOME" tools/android-device-test.sh
+          script: ANDROID_NDK_HOME="$ANDROID_NDK_LATEST_HOME" tools/android-device-test.sh && ANDROID_NDK_HOME="$ANDROID_NDK_LATEST_HOME" cargo run --release -p rustnative-cli -- bench --target android --check --unpaced-display
 
   msrv:
     name: MSRV (1.85)
@@ -221,30 +220,67 @@ jobs:
     # Milestone 42: each shipped target's budget file, enforced. A
     # measurement over its budget (beyond its declared noise) fails the
     # build like a failing test; the report is kept either way.
-    name: budgets (windows, and headless on one core)
+    # A hosted runner's virtual display paces nothing, so the display-paced
+    # keys are reported, not enforced, there (`--unpaced-display`); the
+    # Android budgets run on the emulator in the `android` job.
+    name: budgets (${{ matrix.target }})
     strategy:
       fail-fast: false
       matrix:
         include:
-          - os: windows-latest
+          - target: windows
+            os: windows-latest
             bench: cargo run --release -p rustnative-cli -- bench --target windows --check --build-times --unpaced-display
-          - os: ubuntu-latest
+          - target: headless
+            os: ubuntu-latest
             bench: taskset -c 0 cargo run --release -p rustnative-cli -- bench --target headless --check --low-end
+          - target: linux
+            os: ubuntu-latest
+            bench: tools/linux-session.sh xvfb cargo run --release -p rustnative-cli -- bench --target linux --check --unpaced-display
+          - target: web
+            os: ubuntu-latest
+            bench: cargo run --release -p rustnative-cli -- bench --target web --check
+          - target: serverless
+            os: ubuntu-latest
+            bench: cargo run --release -p rustnative-cli -- bench --target serverless --check
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
+        with:
+          # The serverless budgets build the edge and WASI modules.
+          targets: wasm32-unknown-unknown, wasm32-wasip1
       - uses: Swatinem/rust-cache@v2
-      - name: GTK 4 and libsoup 3 (the workspace builds the Linux backend)
+        with:
+          key: budgets-${{ matrix.target }}
+      - name: GTK 4, libsoup 3, and a virtual session (the workspace builds the Linux backend)
         if: runner.os == 'Linux'
-        run: sudo apt-get update && sudo apt-get install -y libgtk-4-dev libsoup-3.0-dev
+        run: sudo apt-get update && sudo apt-get install -y libgtk-4-dev libsoup-3.0-dev xvfb xdotool dbus dbus-x11 at-spi2-core gnome-keyring
       - name: rustnative bench --check
         run: ${{ matrix.bench }}
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: budget-report-${{ matrix.os }}
+          name: budget-report-${{ matrix.target }}
           path: target/budget-report.json
+
+  apple:
+    # No Apple backend exists yet (Milestones 33, 36, 70). What is checked
+    # here is that every portable crate builds for Apple targets, and that
+    # `rustnative-host` compiles there to its "no backend" placeholder rather
+    # than to a desktop backend.
+    name: portable crates (macOS and iOS, cargo check)
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-apple-ios
+      - uses: Swatinem/rust-cache@v2
+      - name: cargo check (macOS)
+        run: cargo check -p rustnative-core -p rustnative-host -p rustnative-headless -p rustnative-components -p rustnative-data -p rustnative-update -p rustnative-server -p rustnative-sync
+      - name: cargo check (iOS)
+        run: cargo check --target aarch64-apple-ios -p rustnative-core -p rustnative-host -p rustnative-components -p rustnative-update
 
   supply-chain:
     name: cargo-deny + cargo-audit

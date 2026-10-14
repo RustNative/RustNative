@@ -22,8 +22,16 @@ pub enum Platform {
     Android,
     /// iOS (Milestone 36).
     Ios,
-    /// Embedded targets (Milestone 37).
+    /// iPadOS, a target of its own beside iOS (Milestone 70).
+    Ipados,
+    /// Embedded Linux, direct to the display or in a graphical session
+    /// (Milestone 37).
+    #[value(name = "embedded-linux")]
+    EmbeddedLinux,
+    /// Embedded RTOS and bare-metal targets (Milestone 37).
     Embedded,
+    /// Terminal applications (Milestone 38).
+    Tui,
     /// The browser: Rust on the server, HTML/CSS and compile-time generated
     /// JavaScript in the browser, with WebAssembly for subtrees that opt in
     /// (see PLAN.md's web roadmap).
@@ -53,7 +61,9 @@ impl Platform {
             Self::Windows | Self::Linux | Self::Android | Self::Web => None,
             Self::Macos => Some(33),
             Self::Ios => Some(36),
-            Self::Embedded => Some(37),
+            Self::EmbeddedLinux | Self::Embedded => Some(37),
+            Self::Tui => Some(38),
+            Self::Ipados => Some(70),
         }
     }
 }
@@ -66,7 +76,10 @@ impl fmt::Display for Platform {
             Self::Linux => "linux",
             Self::Android => "android",
             Self::Ios => "ios",
+            Self::Ipados => "ipados",
+            Self::EmbeddedLinux => "embedded-linux",
             Self::Embedded => "embedded",
+            Self::Tui => "tui",
             Self::Web => "web",
         };
         f.write_str(name)
@@ -83,9 +96,21 @@ mod tests {
         assert_eq!(Platform::Linux.backend(), Some("rustnative-linux"));
         assert_eq!(Platform::Android.backend(), Some("rustnative-android"));
         assert_eq!(Platform::Android.planned_milestone(), None);
-        for platform in [Platform::Macos, Platform::Ios, Platform::Embedded] {
+        for platform in [
+            Platform::Macos,
+            Platform::Ios,
+            Platform::Ipados,
+            Platform::EmbeddedLinux,
+            Platform::Embedded,
+            Platform::Tui,
+        ] {
             assert!(platform.backend().is_none(), "{platform} has no backend yet");
             assert!(platform.planned_milestone().is_some(), "{platform} names its milestone");
+            assert_eq!(
+                Platform::from_str(&platform.to_string(), true).ok(),
+                Some(platform),
+                "{platform} is spelled the same on the command line"
+            );
         }
     }
 }

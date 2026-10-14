@@ -10,7 +10,8 @@ homepage.workspace = true
 readme.workspace = true
 keywords = ["gui", "testing", "conformance", "native", "framework"]
 categories = ["gui", "development-tools::testing"]
-publish = false
+# Published: a backend built outside this repository proves itself against
+# the same suites (`docs/conformance/new-backend-checklist.md`).
 
 [lints]
 workspace = true

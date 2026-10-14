@@ -4,12 +4,12 @@ version = "0.1.0"
 edition.workspace = true
 rust-version.workspace = true
 license.workspace = true
-description.workspace = true
+description = "The Windows backend for Rust Native: Win32 windows and common controls, UI Automation, Direct2D canvases, and the Windows services"
 repository.workspace = true
 homepage.workspace = true
 readme.workspace = true
-keywords.workspace = true
-categories.workspace = true
+keywords = ["gui", "windows", "win32", "native", "framework"]
+categories = ["gui", "os::windows-apis"]
 
 [lints]
 workspace = true
@@ -25,11 +25,12 @@ async-trait.workspace = true
 # same JSON form persisted component state uses (see `native::lifecycle`).
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
+# The style capability table and unit mapping this backend answers with —
+# on every host, since the platform type answers them wherever it compiles.
+rustnative-style.workspace = true
 
 [target.'cfg(windows)'.dependencies]
 windows-sys.workspace = true
-# The style capability table and unit mapping this backend answers with.
-rustnative-style.workspace = true
 # Milestone 29's escape hatch: a `native_surface` node's window handle is
 # handed to the application through the ecosystem's standard handle traits,
 # so wgpu, ash, glutin, and friends accept it without an adapter.

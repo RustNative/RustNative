@@ -98,38 +98,32 @@ impl Report {
             ),
         }));
 
-        let platforms = [
-            Platform::Windows,
-            Platform::Macos,
-            Platform::Linux,
-            Platform::Android,
-            Platform::Ios,
-            Platform::Embedded,
-            Platform::Web,
-        ]
-        .into_iter()
-        .map(|platform| {
-            let (ready, detail) = match platform.planned_milestone() {
-                _ if platform == Platform::Windows => {
-                    if windows.can_build() {
-                        let packaging = if windows.can_package() {
-                            "packaging tools present"
+        // Every platform the command line accepts, so none is left out here.
+        let platforms = <Platform as clap::ValueEnum>::value_variants()
+            .iter()
+            .copied()
+            .map(|platform| {
+                let (ready, detail) = match platform.planned_milestone() {
+                    _ if platform == Platform::Windows => {
+                        if windows.can_build() {
+                            let packaging = if windows.can_package() {
+                                "packaging tools present"
+                            } else {
+                                "packaging tools missing (makeappx/signtool)"
+                            };
+                            (true, format!("ready — {packaging}"))
                         } else {
-                            "packaging tools missing (makeappx/signtool)"
-                        };
-                        (true, format!("ready — {packaging}"))
-                    } else {
-                        (false, "missing the MSVC build tools or the Windows SDK".to_owned())
+                            (false, "missing the MSVC build tools or the Windows SDK".to_owned())
+                        }
                     }
-                }
-                _ if platform == Platform::Linux => linux_readiness(),
-                _ if platform == Platform::Android => android_readiness(),
-                Some(milestone) => (false, format!("no backend yet — Milestone {milestone}")),
-                None => (false, "no backend yet — see PLAN.md's web roadmap".to_owned()),
-            };
-            PlatformReadiness { platform: platform.to_string(), ready, detail }
-        })
-        .collect();
+                    _ if platform == Platform::Linux => linux_readiness(),
+                    _ if platform == Platform::Android => android_readiness(),
+                    Some(milestone) => (false, format!("no backend yet — Milestone {milestone}")),
+                    None => (false, "no backend yet — see PLAN.md's web roadmap".to_owned()),
+                };
+                PlatformReadiness { platform: platform.to_string(), ready, detail }
+            })
+            .collect();
 
         Self { checks, platforms }
     }
@@ -319,7 +313,7 @@ mod tests {
         for expected in ["rustc", "cargo", "windows sdk", "makeappx", "signtool"] {
             assert!(names.contains(&expected), "{expected} is checked: {names:?}");
         }
-        assert_eq!(report.platforms.len(), 7);
+        assert_eq!(report.platforms.len(), <Platform as clap::ValueEnum>::value_variants().len());
         let windows = &report.platforms[0];
         assert_eq!(windows.platform, "windows");
         let linux = &report.platforms[2];

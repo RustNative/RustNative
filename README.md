@@ -1288,7 +1288,8 @@ that `inspect to-test` turns into a headless regression test.
 A project is a folder with a `rustnative.toml`: the application's identity (the
 same id its saved state and single-instance mutex use), its display name,
 version, publisher, and URL schemes. Every platform on the roadmap is
-recognized; the ones whose backend does not exist yet say so, with the
+recognized — `windows`, `linux`, `android`, `web`, `macos`, `ios`, `ipados`,
+`tui`, `embedded-linux`, and `embedded` (RTOS and bare metal); the ones whose backend does not exist yet say so, with the
 milestone that brings them, and exit with a distinct code rather than
 quietly building for Windows.
 
