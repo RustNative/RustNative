@@ -177,6 +177,15 @@ impl WebAssets {
             headers.insert(header::CACHE_CONTROL, HeaderValue::from_static("no-cache"));
             return Some(response);
         }
+        if rest == rustnative_web::answers::INSPECTION_TABLE {
+            // What the browser runtime's inspection answers from (`rn.inspect`).
+            let mut response =
+                Response::new(Bytes::from(rustnative_web::answers::inspection_table().to_string()));
+            response
+                .headers_mut()
+                .insert(header::CONTENT_TYPE, HeaderValue::from_static("application/json"));
+            return Some(response);
+        }
         let body = if rest == rustnative_web::runtime::runtime_url("").as_str() {
             Bytes::from_static(rustnative_web::runtime::RUNTIME_JS.as_bytes())
         } else if rest == rustnative_web::runtime::worker_url("").as_str() {

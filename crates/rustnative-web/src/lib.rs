@@ -73,6 +73,7 @@ pub mod html;
 pub mod image;
 pub mod jsnode;
 pub mod live;
+pub mod mappers;
 pub mod page;
 pub mod pending;
 pub mod png;

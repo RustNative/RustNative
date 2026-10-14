@@ -83,6 +83,42 @@ pub fn from_effects<'a>(names: impl IntoIterator<Item = &'a str>) -> PlatformCap
     )
 }
 
+/// Where the browser runtime's inspection table is served, below the
+/// framework's asset path (`/_rn/inspect.json`).
+pub const INSPECTION_TABLE: &str = "inspect.json";
+
+/// What the browser runtime answers the inspection protocol's capability
+/// question from (`rn.inspect`, Milestone 44): the effect-to-capability
+/// map, the document's own capabilities, every capability's name, and the
+/// Web's style table and unit mapping — the same rows a native backend's
+/// inspection server reports.
+#[must_use]
+pub fn inspection_table() -> serde_json::Value {
+    use rustnative_style::StyleSupport;
+    let name = |capability: &Capability| format!("{capability:?}");
+    let units = rustnative_style::WEB_UNITS;
+    serde_json::json!({
+        "backend": "web",
+        "effects": EFFECTS.iter().map(|(effect, capability)| (effect, name(capability))).collect::<Vec<_>>(),
+        "document": DOCUMENT.iter().map(name).collect::<Vec<_>>(),
+        "all": Capability::ALL.iter().map(name).collect::<Vec<_>>(),
+        "style": rustnative_style::WEB.rows().map(|(property, support)| serde_json::json!({
+            "what": property.to_string(),
+            "why": match support {
+                StyleSupport::Realized => "realized".to_owned(),
+                StyleSupport::Approximated(how) => format!("approximated: {how}"),
+                StyleSupport::Unavailable(why) => format!("unavailable: {why}"),
+            },
+        })).collect::<Vec<_>>(),
+        "units": {
+            "host_unit": units.host_unit,
+            "pixel": units.pixel,
+            "rem": units.rem,
+            "rounding": units.rounding,
+        },
+    })
+}
+
 #[cfg(test)]
 mod tests {
     use rustnative_core::SurfaceKind;
@@ -116,5 +152,14 @@ mod tests {
         assert!(browser.supports(Capability::WebSocket));
         assert!(!browser.supports(Capability::SystemShare), "no `share` reported");
         assert!(browser.supports(Capability::Http), "the document's own");
+    }
+
+    #[test]
+    fn the_inspection_table_holds_every_row() {
+        let table = inspection_table();
+        assert_eq!(table["backend"], "web");
+        assert_eq!(table["all"].as_array().map(Vec::len), Some(Capability::ALL.len()));
+        assert!(table["style"].as_array().is_some_and(|rows| !rows.is_empty()));
+        assert_eq!(table["units"]["host_unit"], rustnative_style::WEB_UNITS.host_unit);
     }
 }

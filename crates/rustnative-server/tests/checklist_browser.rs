@@ -5,7 +5,8 @@
 //! (row 22); an island that panics gives back what it held of the host —
 //! its pointer capture — while the page's other islands keep working
 //! (row 10); and an island re-renders by patching the elements it owns,
-//! none replaced and none leaked (row 8).
+//! none replaced and none leaked (row 8); and the page answers the
+//! inspection protocol (row 26).
 
 #![allow(
     clippy::unwrap_used,
@@ -212,6 +213,39 @@ fn the_web_column_of_the_checklist_in_a_browser() {
     let dark = scheme("dark");
     assert_ne!(light, dark, "the dark scheme's colour applies without a reload");
     assert_eq!(page.eval("window.__tinted !== undefined").unwrap(), Value::Bool(true));
+
+    // Row 26: the page answers the inspection protocol: the backend, its
+    // realized elements with their rectangles, the element census, and its
+    // capability and style tables.
+    let ask = |request: &str| {
+        page.eval(&format!("(async () => (await {}).inspect('{request}'))()", rt())).unwrap()
+    };
+    assert_eq!(ask("hello")["backend"], "web");
+    let realized = ask("realized");
+    let grab = realized
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|object| object["key"] == "grab")
+        .expect("the island's element is realized");
+    assert_eq!(grab["host_type"], "<span>");
+    assert_eq!(grab["rect"][2], 120, "its width, as laid out");
+    let lifetimes = ask("lifetimes");
+    assert!(lifetimes["live"].as_u64().unwrap() > 0);
+    assert!(lifetimes["created"].as_u64() >= lifetimes["live"].as_u64());
+    let capabilities = ask("capabilities");
+    let names = |field: &str| -> Vec<String> {
+        capabilities[field]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|row| row.as_str().map_or_else(|| row["what"].to_string(), str::to_owned))
+            .collect()
+    };
+    assert!(names("advertised").contains(&"Http".to_owned()));
+    assert!(names("refused").iter().any(|name| name.contains("Surface(TrayExtra)")));
+    assert!(!capabilities["style"].as_array().unwrap().is_empty(), "the style table");
+    assert!(capabilities["units"]["host_unit"].is_string());
 
     // Row 10: the drag handler panics while it holds the pointer. The
     // island fails, the capture is given back, and the other island works.

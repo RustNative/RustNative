@@ -252,6 +252,15 @@ rollback are in `docs/web/deploy.md`. The security model is
   did not render.
 - **Source maps.** They lead generated JavaScript back to the Rust it came
   from.
+- **Mappers.** `rustnative_web::mappers::register_mapper` extends or replaces
+  what the server realizes for one property — text, classes, accessibility
+  attributes, visibility — per node kind or per key, as each native backend's
+  mappers do. They reach pages and server-interactive sessions; a client
+  island re-renders with the browser runtime's own realizer.
+- **Inspection.** `(await import(runtime)).inspect("realized")` answers the
+  inspection protocol's questions for the page — its elements and their
+  rectangles, the element census, and this browser's capabilities against
+  the Web's tables — for any DevTools-protocol client.
 
 ## Testing
 

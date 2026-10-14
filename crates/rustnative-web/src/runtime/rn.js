@@ -1306,9 +1306,15 @@ export function withSharedId(node, key) { node.shared = String(key); return node
 const SVG = "http://www.w3.org/2000/svg";
 const PROPERTIES = { value: "value", checked: "checked", selected: "selected", open: "open" };
 
+/// The host objects this runtime has realized: elements created, counted
+/// for the inspection protocol's lifetimes (`inspect`). The server's markup
+/// an island adopts is counted when the page starts.
+const census = { created: 0 };
+
 /// Creates the DOM for an element.
 export function create(element, svg = false) {
   if (typeof element === "string") return document.createTextNode(element);
+  if ((element.a || []).some(([name]) => name === "id")) census.created++;
   const inSvg = svg || element.t === "svg";
   const node = inSvg ? document.createElementNS(SVG, element.t) : document.createElement(element.t);
   for (const [name, value] of element.a || []) {
@@ -2545,6 +2551,7 @@ export async function start(restored = null) {
   if (!data) return;
   const page = JSON.parse(data.textContent);
   Object.assign(config, page.config || {});
+  census.created += document.querySelectorAll("[data-rn-i] [id], [data-rn-i][id]").length;
   // Generated modules receive this runtime's own namespace.
   const runtime = await import(import.meta.url);
   navigation();
@@ -2844,6 +2851,56 @@ if (typeof PerformanceObserver !== "undefined" && typeof document !== "undefined
 export function applyTokens(tokens) {
   const style = document.documentElement.style;
   for (const [name, value] of Object.entries(tokens)) style.setProperty(`--${name}`, String(value));
+}
+
+/// Answers the inspection protocol (Milestone 44) for this page, in the
+/// shapes a native backend's inspection server replies with: `hello`,
+/// `realized` (each framework element, its tag, and its rectangle in its
+/// parent's), `lifetimes` (the element census), and `capabilities` (what
+/// this browser offers, against the Web's capability and style tables).
+/// Any DevTools-protocol client reaches it by evaluating
+/// `(await import(runtime)).inspect("realized")`.
+export async function inspect(request) {
+  const kind = typeof request === "string" ? request : request && request.request;
+  const elements = () => islands.filter(Boolean).flatMap((island) =>
+    [...document.querySelectorAll(`[id^="${island.scope}"]`)].map((element) => [island, element]));
+  switch (kind) {
+    case "hello":
+      return { version: 1, backend: "web", windows: [0] };
+    case "realized":
+      return elements().map(([island, element]) => {
+        const box = element.getBoundingClientRect();
+        const parent = element.parentElement ? element.parentElement.getBoundingClientRect() : { left: 0, top: 0 };
+        const key = element.id.slice(island.scope.length);
+        return {
+          node: key,
+          key,
+          host_type: `<${element.localName}>`,
+          handle: element.id,
+          rect: [Math.round(box.left - parent.left), Math.round(box.top - parent.top), Math.round(box.width), Math.round(box.height)],
+        };
+      });
+    case "lifetimes": {
+      const live = elements().length;
+      return { created: Math.max(census.created, live), destroyed: Math.max(0, census.created - live), live, recent: [] };
+    }
+    case "capabilities": {
+      const table = await (await fetch(`${config.assets}inspect.json`)).json();
+      const effects = await caps();
+      const advertised = new Set(table.document);
+      for (const [effect, name] of table.effects) if (effects.includes(effect)) advertised.add(name);
+      return {
+        backend: "web",
+        advertised: [...advertised].sort(),
+        refused: table.all.filter((name) => !advertised.has(name)).map((what) => ({ what, why: "this browser does not offer it, or the web backend does not realize it" })),
+        style: table.style,
+        units: table.units,
+        services: [],
+      };
+    }
+    default:
+      return { error: `the browser runtime does not answer \`${kind}\`` };
+  }
 }
 
 export function metrics() {

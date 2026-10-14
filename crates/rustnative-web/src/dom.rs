@@ -920,6 +920,7 @@ impl<'a> Realizer<'a> {
             let owner = self.wire(node.id());
             element = element.child(Self::virtual_elements(&owner, elements));
         }
+        crate::mappers::apply(&mut element, node);
         element
     }
 
