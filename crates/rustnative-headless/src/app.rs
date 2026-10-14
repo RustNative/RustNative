@@ -218,6 +218,58 @@ impl HeadlessApp {
         self
     }
 
+    /// Emulates an iPad, for the portable halves of `PLAN.md` Milestone 70:
+    /// the capabilities an iPad answers (touch, a pen, hover from a pointer,
+    /// several windows), a share sheet presented from its source
+    /// ([`crate::AnchoredShare`], which refuses a request with no anchor), and
+    /// what a running iPad changes under the application — its window mode
+    /// ([`Self::set_window_mode`]) and the keyboard's inset
+    /// ([`Self::set_keyboard_inset`]). Returns the share sheet, to read what
+    /// it showed.
+    pub fn emulate_ipad(&mut self) -> crate::AnchoredShare {
+        use rustnative_core::{Capability, PlatformCapabilities};
+        let share = crate::AnchoredShare::new();
+        self.services = self.services.clone().with_share(Arc::new(share.clone()));
+        self.relaunch_fresh();
+        self.app.set_environment(
+            &rustnative_core::keys::CAPABILITIES,
+            PlatformCapabilities::new([
+                Capability::Touch,
+                Capability::Pen,
+                Capability::Hover,
+                Capability::Cursors,
+                Capability::MultipleWindows,
+                Capability::WindowManagement,
+                Capability::SystemShare,
+                Capability::Clipboard,
+                Capability::DragAndDrop,
+                Capability::Ime,
+                Capability::CommandShortcuts,
+                Capability::StatePersistence,
+                Capability::Lifecycle,
+                Capability::HostTraits,
+            ]),
+        );
+        self.settle();
+        share
+    }
+
+    /// Changes the window's mode while the application runs (split view, an
+    /// overlay window, full screen), as an iPad's multitasking does.
+    pub fn set_window_mode(&mut self, mode: rustnative_core::WindowMode) {
+        self.app.set_environment(&rustnative_core::keys::WINDOW_MODE, mode);
+        self.settle();
+    }
+
+    /// Moves the software keyboard's inset to `height` (0: hidden): the
+    /// window's safe area grows at its bottom edge by that much.
+    pub fn set_keyboard_inset(&mut self, height: i32) {
+        let safe = self.app.environment_for(self.window, &rustnative_core::keys::SAFE_AREA);
+        let insets = rustnative_core::EdgeInsets::logical(safe.top, safe.end, height, safe.start);
+        self.app.set_environment(&rustnative_core::keys::SAFE_AREA, insets);
+        self.settle();
+    }
+
     /// The surfaces beyond the window (tray, jump list, notifications,
     /// widgets) the application asked for since the last call — what a
     /// backend with them would apply.

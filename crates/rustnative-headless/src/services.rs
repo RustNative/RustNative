@@ -123,3 +123,41 @@ impl HttpService for MockHttp {
         Err(ServiceError::new(description))
     }
 }
+
+/// A share sheet as a host that presents it as a popover anchored to its
+/// source (iPadOS) answers: a request with no anchor node is refused, and
+/// every request is recorded for the test to read.
+#[derive(Debug, Clone, Default)]
+pub struct AnchoredShare {
+    shared: std::sync::Arc<std::sync::Mutex<Vec<rustnative_core::services::ShareRequest>>>,
+}
+
+impl AnchoredShare {
+    /// A share sheet that has shown nothing yet.
+    #[must_use]
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// The requests it showed, oldest first.
+    #[must_use]
+    pub fn shown(&self) -> Vec<rustnative_core::services::ShareRequest> {
+        self.shared.lock().unwrap_or_else(std::sync::PoisonError::into_inner).clone()
+    }
+}
+
+#[async_trait::async_trait]
+impl rustnative_core::services::ShareService for AnchoredShare {
+    async fn share(
+        &self,
+        request: rustnative_core::services::ShareRequest,
+    ) -> Result<(), rustnative_core::ServiceError> {
+        if request.anchor.is_none() {
+            return Err(rustnative_core::ServiceError::new(
+                "this host presents the share sheet from its source: the request names no anchor node",
+            ));
+        }
+        self.shared.lock().unwrap_or_else(std::sync::PoisonError::into_inner).push(request);
+        Ok(())
+    }
+}

@@ -158,3 +158,49 @@ fn the_headless_style_table_realizes_everything() {
     }
     assert_eq!(platform.unit_mapping().map(|mapping| mapping.host_unit), Some("logical pixels"));
 }
+
+/// The headless iPad profile (`PLAN.md` Milestone 70, Phase 0): a share
+/// request presented from no source is refused, as an iPad's popover host
+/// refuses it, and the window's mode and keyboard inset change while the
+/// application runs.
+#[test]
+fn the_ipad_profile_enforces_anchors_and_changes_under_the_application() {
+    use rustnative_core::services::{ShareRequest, ShareService};
+    use rustnative_core::{Capability, WindowId, WindowMode};
+
+    fn now<T>(future: impl std::future::Future<Output = T>) -> T {
+        let mut future = std::pin::pin!(future);
+        let mut context = std::task::Context::from_waker(std::task::Waker::noop());
+        match future.as_mut().poll(&mut context) {
+            std::task::Poll::Ready(value) => value,
+            std::task::Poll::Pending => panic!("the share sheet answers at once"),
+        }
+    }
+
+    let mut app = HeadlessApp::launch(Window::new("ipad", Size::new(1024, 768)), || Pair::new(()));
+    let sheet = app.emulate_ipad();
+    let capabilities = app.application().environment_for(WindowId::PRIMARY, &keys::CAPABILITIES);
+    assert!(capabilities.supports(Capability::Pen) && capabilities.supports(Capability::Hover));
+    assert!(!capabilities.supports(Capability::PointerLock));
+
+    let request = |anchor: Option<&str>| ShareRequest {
+        text: "Notes".into(),
+        subject: None,
+        url: None,
+        anchor: anchor.map(rustnative_core::NodeId::from_key),
+        owner: None,
+    };
+    assert!(now(sheet.share(request(None))).is_err(), "no anchor: refused");
+    assert!(now(sheet.share(request(Some("row")))).is_ok());
+    assert_eq!(sheet.shown().len(), 1);
+
+    app.set_window_mode(WindowMode::Overlay);
+    assert_eq!(
+        app.application().environment_for(WindowId::PRIMARY, &keys::WINDOW_MODE),
+        WindowMode::Overlay
+    );
+    app.set_keyboard_inset(300);
+    assert_eq!(app.application().environment_for(WindowId::PRIMARY, &keys::SAFE_AREA).bottom, 300);
+    app.set_keyboard_inset(0);
+    assert_eq!(app.application().environment_for(WindowId::PRIMARY, &keys::SAFE_AREA).bottom, 0);
+}

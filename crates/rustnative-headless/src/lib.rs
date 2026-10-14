@@ -38,5 +38,5 @@ pub use inspect::HeadlessInspect;
 pub use measure::HeadlessMeasurer;
 pub use platform::HeadlessPlatform;
 pub use query::{Found, Query, QueryError};
-pub use services::MockHttp;
+pub use services::{AnchoredShare, MockHttp};
 pub use tree::{HeadlessTree, RealizationStats, RealizedNode};
