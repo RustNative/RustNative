@@ -14,13 +14,38 @@ cargo deny check
 cargo audit
 ```
 
-Changes to `rustnative-windows` also need verification on a real Windows
-runner. Native callback, HWND, COM, menu, dialog, and GDI changes should add
-or update an executable integration test where practical.
+Run them with the newest stable toolchain as well as the one installed
+(`cargo +<newest> clippy …`): CI uses the newest stable, and a new release's
+lints reach CI first. The MSRV is checked with `cargo +1.85 check
+--workspace --all-targets`.
+
+Each backend is verified on its own host:
+
+- `rustnative-windows`: a real Windows session (its `native` module is
+  `#[cfg(windows)]`). Native callback, HWND, COM, menu, dialog, and GDI
+  changes add or update an executable integration test where practical.
+  Visual goldens are kept per machine class (`native::capture`); a missing
+  one fails with its capture written beside it, for review.
+- `rustnative-linux`: a Linux session, or Xvfb with a private session bus —
+  `tools/linux-session.sh xvfb cargo test -p rustnative-linux -p adoption-gtk`
+  (WSL works) — on Ubuntu, Fedora, and Arch, as CI runs it.
+- `rustnative-android`: `cargo clippy -p rustnative-android --target
+  aarch64-linux-android --features device-tests`, then the device suite on a
+  phone or emulator: `tools/android-device-test.sh`.
+- `rustnative-web` and `rustnative-server`: the browser tests need Microsoft
+  Edge (or Chromium) installed; they run in headless mode.
+
+`cargo test --workspace` on a Linux machine without a display excludes the
+GTK backend's own tests (`--exclude rustnative-linux`); run them through
+`tools/linux-session.sh` instead.
 
 ## Design rules
 
-- Preserve the core/platform dependency boundary.
+- Preserve the core/platform dependency boundary. A platform is named in one
+  place, `rustnative-host`; applications, examples, and templates ask for
+  capabilities (`ComponentContext::capabilities`) and services, never for a
+  platform. A capability realized only through a backend's own type is a
+  missing portable contract: add it to `rustnative_core::services` first.
 - Share code between backends only through a platform-group crate
   (`docs/conformance/platform-groups.md`); a backend never depends on another
   backend. Never tell two targets apart by `cfg` when they share a compiler

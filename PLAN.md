@@ -280,7 +280,9 @@ Units follow 2.11 rather than the web's: the core keeps one geometry model in lo
 
 # 3. Completed milestones
 
-The following milestones are implemented in the current codebase. The current production backend is Windows/Win32; every other target in section 1 is planned and not yet implemented.
+The following milestones are implemented in the current codebase. The backends built so far are Windows/Win32, Linux (GTK 4), Android, and the Web, with the headless reference backend; macOS, iOS, iPadOS, terminals, and embedded targets are planned (section 8), and what each built backend still owes is recorded in `BUILD_STATUS.md` and `docs/conformance/new-backend-checklist.md`.
+
+(Sections 4 and 5 — the stages these milestones were planned in — were folded into this section when they were completed; the numbers of the sections after them are kept, because the rest of the repository refers to them.)
 
 ## Milestone 1 — Framework foundation and native Windows label
 
@@ -1079,7 +1081,13 @@ Native AppKit interoperability through Rust Objective-C bindings, with the unsaf
 - embedding in both directions: our tree realized into a caller-supplied `NSView`, and an `NSView` adopted as a leaf of our tree, laid out and clipped by our layout model (Milestone 40);
 - locale formatting, collation, and right-to-left mirroring delegated to the host's own facilities rather than reimplemented (Milestone 46);
 - the host's document architecture — autosave, versions, recent documents, per-document undo — behind the portable document model (Milestone 48), and menu-bar extras, dock menus, and widgets from the surface vocabulary (Milestone 57);
-- verification requires a macOS machine (2.13).
+- the style capability table and unit mapping (Milestone 58): one logical pixel is one point, `rem` follows the person's text size, positions round to the backing store's pixel grid half away from zero, and a window moving to a display of another backing scale restyles and remeasures on the same views; framework-owned boxes realize the extended range through their layers, native controls answer it per control (Milestone 67, 2.2);
+- the portable permission states through the host's privacy consent (TCC), with the mapping in `docs/conformance/permissions.md` (Milestone 39); Keychain secure storage, HTTP with certificate pins, crash capture into the portable crash report, and signed self-updates outside the Mac App Store with model payloads only inside it (Milestones 47, 50, 51, 57; `docs/deploy/update-rules.md`);
+- the lifecycle — sleep and wake, App Nap, memory pressure, termination — onto the portable lifecycle, flushed first (Milestone 30);
+- momentum scrolling, rubber-banding, and Full Keyboard Access as Milestone 61's interaction conformance;
+- its release path — a named build profile, Developer ID and Mac App Store credentials the developer does not hold, notarization, a universal (`arm64` and `x86_64`) binary, and store submission — from Milestone 59; the privacy manifest from the build (Milestone 51);
+- its own checklist column, the inspection protocol, the developer loop on the Mac, and `budgets/macos.toml` enforced in CI (Milestones 41–44);
+- verification requires a macOS machine (2.13). Implementation plan: `docs/superpowers/plans/2026-10-13-macos-milestone-33.md`.
 
 ## Milestone 34 — Linux backend
 
@@ -1166,7 +1174,10 @@ Native UIKit interoperability, sharing the Objective-C interop and Core Text wor
 - its release path — build profile, managed credential, store submission, update channel, generated launch assets, and device pairing — taken from Milestone 59 rather than invented here;
 - privacy manifests and data-use declarations generated from the build rather than hand-maintained (Milestone 51);
 - widgets, live activities, share and action extensions, remote push, store billing, and keychain-backed secure storage from the surface and product-service contracts (Milestone 57), each extension a separate target generated from `rustnative.toml` (Milestone 50);
-- verification requires an iPhone and a developer account (2.13), and includes the lifecycle conformance suite of Milestone 45.
+- the style capability table and unit mapping of its own (Milestone 58): one logical pixel is one UIKit point, `rem` follows Dynamic Type, positions round to the screen's pixel grid half away from zero; framework-owned boxes realize the extended range through their layers, native controls per control (Milestone 67, 2.2);
+- keyboard avoidance through the keyboard layout guide, the edge-swipe back gesture as the portable `BACK` command, and the host's text editing surface as Milestone 61's interaction conformance;
+- its own checklist column, the inspection protocol, the developer loop on a paired iPhone, and `budgets/ios.toml` on a low-end and a high-end iPhone (Milestones 41–44) — none of which an iPad result stands in for;
+- verification requires an iPhone and a developer account (2.13), and includes the lifecycle conformance suite of Milestone 45. Implementation plan: `docs/superpowers/plans/2026-10-13-ios-milestone-36.md`, built together with Milestone 70's.
 
 ## Milestone 70 — iPadOS backend
 
@@ -1227,7 +1238,10 @@ Capability-oriented design is critical here because embedded targets will not im
 - a constrained text profile that declares which scripts it supports, so the limitation is stated rather than discovered (Milestone 48);
 - framework display, input, and storage drivers that take ownership of the ecosystem's typed peripherals rather than raw register handles, so hardware typestate guarantees survive into our layer (`C74-1`); a display driver contract with asynchronous region transfer, so DMA- or programmable-I/O-backed drivers overlap transfer with the next frame's work (`C91-1`); and, for embedded Linux, a direct-to-display profile on the draw-list path with no window system, for appliance-like boot-to-UI times (`C83-1`);
 - declared RAM, flash, and frame budgets per device class, enforced in CI (Milestone 42);
-- verification on device, plus a host-side simulator — the same draw list rendered on a development machine with simulated display size, colour depth, and input — so most of the logic is testable without hardware (Milestone 45).
+- verification on device, plus a host-side simulator — the same draw list rendered on a development machine with simulated display size, colour depth, and input — so most of the logic is testable without hardware (Milestone 45);
+- named reference hardware per profile (a Raspberry Pi with a display for embedded Linux, an RP2040/RP2350 board for bare metal, an Embassy board for an RTOS), a CLI target per profile rather than one `embedded`, a style table and unit mapping per profile (pixels on the device's display, its colour depth), and an embedded checklist column per profile.
+
+Implementation plan: `docs/superpowers/plans/2026-10-13-embedded-milestone-37.md`; its Phase 0 — the `no_std` core subset, a threadless executor, time from the host clock only — is core work tracked in `BUILD_STATUS.md` from 2026-10-12.
 
 ## Milestone 38 — Terminal (TUI) backend
 
@@ -1245,11 +1259,16 @@ A `rustnative-tui` backend realizing the same application model onto a terminal.
 - **terminal restoration is a correctness requirement**: raw mode, the alternate screen, and the cursor are restored on exit, on signal, and on panic. A crashed application must not leave a terminal unusable;
 - **tooling**: `rustnative run tui` and `rustnative build tui` — a new platform value in the CLI, built with Cargo alone — plus a deterministic harness that drives a synthetic terminal of a given size and asserts the resulting cell grid, so most of the backend is testable without a TTY;
 - **section 11's gates in reduced form**: the inspection protocol answered over a side channel rather than a second screen, since the terminal is already the output surface (Milestone 44); the cell-damage tracking above shared with the embedded draw-list path rather than duplicated (Milestone 37); locale-aware display width and mirroring from the localization work (Milestone 46); and the synthetic-terminal harness counted as one of the headless test backends (Milestone 45);
-- **why it belongs in this plan at all**: same components, same state, same layout, same identity, one small capability set. A target this constrained is the strongest test that the capability model is real rather than decorative.
+- **why it belongs in this plan at all**: same components, same state, same layout, same identity, one small capability set. A target this constrained is the strongest test that the capability model is real rather than decorative;
+- **its own tables and budgets**: `rustnative_style::TUI` and `TUI_UNITS`, a terminal checklist column, and `budgets/tui.toml` (startup, memory, bytes written per keystroke, frame time) enforced in CI; packaging through the host operating system's formats; the host operating system's update rules.
+
+Implementation plan: `docs/superpowers/plans/2026-10-13-terminal-milestone-38.md`. The CLI recognizes `tui` and fails with this milestone until the backend exists.
 
 ## Web backend — Web milestones A–K
 
 The Web track is lettered rather than numbered because it predates the numbering and because `rustnative` names no milestone for `web`. It is one backend like the others; it is longer because the browser is not one deployment target but three.
+
+**Status: built, with checklist rows owed.** Web milestones A–K are built (`docs/web.md`), and by this section's definition the backend is not yet finished: the Web column of `docs/conformance/new-backend-checklist.md` holds no test for rows 4, 6, 8–16, 19, 22, and 26 (among them safe areas, gesture arbitration against `touch-action`, runtime token switching without a reload, and the inspection protocol). Virtual-list range events and canvas virtual elements, owed until the 2026-10-12 review, are built there.
 
 ### Web deployment modes
 
@@ -3588,11 +3607,10 @@ milestone neither waits for it nor depends on it.
 The cost is ongoing as well as initial. Every property here is an answer owed by
 every backend — properties times backends, including backends not yet built —
 which is why properties arrive by family with their tests, and why a family
-that no host realizes beyond the browser is not added for the browser alone. And
-one correctness debt is paid before any of it: the Windows unit mapping still
-equates a logical pixel with a device pixel (Milestone 58's status), and every
-length this milestone adds would be measured wrongly on a scaled display until
-Milestone 69's first part is done.
+that no host realizes beyond the browser is not added for the browser alone. One
+correctness debt had to be paid before any of it — the Windows unit mapping
+equated a logical pixel with a device pixel — and Milestone 69's first part paid
+it (2026-10-14).
 
 **Done when** every family above exists in both spellings with an equivalence
 case per property; every shipped backend's table answers every new property, for
@@ -3620,7 +3638,7 @@ The Windows backend realizes the tree as Win32 windows and common controls,
 styled through GDI (Milestone 21). That is correct for its controls and narrow
 for its boxes: a GDI child window cannot cast a shadow, blend with what lies
 behind it, or anti-alias a clipping region, so most of Milestone 67's extended
-range answers unavailable here. And the backend's unit mapping is still the one
+range answers unavailable here. And the backend's unit mapping was the one
 Milestone 58 recorded — one logical pixel is one device pixel. This milestone
 takes both, in an order that matters — scale first, because it is a correctness
 obligation; composition second, because it is an option to be measured — and
@@ -3630,6 +3648,10 @@ Satisfies: `D-WIN-1`, `D-WIN-2`, `D-WIN-3`; concept `C106` (compositing,
 shared with Milestone 60).
 
 ### Scale
+
+*Built (2026-10-14), `crates/rustnative-windows/src/native/dpi.rs`, held at 150 %
+by `native/dpi_integration.rs`; a container's border stays a one-device-pixel
+hairline.*
 
 - **layout in logical pixels, scaled per window**: geometry is converted by the
   window's own DPI (`GetDpiForWindow / 96`) where it reaches a native window,

@@ -165,7 +165,7 @@ refreshed on 2026-09-27 for every concept that milestone set names as built.
 
 | Capability | Score | Evidence | Gap |
 | --- | --- | --- | --- |
-| Architecture documentation | **Met** | `PLAN.md`, `README.md`, `BUILD_STATUS.md`, `Audit.md` | — |
+| Architecture documentation | **Met** | `PLAN.md`, `README.md`, `BUILD_STATUS.md`, `docs/history/2026-08-29-engineering-audit.md` | — |
 | Task-oriented guides and generated API reference | **Partial** | `missing_docs` enforced; no guide set or published reference | `X-DOC-1` |
 | Runnable example per subsystem | **Partial** | `examples/` exists | `X-DOC-2` |
 | Stability, deprecation, and migration policy | **Absent** | — | `W-MF-8` |

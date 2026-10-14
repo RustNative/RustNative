@@ -44,18 +44,19 @@ rustnative deploy local status
 - **Revisions are immutable.** A name used once cannot be deployed again.
 - **Client addresses.** Behind the proxy, every request reaches a revision
   from the proxy's address. The proxy sends the client's address in
-  `x-forwarded-for`, replacing any the client sent. A revision's
-  per-client rate limit counts the proxy, so turn it off on revisions
-  (`Security { rate_limit: None, .. }`). A per-client limit at the proxy is
-  owed.
+  `x-forwarded-for`, replacing any the client sent, and a revision believes
+  it because the proxy is a trusted one: loopback is trusted by default
+  (`Security::trusted_proxies`), so each revision's rate limit counts
+  clients, not the proxy. Behind another proxy or load balancer, add its
+  addresses to `trusted_proxies`.
 
 ## Container and infrastructure descriptions
 
 ```sh
-rustnative deploy export container    # Dockerfile (distroless, non-root)
-rustnative deploy export compose
-rustnative deploy export kubernetes   # Deployment + Service, probes on /healthz and /readyz
-rustnative deploy export systemd
+rustnative deploy export container    # Dockerfile (distroless, non-root, /data a volume)
+rustnative deploy export compose      # read-only root, the state on a named volume
+rustnative deploy export kubernetes   # Deployment + PersistentVolumeClaim + Service, probes on /healthz and /readyz
+rustnative deploy export systemd      # the system read-only to the service, its state in StateDirectory
 ```
 
 - **Output.** The descriptions are written to `deploy/`.
@@ -63,6 +64,20 @@ rustnative deploy export systemd
   application declared: the port, the environment variables in
   `rustnative.toml` `[resources]`, a read-only root file system, and a
   non-root user.
+- **One writable place.** The application's state — the SQLite database,
+  the durable job queue, workflows, actors (`db` is a default feature) —
+  lives in one directory each description makes writable: `/data` on a
+  volume in a container, `/var/lib/<name>` (`StateDirectory`) under
+  systemd. It is the working directory, so a relative path such as
+  `app.db` lands there, and `RUSTNATIVE_DATA_DIR` names it
+  (`rustnative_server::data_dir()`).
+- **One instance.** That state belongs to one instance, so the
+  descriptions run one (`replicas: 1`, a `Recreate` strategy for the
+  volume). Move the state to a database the instances share before
+  scaling out; the response cache, rate limiter, and server-interactive
+  sessions are per instance too.
+- **Pinned images.** Images are tagged with `rustnative.toml`'s version,
+  never `latest`, so a revision is what its name says.
 - **Building the image.** This needs Docker. `rustnative deploy export
   container --build` runs `docker build` when Docker is installed, and
   says so when it is not.
@@ -87,7 +102,19 @@ tagged `notes`. `cache_inspection::<P, Policy>()` serves the cache's state
 at `/__cache`.
 
 - **Public only.** Only public routes are cached.
-- **No personal data.** A response that sets a cookie is never stored.
+- **No personal data.** A response that sets a cookie, or says it must not
+  be shared (`Cache-Control: no-store` or `private`), is never stored. A
+  rendered page is `no-store` — it carries its request's CSP nonce and
+  request-forgery token — so a page route marked `cached` is rendered per
+  request; a page's shareable part is cached as its prerendered shell
+  (`Strategy::PartiallyPrerendered`). What the cache stores are the other
+  public responses: JSON, feeds, generated assets.
+- **Varies by language and format.** Entries are keyed by path, query,
+  `Accept-Language`, and `Accept`, so one visitor's language is never served
+  to another.
+- **Bounded.** At most `ResponseCache::DEFAULT_CAPACITY` entries (or
+  `ResponseCache::with_capacity`); past that, the entry nearest its expiry
+  goes first.
 
 ## Desktop updates
 
@@ -105,12 +132,24 @@ The CLI commands:
 ```sh
 rustnative update keygen --out publisher.key
 rustnative update manifest --version 1.1.0 --url https://…/demo-1.1.0.zip \
-    --package target/package/demo-1.1.0.zip --rollout 10 --key publisher.key > latest.json
+    --package target/package/demo-1.1.0.zip --rollout 10 --expires-in-days 30 \
+    --key publisher.key > latest.json
 ```
 
 `rustnative update manifest` refuses a key whose public half is not the
 `[update] public-key` in `rustnative.toml`, so a release cannot be signed
 with a key the installed application does not trust.
+
+The manifest format is `rustnative_update`'s, the same on every host that
+updates itself. What is published is an envelope — the manifest's JSON as a
+string, and an Ed25519 signature over exactly those bytes — so nothing is
+re-serialized to be verified, and a field a later release adds does not break
+an older installation. A verified manifest is still refused when it names
+another application id than the installation's, or when it is past its
+`expires` time (default 30 days): a stale manifest served by a compromised
+mirror stops being believed, so republish `latest.json` before it expires.
+Versions compare numerically with pre-releases before their release
+(`1.3.0-beta.2` < `1.3.0`).
 
 An MSIX installed from a web page or a share updates through App Installer
 instead: `rustnative package windows --format msix --appinstaller <url>`

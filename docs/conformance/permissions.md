@@ -57,15 +57,44 @@ Revoking a granted runtime permission (in Settings, or `pm revoke`) makes
 Android kill the application's process; it restarts with the permission
 `Denied` or `PermanentlyDenied` as the record and the rationale say.
 
+## Linux (`rustnative_linux::LinuxPermissions`)
+
+An unsandboxed desktop application (a distribution package, a tarball, an
+AppImage) is not gated: it has every resource the person's account has, and
+every permission is `Granted`. Inside a Flatpak or Snap sandbox, two
+resources are asked for at use through the desktop portals; the rest are
+static permissions of the sandbox's manifest:
+
+| Permission | Unsandboxed | Sandboxed |
+|---|---|---|
+| Camera | `Granted` | the Camera portal's `AccessCamera`, asked on request: `NotAsked` until this run's request is answered, then `Granted` or `Denied` |
+| Location | `Granted` | the Location portal's session, asked on request, likewise |
+| Microphone, Notifications, Contacts, Photos, Bluetooth | `Granted` | `Granted` (the manifest's) |
+
+The portal's permission store is not readable from inside the sandbox, which
+is why a new run starts at `NotAsked`. Tests:
+`rustnative_linux::services::permissions::tests`.
+
+## The Web
+
+The Permissions API's states through `fx.permission` and
+`fx.request_permission` (`rustnative_web::capability`): `granted` →
+`Granted`, `denied` → `Denied`, `prompt` (or the browser's `default`) →
+`Prompt`, a permission the browser does not know → `Unsupported`; see
+`docs/web/capabilities.md`.
+
 ## Headless
 
 `FixedPermissions`: configured per test.
 
 ## Owed
 
-iOS (36), iPadOS (70), macOS (33), and the Web (E) — the hosts
-where `NotAsked`, `Limited`, and `Denied` are real — document their mappings
-here when they land. iPadOS reads the same host permission APIs as iOS
+iOS (36), iPadOS (70), and macOS (33) — hosts where `NotAsked`, `Limited`,
+and `Denied` are real — document their mappings here when they land:
+macOS's privacy consent (TCC) per service, with `NotAsked` until the first
+request and only System Settings changing a refusal (`PermanentlyDenied`);
+iOS's authorization status per framework, with `Limited` for a partial
+photo library and approximate location. iPadOS reads the same host permission APIs as iOS
 through the shared UIKit group crate, so its section states only where an
 iPad answers differently — and a permission for hardware a given iPad lacks
 is answered as an absent capability, not as `Denied`.

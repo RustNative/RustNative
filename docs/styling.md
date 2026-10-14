@@ -7,8 +7,9 @@ what it describes is **built** or **planned**, and which milestone owns it:
 
 | Part | Status | Milestone |
 |---|---|---|
-| The portable range, both spellings, capability tables, unit mappings | built (Windows, Linux, Web, headless) | 58 |
-| Guards, declared targets, the extended range, structural variants | planned | 67 |
+| The portable range, both spellings, capability tables, unit mappings | built (Windows, Linux, Android, Web, headless) | 58 |
+| Declared targets (`[style] targets`) | built | 58, 2026-10-12 review |
+| Guards, the extended range, structural variants, `approximations` | planned | 67 |
 | Windows scaling and composition | planned | 69 |
 | Relationships on another node's state or size, generated content, host passthrough | optional | 68 |
 
@@ -43,8 +44,8 @@ so a relationship is as portable as the properties it sets.
 Every backend answers every property — realized, approximated (and how), or
 unavailable (and why) — once for a native control and once for a box the
 framework owns, because a host may decorate the second and must never redraw
-the first (2.2). The tables are `rustnative_style::WINDOWS`, `LINUX`, `WEB`,
-and `HEADLESS`.
+the first (2.2). The tables are `rustnative_style::WINDOWS`, `LINUX`,
+`ANDROID`, `WEB`, and `HEADLESS`.
 
 What a declaration does on a target, by that target's answer:
 
@@ -58,27 +59,38 @@ With `approximations = "refuse"` in `rustnative.toml`, an unguarded or
 `supports-[…]:` declaration that a declared target only approximates is a build
 error too.
 
-*Built today*: an unguarded declaration of a property the Windows table marks
-unavailable fails the Windows build at the class. *Planned (Milestone 67)*:
-the guards, and checking every declared target rather than the one being
-compiled.
+*Built today*: an unguarded declaration of a property a declared target's
+table marks unavailable fails the build at the class, for every declared
+target, whatever machine compiles the project. *Planned (Milestone 67)*: the
+guards that resolve such a failure, and `approximations`.
 
 ## Declared targets
 
-*Planned (Milestone 67).*
+*Built.* The `[style]` table of `rustnative.toml` names the backends the
+application is realized on:
 
 ```toml
 [style]
 file = "app.css"
-targets = ["windows", "linux", "web"]   # default: every backend the project depends on
-approximations = "allow"                # or "refuse"
+targets = ["windows", "linux", "android"]
 ```
 
-The build checks each unguarded declaration against every declared target's
-table. A failure names the class, the property, the target, the target's
-reason, and the guard that would resolve it. Adding a target surfaces every
-unguarded use at once. `rustnative expand --targets` prints what each declared
-target will show for a class string.
+`classes!` and `styles!` check each unguarded declaration against every
+declared target's table, and a failure names the class, the property, the
+target, and the target's reason. Adding a target surfaces every unguarded use
+at once. A web project lists `["web"]` (`rustnative new --web` writes it), so
+its server binary — compiled for Windows or Linux — is checked against the
+Web's table, which realizes shadows, rather than against the compiling
+machine's. Planned targets (`macos`, `ios`, `ipados`, `tui`, `embedded`) are
+accepted and checked once their tables exist; an unknown name is an error.
+
+Without `targets`, the native backend of the operating system the project is
+compiled for is checked — right for a native application built where it
+runs, and the reason a project spanning hosts should declare them.
+
+*Planned (Milestone 67)*: `approximations = "refuse"`, and `rustnative expand
+--targets`, which prints what each declared target will show for a class
+string.
 
 ## Guards
 
@@ -223,15 +235,13 @@ editing, and accessibility — and the backend never captures a control's output
 into a bitmap to rotate, scale, blur, or shadow it. A container has no native
 equivalent: it is a box the framework owns, and the backend may decorate it.
 
-*Planned (Milestone 69)*, in this order:
+Milestone 69, in this order:
 
-1. **Scale.** Layout in logical pixels, scaled by each window's DPI; fonts,
-   borders, regions, and surfaces following the same factor; `WM_DPICHANGED`
-   handled live on the same windows. Today the unit mapping equates a logical
-   pixel with a device pixel (`rustnative_style::WINDOWS_UNITS`), and every
-   length the extended range adds would be measured at the wrong scale until
-   this is done.
-2. **Composition for boxes.** DirectComposition — the host's own compositor —
+1. **Scale** *(done, 2026-10-14)*. Layout runs in logical pixels, scaled by
+   each window's DPI where geometry reaches Win32; fonts, padding, rounded
+   regions, canvases, and surfaces follow the same factor; `WM_DPICHANGED` is
+   handled live on the same windows (`rustnative_style::WINDOWS_UNITS`).
+2. **Composition for boxes** *(planned)*. DirectComposition — the host's own compositor —
    behind framework-owned containers, for anti-aliased corners, shadows,
    gradients, and fades. Its limit is stated rather than discovered: every
    native child window is its own surface, so a decoration cannot draw over a
@@ -239,7 +249,7 @@ equivalent: it is a box the framework owns, and the backend may decorate it.
    controls beneath it, and animating a box that holds controls moves real
    windows each frame. It starts as a time-boxed prototype measured against
    `budgets/windows.toml`, and is adopted or not on the record.
-3. **The control-set decision, named and not taken.** WinUI 3's controls are
+3. **The control-set decision, named and not taken** *(planned)*. WinUI 3's controls are
    native too, and composition runs through its whole tree, so it has no
    airspace limit — but it is a different control set and effectively a second
    Windows backend. It is decided as a control-set question, on written

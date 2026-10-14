@@ -5,7 +5,8 @@
 //!
 //! The surveys of other frameworks (`docs/ecosystem-analysis`) and the
 //! working plans (`docs/superpowers`) describe other projects and intentions,
-//! not this one's performance, and are not held to it. A phrase that names
+//! and the archived reviews (`docs/history`) a past state; none is this one's
+//! performance, and they are not held to it. A phrase that names
 //! a mechanism rather than making a claim (the "transient fast path") is
 //! not one either.
 
@@ -46,7 +47,7 @@ fn markdown_under(directory: &Path, into: &mut Vec<PathBuf>) {
         let path = entry.path();
         let name = entry.file_name();
         if path.is_dir() {
-            if name != "ecosystem-analysis" && name != "superpowers" {
+            if name != "ecosystem-analysis" && name != "superpowers" && name != "history" {
                 markdown_under(&path, into);
             }
         } else if path.extension().is_some_and(|extension| extension == "md") {

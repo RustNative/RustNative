@@ -20,16 +20,31 @@ tree, reach the same API, and cost the same at runtime. See
 ## Current status
 
 The working backends are Windows/Win32, Linux (GTK 4 on Wayland and X11; see
-[`docs/linux.md`](docs/linux.md)), and the Web (semantic HTML and CSS,
-in the browser, on a server, as a function, or on an edge host; see
-[`docs/web.md`](docs/web.md)), with the headless reference backend for
-tests. The framework core is designed to remain platform-independent so macOS, Android, iOS, iPadOS, terminal, and embedded targets are added as separate adapters, each planned to the same depth: native host objects, native measurement, native input, native accessibility, its own toolchain and packaging.
+[`docs/linux.md`](docs/linux.md)), Android (platform `View`s, verified on a
+phone and an emulator; see [`docs/android.md`](docs/android.md)), and the Web
+(semantic HTML and CSS, in the browser, on a server, as a function, or on an
+edge host; see [`docs/web.md`](docs/web.md)), with the headless reference
+backend for tests. An application names none of them: `rustnative-host`
+picks the native backend for the target being compiled and builds its
+services, and components ask for *capabilities*
+(`ComponentContext::capabilities`), never for a platform (see
+[Running on every host](#running-on-every-host)). The framework core is
+platform-independent, so macOS, iOS, iPadOS, terminal, and embedded targets
+are added as separate adapters, each planned to the same depth: native host
+objects, native measurement, native input, native accessibility, its own
+toolchain and packaging.
 
 Two notes on what "planned" means here. macOS, iOS, and iPadOS are fully planned platforms that this project has no hardware to build or verify on yet, so their milestones are specified and designed for but not started — order follows hardware, not priority. And a backend advertises a capability only once it genuinely realizes it, so "planned" never reaches an application as a claim of support.
 
-Milestones 39–58 are built on the Windows backend (every milestone and
-tier except the other backends, which come later and are recorded as owed in
-`BUILD_STATUS.md`). Done so far: **Milestone 52 — the project around the framework** (a stability policy kept by codemods in `rustnative upgrade`, third-party capability packages with `rustnative add`/`search`, feature kits, `rustnative describe --json`, measured core costs, and guides; `docs/guides/README.md`), **Milestone 57 — surfaces beyond the main window, and product services** (the tray icon and menu, jump list, taskbar progress, and notifications answered as events; secure storage; typed feature flags with remote configuration; `docs/surfaces.md`), **Milestone 51 — observability, security, and compliance** (one trace across client and server with consent-gated export, crash reports with the tree at failure, grants enforced per request, a sandboxed isolated worker, power-loss-safe state, and generated compliance evidence; `docs/observability.md`), **Milestone 50 — deployment, updates, and fleet operations** (immutable revisions with preview, staged promotion, and rollback; container and systemd export; single-artifact assets; response caching; signed, staged Windows updates with automatic rollback; `docs/deploy.md`), **Milestone 56 — durable and event-driven execution** (replayed workflows with exactly-once steps, timers, signals and compensation; event handlers with partial-failure batches and dead letters; single-writer actors; supervision; long operations across the boundary; `docs/durable.md`), **Milestone 55 — reconciliation beyond the screen** (local-first sync with conflict policies and CRDTs, server-interactive screens that survive reconnects and deploys, channels and presence, and device desired state over MQTT; `docs/sync.md`), **Milestone 49 — the server application model** (a `tower` service on the client's own contracts: typed handlers, secure defaults, sessions, passkeys, checked SQL, durable jobs, typed server functions, server-only components, and an OpenAPI contract; `docs/server.md`), **Milestone 48 — components, tokens, and visualization** (native controls, a component library in both syntaxes, design-token import with host-following roles, accessible charts, grids, matched geometry, list views, documents, and host content; `docs/components.md`), **Milestone 54 — responsiveness under load** (message priorities, deferred values computed off the UI thread, pure components, and suspension of hidden screens; `docs/responsiveness.md`), **Milestone 47 — state, resilience, and data** (scoped stores read by slice, error boundaries with supervision, a query cache with offline mutations, forms, migrations, and WinHTTP with certificate pinning; `docs/data.md`), **Milestone 46
+What each backend still owes against the definition of a finished backend
+(`PLAN.md` section 8) is listed, row by row, in
+[`docs/conformance/new-backend-checklist.md`](docs/conformance/new-backend-checklist.md)
+and in `BUILD_STATUS.md`. Windows layout scaling with the display's DPI (the
+first part of Milestone 69) was built as part of the 2026-10-12 review.
+
+Milestones 39–58 were built on the Windows backend first and then carried
+to Linux, Android, and the Web with those backends (`BUILD_STATUS.md` records
+what each still owes). Done so far: **Milestone 52 — the project around the framework** (a stability policy kept by codemods in `rustnative upgrade`, third-party capability packages with `rustnative add`/`search`, feature kits, `rustnative describe --json`, measured core costs, and guides; `docs/guides/README.md`), **Milestone 57 — surfaces beyond the main window, and product services** (the tray icon and menu, jump list, taskbar progress, and notifications answered as events; secure storage; typed feature flags with remote configuration; `docs/surfaces.md`), **Milestone 51 — observability, security, and compliance** (one trace across client and server with consent-gated export, crash reports with the tree at failure, grants enforced per request, a sandboxed isolated worker, power-loss-safe state, and generated compliance evidence; `docs/observability.md`), **Milestone 50 — deployment, updates, and fleet operations** (immutable revisions with preview, staged promotion, and rollback; container and systemd export; single-artifact assets; response caching; signed, staged Windows updates with automatic rollback; `docs/deploy.md`), **Milestone 56 — durable and event-driven execution** (replayed workflows with exactly-once steps, timers, signals and compensation; event handlers with partial-failure batches and dead letters; single-writer actors; supervision; long operations across the boundary; `docs/durable.md`), **Milestone 55 — reconciliation beyond the screen** (local-first sync with conflict policies and CRDTs, server-interactive screens that survive reconnects and deploys, channels and presence, and device desired state over MQTT; `docs/sync.md`), **Milestone 49 — the server application model** (a `tower` service on the client's own contracts: typed handlers, secure defaults, sessions, passkeys, checked SQL, durable jobs, typed server functions, server-only components, and an OpenAPI contract; `docs/server.md`), **Milestone 48 — components, tokens, and visualization** (native controls, a component library in both syntaxes, design-token import with host-following roles, accessible charts, grids, matched geometry, list views, documents, and host content; `docs/components.md`), **Milestone 54 — responsiveness under load** (message priorities, deferred values computed off the UI thread, pure components, and suspension of hidden screens; `docs/responsiveness.md`), **Milestone 47 — state, resilience, and data** (scoped stores read by slice, error boundaries with supervision, a query cache with offline mutations, forms, migrations, and WinHTTP with certificate pinning; `docs/data.md`), **Milestone 46
 — internationalization** (typed message catalogues with CLDR plurals and
 gender, runtime locale switching, host formatting, the translator's
 workflow; `docs/i18n.md`), **Milestone 43
@@ -75,12 +90,15 @@ verified, what it found while doing so, and what is still open.
                            │
                     Native realization
                            │
-              ┌────────────┴────────────┐
-              ▼                         ▼
-          rustnative-core        rustnative-windows
-                                          │
-                                          ▼
-                                    Windows / Win32
+     rustnative-host picks one per target (or the Web serves pages)
+                           │
+   ┌──────────────┬────────┴─────┬───────────────┬──────────────────┐
+   ▼              ▼              ▼               ▼                  ▼
+rustnative-   rustnative-    rustnative-     rustnative-web     rustnative-
+ windows        linux         android        (+ server)          headless
+   │              │              │               │                  │
+ Win32 HWNDs   GTK 4 widgets  Android Views   HTML, CSS, JS      a model, for
+ + UIA         + AT-SPI       + TalkBack      + ARIA             tests
 ```
 
 The runtime also carries theme/style data and portable capability discovery;
@@ -311,152 +329,43 @@ alphabetical and means nothing else. Neither syntax is the default, and the
 CLI's project templates require you to choose (`rustnative new --syntax
 builder|markup`) rather than choosing for you.
 
-**Status.** The builder syntax is implemented and verified through Milestone 32
-and is what the examples in `examples/` are written in. The markup syntax —
-`.rsx` files and `rsx!` alike — is specified at implementable depth and is
-**Milestone 53**; the markup in this repository is that specification and does
-not compile yet. `PLAN.md` 2.9 states the contract it is held to, and
-`BUILD_STATUS.md` records its status the same way it records everything else
-this project has not yet run.
+**Status.** Both syntaxes are built. The markup syntax — `.rsx` files and
+`rsx!` alike — is **Milestone 53**, complete: the markup on this page
+compiles, the equivalence suite (`rustnative-conformance`) asserts each pair
+produces equal `Node` values, and the compile-failure suite holds its
+diagnostics to the attribute or element written. `PLAN.md` 2.9 states the
+contract it is held to.
 
 ## Crate boundaries
 
-```text
-RustNative/
-├── .github/
-│   └── workflows/
-│       └── ci.yml
-├── Cargo.toml
-├── Cargo.lock
-├── .gitignore
-├── .gitattributes
-├── rust-toolchain.toml
-├── rustfmt.toml
-├── clippy.toml
-├── deny.toml
-├── LICENSE-APACHE
-├── LICENSE-MIT
-├── SECURITY.md
-├── CONTRIBUTING.md
-├── PLAN.md
-├── BUILD_STATUS.md
-├── README.md
-│
-├── crates/
-│   ├── rustnative-core/
-│   │   ├── Cargo.toml
-│   │   ├── src/
-│   │   │   ├── lib.rs              (module map + flat public re-exports)
-│   │   │   ├── identity.rs          (NodeId/ComponentId/WindowId + key interning)
-│   │   │   ├── event.rs
-│   │   │   ├── node.rs
-│   │   │   ├── component/           (Component trait, context, effects, tree)
-│   │   │   ├── reconcile/           (snapshot + diff)
-│   │   │   ├── layout/              (geometry, constraints, measure, engine)
-│   │   │   ├── style/               (theme + the two style phases)
-│   │   │   ├── scheduler/           (Scheduler, TaskScope, pluggable Executor)
-│   │   │   ├── services/            (service contracts + in-memory impls)
-│   │   │   ├── capability.rs
-│   │   │   ├── menu.rs
-│   │   │   ├── window.rs
-│   │   │   ├── panic.rs             (component-panic policy)
-│   │   │   ├── application.rs
-│   │   │   └── platform.rs
-│   │   ├── tests/
-│   │   │   ├── component_lifecycle.rs
-│   │   │   └── property_tests.rs
-│   │   └── benches/
-│   │       └── core_benchmarks.rs
-│   │
-│   ├── rustnative-markup/             (Milestone 53: the markup grammar, once)
-│   │   ├── Cargo.toml
-│   │   └── src/
-│   │       ├── lib.rs
-│   │       ├── parse/                (elements, attributes, children,
-│   │       │                          control flow, fragments, spreads)
-│   │       ├── vocabulary.rs         (element -> constructor,
-│   │       │                          attribute -> builder method)
-│   │       ├── lower.rs              (element tree -> builder calls)
-│   │       ├── rsx_file.rs           (.rsx: find markup expressions, wrap
-│   │       │                          them in rsx!, record the source map)
-│   │       ├── source_map.rs         (lowered position <-> .rsx position)
-│   │       └── diagnostics.rs        (spans and messages)
-│   │
-│   ├── rustnative-macros/             (Milestone 53: `rsx!`, a thin proc-macro
-│   │   │                              shell over rustnative-markup,
-│   │   │                              re-exported from rustnative-core)
-│   │   ├── Cargo.toml
-│   │   ├── src/lib.rs
-│   │   └── tests/
-│   │       ├── equivalence.rs        (builder, .rsx, and rsx! spellings,
-│   │       │                          asserted equal)
-│   │       ├── rsx_files/            (the same cases as .rsx files)
-│   │       ├── expansion/            (expansion goldens)
-│   │       └── ui/                   (compile-failure suite, both carriers)
-│   │
-│   ├── rustnative-style/              (the style vocabulary, once — Milestone 58)
-│   │   ├── Cargo.toml
-│   │   ├── VENDORED.md               (the pinned Tailwind v4 theme)
-│   │   ├── vendor/                   (tailwind-theme-4.1.13.css, licence)
-│   │   └── src/
-│   │       ├── model.rs              (properties, values, conditions,
-│   │       │                          DeclarationSet)
-│   │       ├── value.rs, color.rs    (lengths, calc(), colour functions,
-│   │       │                          the gamut rule)
-│   │       ├── vocabulary.rs         (classes and declarations -> model)
-│   │       ├── sheet.rs              (app.css: @theme, @utility, @apply,
-│   │       │                          @custom-variant)
-│   │       ├── token_table.rs        (run-time tokens)
-│   │       ├── capability.rs         (per-backend tables, unit mappings)
-│   │       └── tokens.rs             (model -> Rust, for the macros)
-│   │
-│   ├── rustnative-interop/            (library-only mode — Milestone 40:
-│   │                                  the .ril description, C/C#/Rust
-│   │                                  generators, the shims' runtime)
-│   │
-│   ├── rustnative-build/              (build-script helpers: resources,
-│   │                                  `compile_rsx()`, `compile_styles()`)
-│   │
-│   └── rustnative-windows/
-│       ├── Cargo.toml
-│       └── src/
-│           ├── lib.rs              (module map + flat public re-exports)
-│           ├── error.rs             (Error + NativeContext + Win32Category)
-│           ├── platform.rs          (WindowsPlatform: the Platform impl)
-│           ├── ffi.rs               (shared string/memory helpers)
-│           ├── services/            (clipboard, dialogs, notifications, system)
-│           └── native/              (the Win32 window backend)
-│               ├── context.rs       (the only place a raw handle becomes a reference)
-│               ├── win32.rs         (Win32 return-value classification)
-│               ├── message_loop.rs  (window class, message loop, WNDPROC)
-│               ├── runtime.rs       (per-window Runtime + WindowRegistry)
-│               ├── container.rs     (container WNDPROC)
-│               ├── registry.rs      (NodeId <-> native object, both directions)
-│               ├── rendering/       (realization, controls, styling,
-│               │                     accessibility, scrolling)
-│               ├── input/           (keys, focus, pointers/capture/gestures,
-│               │                     IME, clipboard events, OLE drop target,
-│               │                     XInput controllers)
-│               ├── measure.rs       (GDI text measurement)
-│               ├── menu.rs          (MenuBar -> HMENU, with RAII)
-│               ├── user_data.rs     (typed GWLP_USERDATA accessors)
-│               ├── window_handles.rs
-│               ├── harness.rs       (test-only bounded message pump)
-│               ├── integration.rs   (test-only native scenarios)
-│               └── input_integration.rs (test-only advanced-input scenarios)
-│
-├── examples/
-│   ├── hello-label/
-│   │   ├── Cargo.toml
-│   │   └── src/main.rs
-│   └── gdi-font-diagnostic/         (standalone GDI handle-lifetime probe)
-│       ├── Cargo.toml
-│       └── src/main.rs
-│
-└── tools/
-    ├── windows-cross-test.sh        (mingw + Wine cross-compile/run)
-    └── win_probes/                  (C ground-truth probes for Win32 behavior)
-```
+| Crate | What it owns |
+|---|---|
+| `rustnative-core` | the portable runtime: components, identity, the tree and its diff, layout, styling, the scheduler, the environment, capabilities, service contracts, accessibility, animation, input, inspection — no operating-system code |
+| `rustnative-types` | the `no_std` value types every layer passes around (geometry, colour, scalars) |
+| `rustnative-markup`, `rustnative-macros` | the markup grammar once, and `rsx!`, `classes!`, `styles!` over it |
+| `rustnative-style` | the style vocabulary, the Tailwind v4.1.13 utility table, `app.css`, and every backend's capability table and unit mapping |
+| `rustnative-build` | build-script helpers: resources and manifests, `compile_rsx()`, `compile_styles()`, `compile_messages()`, Android project files |
+| `rustnative-host` | the native backend for the target being compiled, and its default services — the one place a platform is named |
+| `rustnative-windows` | the Win32 backend: HWNDs, common controls, UI Automation, Direct2D canvases, WinHTTP, crash capture, signed updates |
+| `rustnative-linux` | the GTK 4 backend behind a toolkit seam: Wayland and X11, AT-SPI2, the desktop portals, libsoup, packaging for three distribution families |
+| `rustnative-android` | the Android backend: platform `View`s over one JNI module, `AccessibilityNodeInfo`, the activity lifecycle, the Android services and surfaces |
+| `rustnative-web`, `rustnative-webgen`, `rustnative-web-macros` | the Web backend: the DOM mapping, CSS, the browser runtime, client components compiled to JavaScript, WebAssembly subtrees |
+| `rustnative-server`, `rustnative-server-macros` | the server application model: typed handlers, secure defaults, sessions, passkeys, checked SQL, jobs, pages, serverless, deployment |
+| `rustnative-headless` | the headless reference backend: the tree realized into a model and driven by synthetic input, for tests |
+| `rustnative-data` | the data layer: queries, mutations, forms, migrations, history, state machines, constrained work, images |
+| `rustnative-sync` | local-first sync and CRDTs, server-interactive screens, channels, device desired state |
+| `rustnative-durable` | durable workflows, event handlers, actors, supervision |
+| `rustnative-observe` | one trace across client and server, metrics, consent-gated export |
+| `rustnative-components` | the component library and charts, in both syntaxes |
+| `rustnative-i18n` | message catalogues and CLDR plural rules |
+| `rustnative-interop` | library-only mode: the `.ril` description and its C, C#, and Rust generators |
+| `rustnative-conformance`, `rustnative-web-testing` | the shared guarantee, layout, syntax, and style suites; the browser test harness |
+| `rustnative` (`rustnative-cli`) | the `rustnative` command |
+
+`examples/` holds the worked examples (each named in the milestone it
+demonstrates), `tools/` the scripts the backends' gates run (a Linux session
+under Xvfb, the Android device suite), and `budgets/` the performance budget
+of every shipped target.
 
 ### `rustnative-core`
 
@@ -491,7 +400,7 @@ It must not import Windows or any other operating-system API.
 
 ### The markup crates: `rustnative-markup`, `rustnative-macros`, and `compile_rsx`
 
-The markup syntax is three thin pieces over one implementation, all planned for
+The markup syntax is three thin pieces over one implementation, built in
 Milestone 53:
 
 - **`rustnative-markup`** owns the grammar, once: one element per `Node`
@@ -545,6 +454,12 @@ several callers:
   after every render, and whenever the theme or environment changes, each
   node's declarations are folded into its typed properties.
 
+Which backends a class is checked against is the project's own statement:
+`[style] targets = ["windows", "web"]` in `rustnative.toml` checks those
+tables wherever the project compiles (a web project built on Windows may use
+`shadow-*`, which the Web realizes); a project that declares none is checked
+against the native backend of the operating system it is compiled for.
+
 It emits typed style properties and nothing else, so — like markup — it cannot
 give a node a style the typed spelling could not already produce. There is no
 matcher, no stylesheet, and no class string at run time.
@@ -583,11 +498,66 @@ Owns Windows-specific implementation details:
   `XInput`);
 - native scrolling/viewport implementation;
 - Windows event-loop wakeups;
-- the accessibility bridge (`WS_TABSTOP`, and MSAA dynamic annotation for
-  name/description/role);
+- the accessibility bridge (UI Automation providers, `WS_TABSTOP`, and MSAA
+  dynamic annotation for clients that only speak MSAA);
 - platform-specific unsafe code.
 
-This is the only place where Windows APIs should leak into the framework implementation.
+This is the only place where Windows APIs should leak into the framework
+implementation. `rustnative-linux` and `rustnative-android` are arranged the
+same way for their hosts (`docs/linux.md`, `docs/android.md`).
+
+## Running on every host
+
+An application never writes a `cfg(target_os)` ladder. `rustnative-host` is
+the one crate that knows which platform this is: `HostPlatform` is the
+backend for the target being compiled (and, on a target whose backend is
+planned but not built, a placeholder that fails at `run` naming the
+milestone — never another platform's backend), and `services` is that
+backend's whole set of services.
+
+```rust
+fn main() -> Result<(), Box<dyn std::error::Error>> {
+    let app = rustnative_host::AppIdentity::new("com.example.inbox", "Inbox");
+    let mut application = Application::with_services(
+        Inbox::new(()),
+        Window::new("Inbox", Size::new(640, 480)),
+        rustnative_host::services(&app)?,
+    );
+    rustnative_host::run(&mut application, &app)?;
+    Ok(())
+}
+```
+
+Inside the tree, a component asks for what it needs rather than where it is:
+
+**Builder**
+
+```rust
+fn render(&mut self, context: &mut ComponentContext<'_, Self::Message>) -> Node {
+    if context.capabilities().supports(Capability::SystemShare) {
+        Node::button("share", "Share")
+    } else {
+        Node::button("share", "Copy link")
+    }
+}
+```
+
+**Markup**
+
+```rust
+fn render(&mut self, context: &mut ComponentContext<'_, Self::Message>) -> Node {
+    if context.capabilities().supports(Capability::SystemShare) {
+        <Button key="share" text="Share" />
+    } else {
+        <Button key="share" text="Copy link" />
+    }
+}
+```
+
+Every backend sets `keys::CAPABILITIES` before its first render; services
+the host has are on `context.services()` — the share sheet, the host's
+background-work scheduler, and document access among them — and ones it
+lacks are absent rather than stubs.
 
 Two modules inside `native/` exist specifically to keep the unsafe surface
 small, and are worth reading before anything else there:
@@ -1323,11 +1293,13 @@ quietly building for Windows.
 
 ## Performance budgets
 
-Performance numbers in this project come from the budget files
-(`budgets/windows.toml`, `budgets/headless.toml`, with the keys defined in
-`budgets/SCHEMA.md`), not from adjectives. `rustnative bench --target
+Performance numbers in this project come from the budget files — one per
+shipped target: `budgets/windows.toml`, `linux.toml`, `android.toml`,
+`web.toml`, `serverless.toml`, and `headless.toml`, with the keys defined in
+`budgets/SCHEMA.md` — not from adjectives. `rustnative bench --target
 <target>` measures them, and `--check` fails the build on a regression beyond
-each key's declared noise. CI runs it on every push. A documentation test
+each key's declared noise. CI checks the Windows, Linux, Web, serverless, and
+headless budgets on every push, and the Android budgets on the emulator. A documentation test
 (`rustnative-conformance/tests/doc_claims.rs`) rejects a performance claim in
 this README or `docs/` that does not point at a budget.
 
@@ -1380,6 +1352,15 @@ checksums mean something. The MSIX takes its identity, publisher, version,
 and URL schemes from the same `rustnative.toml` the running application uses, so a
 package cannot disagree with the program inside it.
 
+The other hosts package the same way, from the same `rustnative.toml`:
+
+```sh
+rustnative package linux --format all       # .deb, .rpm, pacman, tarball, AppImage
+rustnative package android --format aab     # or apk; signed with the keystore rustnative.toml names
+rustnative build web --mode server          # or client (static files) / serverless --host lambda|wagi
+rustnative deploy export all                # Dockerfile, Compose, Kubernetes, systemd, SAM, Spin
+```
+
 ## Text input
 
 A text field is a node like any other:
@@ -1396,7 +1377,9 @@ Node::text_input("search", self.query.clone())
 <TextInput key="search" value={self.query.clone()} />
 ```
 
-The current Windows backend uses a native Win32 `EDIT` control. Its value is controlled by component state:
+Each backend uses its host's own field — a Win32 `EDIT` control, a
+`GtkEntry`, an Android `EditText`, an `<input>` — and its value is
+controlled by component state:
 
 ```text
 Native EDIT
@@ -1429,9 +1412,20 @@ cargo run -p hello-label
 ```
 
 CI (`.github/workflows/ci.yml`) runs all of the above, plus an MSRV check,
-and — importantly — a `windows-latest` job. That job is what actually
-compiles and runs `rustnative-windows`'s `native` module: it is
-`#[cfg(windows)]`-gated, so a Linux-only pipeline silently excludes it.
+and one job per backend on its own host: `windows-latest` for the Win32
+backend (its `native` module is `#[cfg(windows)]`-gated, so a Linux-only
+pipeline would silently exclude it); the GTK backend on Xvfb under Ubuntu,
+Fedora, and Arch (`tools/linux-session.sh`); the Android backend's device
+suite on an emulator (`tools/android-device-test.sh`); the browser tests in
+headless Edge; and `cargo check` for the Apple targets, so the portable
+crates keep compiling for the hosts whose backends come later.
+
+The same per-backend gates run locally:
+
+```sh
+tools/linux-session.sh xvfb cargo test -p rustnative-linux   # in a Linux session or WSL
+tools/android-device-test.sh                                 # with a phone or emulator attached
+```
 
 `rustnative-core` is covered by unit tests, integration tests, `proptest`
 property tests (identity, reconciliation, layout constraints, scroll ranges,

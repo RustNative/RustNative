@@ -13,6 +13,20 @@ second member is written; the crate is created when that member is.
 | Android | Android (35) only | nothing to share: no other host runs the Android framework | none |
 | Desktop shell | Windows, macOS, Linux | tray/menu-bar extras, jump lists and dock menus, document windows (Milestones 48, 57) | `rustnative-desktop-shell` |
 
+Two crates sit beside the groups rather than in one, because what they
+hold is portable rather than shared by some hosts:
+
+- **`rustnative-host`** is where a target's backend is chosen and its
+  default services built (the one place a platform is named). It depends on
+  the backends; nothing depends on it but applications.
+- **`rustnative-update`** holds the signed update manifest, its verifier,
+  and the update decision (rollout bucket, pinning, payload compatibility)
+  that every self-updating host shares — the Windows and Android updaters,
+  and later macOS outside its store and AppImage on Linux. It was copied
+  between the Windows and Android backends until the 2026-10-12 review
+  moved it here; each backend keeps only how its host installs a staged
+  version.
+
 Rules:
 
 - a group is defined by what its hosts *agree on*, not by market;

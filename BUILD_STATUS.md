@@ -1,16 +1,23 @@
 # Build Status — RustNative
 
-## Current work: Milestones 39–58 on the Windows backend
+## Current state (2026-10-14)
 
-Scope, as decided on 2026-09-23 and recorded in
-`docs/superpowers/plans/2026-09-23-milestones-39-58.md`: every remaining
-milestone, every tier, with the exception of backends other than Windows
-(Milestones 33–38 and Web milestones A–K). Where a milestone item can only be
-*realized* on one of those backends, its portable contract and its test double
-are built here and the realization is listed below as **owed** by the backend
-milestone that will do it. The shipped backends are Windows and the headless
-reference backend (Milestone 45); a "done when" that names several backends is
-met on those two, and its other half is listed as owed.
+The shipped backends are **Windows**, **Linux** (GTK 4; Ubuntu, Fedora, Arch),
+**Android**, the **Web**, and the **headless** reference backend; the server
+runs long-lived, serverless, and at the edge. Every milestone through 58, the
+Web milestones A–K, Milestones 34 and 35, and the first part of Milestone 69
+(Windows per-monitor DPI scaling) are built. The backends not yet built —
+macOS (33), iOS (36), embedded (37), the terminal (38), and iPadOS (70) — owe
+the standard in PLAN.md section 8 and
+docs/conformance/new-backend-checklist.md, row by row. The 2026-10-12
+whole-framework review and the fixes it led to are the first entry below.
+
+History: Milestones 39–58 were scoped on 2026-09-23
+(docs/superpowers/plans/2026-09-23-milestones-39-58.md) as Windows-first,
+with each item that only another backend could realize built as a portable
+contract and a test double and recorded as **owed** by that backend; the
+entries below keep that wording where it was true when written, and each
+backend's own entry records what it paid.
 
 **The Web track (2026-09-27 to 2026-09-28).** Web milestones A–K are built,
 with every web half those milestones had recorded as owed. See the Web
@@ -78,7 +85,7 @@ and the touched crates' tests.
 
 **Plan: iPadOS as a target of its own (2026-10-04).** `PLAN.md` gains
 Milestone 70, the iPadOS backend, beside Milestone 36 in section 8, specified
-at the same depth as macOS and iOS; the implementation plan is
+in more depth than macOS and iOS were then (their plans followed on 2026-10-13); the implementation plan is
 `docs/superpowers/plans/2026-10-04-ipados-milestone-70.md`. **Nothing is
 built and no code changed**: this project has no Mac, iPhone, or iPad (2.13),
 so the entry records a plan, not a verification. What the plan decides: iPadOS
@@ -1840,19 +1847,18 @@ style spellings.
 deferred by the plan; a `Literal::subspan` span inside the class string needs
 an unstable API, so errors point at the string and name the class. The
 deferred backends owe their own capability tables and unit mappings
-(Milestones 33–38 and 70, Web). The unavailable-property check keys to
-`target_os = "windows"`; a second backend on the same OS will need a
-backend-selecting cfg. (No cfg can separate iOS from iPadOS, which share
-`target_os = "ios"` and one universal binary: Phase 0 of the iPadOS plan,
-`docs/superpowers/plans/2026-10-04-ipados-milestone-70.md`, moves the check to
-the project's declared targets.) The Windows unit mapping is recorded as it is, not as intended:
-layout works in device pixels (one logical pixel is one device pixel), and
-scaling layout by `GetDpiForWindow / 96` is **owed** — `rem` does follow the
-text-scale setting. Where the rest is specified: the scaling is the first part
-of Milestone 69, ahead of host composition for framework-owned containers; the
+(Milestones 33–38 and 70, Web). The unavailable-property check keys to the
+project's declared targets (`[style] targets` in `rustnative.toml`, checked
+wherever the project compiles), falling back to the compiled-for OS when none
+are declared (2026-10-12 review); a target with no table yet (iPadOS) is
+accepted and checked once its table exists. The Windows unit mapping scales
+layout by `GetDpiForWindow / 96` per window (the first part of Milestone 69,
+built 2026-10-14, held at 150 % by `native::dpi_integration`); a container's
+border stays a one-device-pixel hairline. Where the rest is specified: host
+composition for framework-owned containers is the rest of Milestone 69; the
 guards, declared targets, extended range, and structural variants are
 Milestone 67; container queries, relational variants, and host passthrough are
-the optional Milestone 68. None of the three is started.
+the optional Milestone 68.
 
 ### Milestone 53 — The markup syntax — complete
 

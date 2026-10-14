@@ -1,5 +1,22 @@
 # RustNative — In-Depth Engineering Audit
 
+> **Historical record.** This audit describes the repository as it stood
+> on 2026-08-29, before the standards pass it prompted. Its findings were
+> resolved in the passes recorded in `BUILD_STATUS.md` — among them:
+> identity is interned and component-scoped rather than hashed
+> (`rustnative_core::identity`); the scheduler runs on a pluggable
+> `Executor` with no process-wide fixed runtime; task scopes release
+> finished handles; effects compare dependencies by equality; snapshots
+> keep a child index; layout invalidation is limited to geometry-affecting
+> changes; the Windows backend confines raw handles to `native::context`,
+> classifies Win32 results in `native::win32`, runs file dialogs on a
+> dedicated STA thread through `IFileDialog`, and owns menus through RAII;
+> the accessibility bridge is UI Automation; CI, `rustfmt.toml`,
+> `SECURITY.md`, and `CONTRIBUTING.md` exist. It is kept for its reasoning,
+> not as a description of the current code. The current whole-framework
+> review is recorded in `BUILD_STATUS.md` ("Whole-framework review,
+> 2026-10-12").
+
 **Audit date:** 2026-08-29  
 **Scope:** `RustNative.zip` as supplied in this conversation  
 **Audit mode:** Read-only / no source rewrite performed  

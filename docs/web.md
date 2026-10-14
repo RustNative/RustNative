@@ -1,9 +1,23 @@
 # The Web backend
 
 `PLAN.md` Web milestones A–K. A Rust Native application runs in the browser
-with the same components, events, and state as on Windows. Its views become
-semantic HTML, its styles become CSS, and its logic runs in the browser
-compiled to JavaScript or WebAssembly, or on the server.
+with the same nodes, events, styles, and services as on the native hosts. Its
+views become semantic HTML, its styles become CSS, and its logic runs in the
+browser compiled to JavaScript or WebAssembly, or on the server.
+
+**Which components run where.** Any `Component` renders on the server (a
+static page, or a server-interactive `Live` subtree whose state stays on the
+server), and any `Component` runs in the browser as full Rust inside a
+WebAssembly subtree. What runs in the browser as *generated JavaScript* is a
+client component: a `#[client]` module with state, `update`, and `view`
+over a subset of Rust (`docs/web/client-subset.md`) — not the full
+`Component` contract with its context, effects, child components, and
+persisted state. A client component also runs natively, as a `Component`
+(`rustnative_web::Client<State>`), so logic written in the subset is shared
+with every host; logic that needs the whole contract is a native component,
+a `Live` subtree, or a WebAssembly subtree on the Web. This is a deliberate
+seam — the JavaScript path is what keeps a page's script small and its
+policy strict — and the choice is per subtree.
 
 ## Three modes, one application
 
