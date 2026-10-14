@@ -502,6 +502,12 @@ impl WindowRegistry {
         // `i32`'s range.
         #[allow(clippy::cast_possible_wrap)]
         let (width, height) = (size.width as i32, size.height as i32);
+        // The window's size is logical; it opens at the system's DPI (the
+        // primary monitor's), and WM_DPICHANGED resizes it if it lands on
+        // a monitor of another (`native::dpi`).
+        let dpi = super::dpi::system_dpi();
+        let (width, height) =
+            (super::dpi::to_device(width, dpi), super::dpi::to_device(height, dpi));
         // SAFETY: `wide(WINDOW_CLASS_NAME)` names the top-level window
         // class `register_window_classes` registers before any window
         // is created; its `Vec<u16>` is a temporary whose lifetime

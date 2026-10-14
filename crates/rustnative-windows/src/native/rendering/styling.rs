@@ -207,10 +207,10 @@ pub(crate) fn create_font(typography: &Typography, scale: f32) -> HFONT {
     let encoded: Vec<u16> = self::face_name(&typography.family).encode_utf16().take(31).collect();
     face_name[..encoded.len()].copy_from_slice(&encoded);
 
-    // A negative `lfHeight` asks GDI for a character height in logical
-    // (pixel, at the default 96 DPI this framework currently assumes)
-    // units rather than a cell height, which is what the framework's
-    // `Typography::size` is meant to represent.
+    // A negative `lfHeight` asks GDI for a character height rather than a
+    // cell height, which is what the framework's `Typography::size` is
+    // meant to represent; `scale` carries the text scale and the window's
+    // DPI scale, so the height is in device pixels.
     let logfont = LOGFONTW {
         lfHeight: -scaled_height(typography, scale),
         lfWidth: 0,
@@ -249,6 +249,9 @@ pub(crate) struct StyleCache {
     interaction: HashMap<NodeId, ControlState>,
     theme: Theme,
     host: HostSettings,
+    /// The window's DPI: fonts are realized at their logical size times
+    /// its scale (`native::dpi`), so text fills the room layout made.
+    dpi: u32,
     pool: GdiPool,
 }
 
@@ -287,6 +290,14 @@ impl StyleCache {
         self.host.text_scale
     }
 
+    /// Records the window's DPI; returns whether it changed (every realized
+    /// font must then be realized again).
+    pub(crate) fn set_dpi(&mut self, dpi: u32) -> bool {
+        let changed = self.dpi != dpi;
+        self.dpi = dpi;
+        changed
+    }
+
     /// Records the system settings styles follow; returns whether they
     /// changed (every realized style must then be realized again).
     pub(crate) fn set_host_settings(&mut self, host: HostSettings) -> bool {
@@ -314,10 +325,14 @@ impl StyleCache {
         } else {
             self.interaction.get(&id).copied().unwrap_or(ControlState::Normal)
         };
+        // Fonts at the person's text scale and the window's DPI.
+        #[allow(clippy::cast_possible_truncation, reason = "a DPI scale, between 1 and 5")]
+        let dpi_scale = crate::native::dpi::scale(self.dpi) as f32;
+        let host = HostSettings { text_scale: self.host.text_scale * dpi_scale, ..self.host };
         let resolved = ControlStyle::resolve(
             &self.theme.resolve(kind, state, style_override),
             kind,
-            self.host,
+            host,
             &mut self.pool,
         );
         self.realized.insert(id, resolved);

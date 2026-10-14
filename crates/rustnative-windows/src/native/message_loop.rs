@@ -791,9 +791,14 @@ fn window_proc_impl(hwnd: HWND, message: u32, wparam: WPARAM, lparam: LPARAM) ->
         }
         WM_SIZE => {
             with_runtime(hwnd, |runtime| {
+                // Device pixels from Win32; the application hears logical ones.
+                let dpi = super::dpi::dpi_of(hwnd);
+                let logical = |value: u16| {
+                    u32::try_from(super::dpi::to_logical(i32::from(value), dpi)).unwrap_or(0)
+                };
                 let size = rustnative_core::Size::new(
-                    u32::from(super::util::loword_signed(lparam)),
-                    u32::from(super::util::hiword_signed(lparam)),
+                    logical(super::util::loword_signed(lparam)),
+                    logical(super::util::hiword_signed(lparam)),
                 );
                 let window = runtime.window_id;
                 if !runtime.dispatch_or_quit(Event::WindowResized { window, size }) {

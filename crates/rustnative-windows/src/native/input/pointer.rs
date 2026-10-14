@@ -212,7 +212,13 @@ fn local_point(runtime: &Runtime, id: NodeId, screen: POINT) -> Point {
     // registry; `point` is a valid, exclusively borrowed `POINT`.
     let converted = unsafe { ScreenToClient(object.hwnd(), &raw mut point) } != 0;
     best_effort(converted, "ScreenToClient", "the sample is reported in screen coordinates");
-    Point::new(point.x, point.y)
+    // Device pixels from Win32; a node's coordinates are logical, the
+    // space its draw list and hit regions are in (`native::dpi`).
+    let dpi = runtime.renderer.scale_dpi();
+    Point::new(
+        crate::native::dpi::to_logical(point.x, dpi),
+        crate::native::dpi::to_logical(point.y, dpi),
+    )
 }
 
 fn now(runtime: &Runtime) -> std::time::Duration {

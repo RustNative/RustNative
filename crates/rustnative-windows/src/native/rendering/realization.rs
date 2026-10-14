@@ -101,6 +101,9 @@ pub(crate) struct Renderer {
     /// The window's DPI as `WM_DPICHANGED` last announced it, which is what
     /// a surface's scale factor follows once the window has moved.
     dpi: Option<u32>,
+    /// The DPI the current layout was applied at (`crate::native::dpi`):
+    /// layout is logical, native geometry is this many dots per 96.
+    scale_dpi: u32,
     /// Set when the system settings styles follow changed.
     restyle_all: bool,
     /// Surface size changes not yet reported (see
@@ -150,6 +153,7 @@ impl Renderer {
             pool: ControlPool::default(),
             surface_sizes: HashMap::new(),
             dpi: None,
+            scale_dpi: crate::native::dpi::BASELINE_DPI,
             restyle_all: false,
             surface_changes: Vec::new(),
             accessibility: AccessibilityBridge::default(),
@@ -243,11 +247,15 @@ impl Renderer {
             "layout falls back to a zero-size client",
         );
 
+        // Win32 reports device pixels; layout runs in logical ones.
+        let dpi = crate::native::dpi::dpi_of(window);
+        self.set_scale_dpi(dpi);
         let size = Size::new(
-            dimension_to_u32(client.right - client.left),
-            dimension_to_u32(client.bottom - client.top),
+            dimension_to_u32(crate::native::dpi::to_logical(client.right - client.left, dpi)),
+            dimension_to_u32(crate::native::dpi::to_logical(client.bottom - client.top, dpi)),
         );
-        let measurer = WindowsIntrinsicMeasurer { window, text_scale: self.styles.text_scale() };
+        let measurer =
+            WindowsIntrinsicMeasurer { window, text_scale: self.styles.text_scale(), dpi };
         let output = self.measure_and_lay_out(size, &measurer);
 
         self.collect_geometry_transitions(&output.rects);
@@ -323,6 +331,26 @@ impl Renderer {
     /// Records the DPI `WM_DPICHANGED` announced for this window.
     pub(crate) fn set_dpi(&mut self, dpi: u32) {
         self.dpi = Some(dpi);
+    }
+
+    /// The DPI native geometry is placed at; a change restyles every node,
+    /// because fonts are realized at it, and moves every object again.
+    fn set_scale_dpi(&mut self, dpi: u32) {
+        if self.scale_dpi != dpi {
+            self.scale_dpi = dpi;
+            self.positioned.clear();
+            if self.styles.set_dpi(dpi) {
+                for node in self.snapshot.nodes().cloned().collect::<Vec<_>>() {
+                    self.apply_control_style(&node);
+                }
+            }
+        }
+        self.scroll.set_dpi(dpi);
+    }
+
+    /// The DPI native geometry is placed at.
+    pub(crate) const fn scale_dpi(&self) -> u32 {
+        self.scale_dpi
     }
 
     /// Native surfaces whose size changed, for the runtime to report.
@@ -773,6 +801,7 @@ impl Renderer {
         // until its animation ends (see `rendering::animated`).
         let rect = self.animated.rect_for(id, rect);
         let placed = (object.hwnd() as isize, rect);
+        let device = crate::native::dpi::rect_to_device(rect, self.scale_dpi);
         if self.positioned.insert(id, placed) == Some(placed) {
             if object.content_hwnd().is_some() {
                 self.scroll.apply(id, &self.registry, rect);
@@ -790,10 +819,10 @@ impl Renderer {
             SetWindowPos(
                 object.hwnd(),
                 std::ptr::null_mut(),
-                rect.x,
-                rect.y,
-                rect.width,
-                rect.height,
+                device.x,
+                device.y,
+                device.width,
+                device.height,
                 SWP_NOACTIVATE | SWP_NOZORDER,
             )
         } != 0;

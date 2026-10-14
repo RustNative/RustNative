@@ -563,6 +563,7 @@ fn text_goes_through_the_systems_own_stack() {
         let measurer = super::measure::WindowsIntrinsicMeasurer {
             window: harness.hwnd(WindowId::PRIMARY),
             text_scale: 1.0,
+            dpi: 96,
         };
         let ours = rustnative_core::IntrinsicMeasurer::measure_styled(
             &measurer,

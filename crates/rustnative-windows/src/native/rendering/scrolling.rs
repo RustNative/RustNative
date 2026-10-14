@@ -48,9 +48,17 @@ pub(crate) struct ScrollState {
     offsets: HashMap<NodeId, Point>,
     ranges: HashMap<NodeId, Size>,
     content_sizes: HashMap<NodeId, Size>,
+    /// The window's DPI: offsets and extents are logical, and are converted
+    /// to device pixels where the content host is moved (`native::dpi`).
+    dpi: u32,
 }
 
 impl ScrollState {
+    /// Records the window's DPI, which [`Self::apply`] converts by.
+    pub(crate) const fn set_dpi(&mut self, dpi: u32) {
+        self.dpi = dpi;
+    }
+
     /// Replaces the ranges and content sizes a layout pass just produced,
     /// then reconciles existing offsets against them.
     ///
@@ -146,6 +154,12 @@ impl ScrollState {
         };
         let offset = self.offset(id);
         let (width, height) = self.content_extent(id, viewport);
+        let to_device = |value: i32| super::super::dpi::to_device(value, self.dpi);
+        let (offset, width, height) = (
+            Point::new(to_device(offset.x), to_device(offset.y)),
+            to_device(width),
+            to_device(height),
+        );
 
         // SAFETY: `content` is a live HWND owned by this node's registry
         // entry (matched above); a null `hWndInsertAfter` combined with

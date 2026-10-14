@@ -222,8 +222,10 @@ pub const WEB_UNITS: UnitMapping = UnitMapping {
 pub const WINDOWS_UNITS: UnitMapping = UnitMapping {
     backend: "Windows",
     host_unit: "device pixels",
-    pixel: "one logical pixel is one device pixel: layout is not yet scaled by `GetDpiForWindow / 96` (a surface \
-            reports that ratio as its `scale_factor`; scaling layout itself is recorded as owed in BUILD_STATUS.md)",
+    pixel: "one logical pixel is `GetDpiForWindow / 96` device pixels, per window: layout runs in logical pixels and \
+            control rectangles, scroll offsets, padding, corner radii, fonts, and canvases are scaled where they \
+            reach Win32, following `WM_DPICHANGED` on the same windows; a container's border stays a one-device-pixel \
+            hairline",
     rem: "16 logical pixels × the text-scale factor (`keys::TEXT_SCALE`, fed from the system text-size setting) for \
           lengths; font sizes are specified at the default text size and every font — themed or declared — is \
           scaled by the text scale when it is realized",

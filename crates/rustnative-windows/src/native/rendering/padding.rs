@@ -50,7 +50,7 @@ fn pack(low: i32, high: i32) -> usize {
 /// when it changed. `is_edit` picks the `WM_CTLCOLOR*` the band is filled
 /// from.
 pub(crate) fn set(hwnd: HWND, padding: Option<EdgeInsets>, is_edit: bool) {
-    let padding = padding.filter(|padding| *padding != EdgeInsets::default());
+    let padding = device_insets(hwnd, padding).filter(|padding| *padding != EdgeInsets::default());
     if padding_of(hwnd) == padding {
         return;
     }
@@ -88,7 +88,7 @@ pub(crate) fn set(hwnd: HWND, padding: Option<EdgeInsets>, is_edit: bool) {
 /// Sets a button's text margins to its own plus `padding`, recording
 /// `padding` so the button's own can be recovered when it changes.
 pub(crate) fn set_button(hwnd: HWND, padding: Option<EdgeInsets>) {
-    let padding = padding.filter(|padding| *padding != EdgeInsets::default());
+    let padding = device_insets(hwnd, padding).filter(|padding| *padding != EdgeInsets::default());
     let recorded = padding_of(hwnd);
     if recorded == padding {
         return;
@@ -296,4 +296,17 @@ unsafe extern "system" fn subclass_proc(
         }
         _ => next(),
     }
+}
+
+/// `padding` (logical, as styles declare it) in `hwnd`'s device pixels,
+/// which is what is recorded and painted (`native::dpi`).
+fn device_insets(hwnd: HWND, padding: Option<EdgeInsets>) -> Option<EdgeInsets> {
+    let dpi = crate::native::dpi::dpi_of(hwnd);
+    let device = |value: i32| crate::native::dpi::to_device(value, dpi);
+    padding.map(|padding| EdgeInsets {
+        top: device(padding.top),
+        end: device(padding.end),
+        bottom: device(padding.bottom),
+        start: device(padding.start),
+    })
 }

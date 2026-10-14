@@ -19,6 +19,9 @@ mod controls_integration;
 mod cursor;
 #[cfg(test)]
 mod data_integration;
+pub(crate) mod dpi;
+#[cfg(test)]
+mod dpi_integration;
 pub(crate) mod embed;
 pub(crate) mod foreign;
 pub(crate) mod graphics;

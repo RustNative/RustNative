@@ -24,6 +24,9 @@ pub(crate) struct WindowsIntrinsicMeasurer {
     /// The text scale fonts are realized at, so text measures in the font
     /// that will draw it.
     pub(crate) text_scale: f32,
+    /// The window's DPI: text is measured in the device-pixel font that will
+    /// draw it and reported in logical pixels (`native::dpi`).
+    pub(crate) dpi: u32,
 }
 
 thread_local! {
@@ -93,7 +96,7 @@ impl IntrinsicMeasurer for WindowsIntrinsicMeasurer {
             max_width,
             typography
                 .map(|typography| (typography.family.clone(), typography.size, typography.weight)),
-            text_scale_milli(self.text_scale),
+            text_scale_milli(self.text_scale * self.dpi_scale()),
         );
         if let Some(size) = MEASUREMENTS.with(|cache| cache.borrow().get(&key).copied()) {
             return size;
@@ -111,6 +114,11 @@ impl IntrinsicMeasurer for WindowsIntrinsicMeasurer {
 }
 
 impl WindowsIntrinsicMeasurer {
+    #[allow(clippy::cast_possible_truncation, reason = "a DPI scale, between 1 and 5")]
+    fn dpi_scale(&self) -> f32 {
+        crate::native::dpi::scale(self.dpi) as f32
+    }
+
     fn measure_uncached(
         &self,
         kind: NodeKind,
@@ -142,7 +150,14 @@ impl WindowsIntrinsicMeasurer {
 
         // Measured in the font that will draw it — the node's own, or the
         // default the theme gives text — at the person's text scale.
-        let font = measuring_font(&typography.cloned().unwrap_or_default(), self.text_scale);
+        let font = measuring_font(
+            &typography.cloned().unwrap_or_default(),
+            self.text_scale * self.dpi_scale(),
+        );
+        // Measured in device pixels, at the window's DPI; reported in
+        // logical ones, rounded up so nothing measured is clipped.
+        let device = |value: i32| crate::native::dpi::to_device(value, self.dpi);
+        let logical = |value: i32| crate::native::dpi::to_logical_ceil(value, self.dpi);
         let previous = if font.is_null() {
             std::ptr::null_mut()
         } else {
@@ -169,7 +184,8 @@ impl WindowsIntrinsicMeasurer {
         // bounding box by adding to these bounds, so leaving three quarters
         // of the range as headroom keeps the arithmetic inside GDI from
         // overflowing on a pathologically long single line.
-        let available_width = max_width.map_or(i32::MAX / 4, |width| (width - padding).max(1));
+        let available_width =
+            max_width.map_or(i32::MAX / 4, |width| device((width - padding).max(1)));
         let mut rect = RECT { left: 0, top: 0, right: available_width, bottom: i32::MAX / 4 };
         let flags = DT_CALCRECT
             | if matches!(kind, NodeKind::Label) && max_width.is_some() { DT_WORDBREAK } else { 0 };
@@ -203,8 +219,8 @@ impl WindowsIntrinsicMeasurer {
         // `DT_CALCRECT` writes a normalized rectangle, so `right >= left`
         // and `bottom >= top`, and neither difference can exceed the
         // `i32::MAX / 4` bounds given above.
-        let width = (rect.right - rect.left + padding).max(1);
-        let height = (rect.bottom - rect.top).max(1);
+        let width = (logical(rect.right - rect.left) + padding).max(1);
+        let height = logical(rect.bottom - rect.top).max(1);
         // `.max(1)` above guarantees both are positive, so the cast to an
         // unsigned `Size` cannot actually lose a sign — clippy's
         // `cast_sign_loss` can't see that guarantee through `.max`, so it
@@ -223,7 +239,7 @@ mod tests {
     #[test]
     fn measuring_empty_text_does_not_touch_the_device_context() {
         let window = TestWindow::new();
-        let measurer = WindowsIntrinsicMeasurer { window: window.hwnd, text_scale: 1.0 };
+        let measurer = WindowsIntrinsicMeasurer { window: window.hwnd, text_scale: 1.0, dpi: 96 };
         let size = measurer.measure(NodeKind::Label, None, None);
         assert!(size.width > 0 && size.height > 0, "even an empty label reserves some space");
     }
@@ -231,7 +247,7 @@ mod tests {
     #[test]
     fn measuring_more_text_never_produces_a_narrower_result() {
         let window = TestWindow::new();
-        let measurer = WindowsIntrinsicMeasurer { window: window.hwnd, text_scale: 1.0 };
+        let measurer = WindowsIntrinsicMeasurer { window: window.hwnd, text_scale: 1.0, dpi: 96 };
         let short = measurer.measure(NodeKind::Label, Some("Hi"), None);
         let long = measurer.measure(
             NodeKind::Label,
@@ -248,7 +264,7 @@ mod tests {
     #[test]
     fn measuring_respects_a_max_width_constraint_for_wrapping_kinds() {
         let window = TestWindow::new();
-        let measurer = WindowsIntrinsicMeasurer { window: window.hwnd, text_scale: 1.0 };
+        let measurer = WindowsIntrinsicMeasurer { window: window.hwnd, text_scale: 1.0, dpi: 96 };
         let long_text = "word ".repeat(40);
         let unconstrained = measurer.measure(NodeKind::Label, Some(&long_text), None);
         let constrained = measurer.measure(NodeKind::Label, Some(&long_text), Some(80));
@@ -262,7 +278,7 @@ mod tests {
     #[test]
     fn measuring_a_pathologically_long_line_stays_within_the_coordinate_domain() {
         let window = TestWindow::new();
-        let measurer = WindowsIntrinsicMeasurer { window: window.hwnd, text_scale: 1.0 };
+        let measurer = WindowsIntrinsicMeasurer { window: window.hwnd, text_scale: 1.0, dpi: 96 };
         let huge = "x".repeat(100_000);
         let size = measurer.measure(NodeKind::Label, Some(&huge), None);
         assert!(size.width > 0, "an enormous single line still measures to a usable width");

@@ -55,7 +55,9 @@ fn get(hwnd: HWND, property: &str) -> Option<usize> {
 /// the radius to its current size.
 pub(crate) fn set_shape(hwnd: HWND, border: Option<COLORREF>, radius: u16) {
     set(hwnd, BORDER, border.map(|color| color as usize));
-    set(hwnd, RADIUS, (radius > 0).then_some(usize::from(radius)));
+    // The radius is logical; the region is cut in device pixels.
+    let radius = crate::native::dpi::to_device(i32::from(radius), crate::native::dpi::dpi_of(hwnd));
+    set(hwnd, RADIUS, usize::try_from(radius).ok().filter(|radius| *radius > 0));
     apply_region(hwnd);
 }
 

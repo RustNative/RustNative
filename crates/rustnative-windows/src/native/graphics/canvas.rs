@@ -272,16 +272,18 @@ fn render(hwnd: HWND, state: &mut CanvasState) -> bool {
 }
 
 fn create_target(hwnd: HWND, factories: &d2d::Factories) -> Option<ID2D1HwndRenderTarget> {
+    // Canvas units are logical pixels, like every layout unit; giving
+    // Direct2D the window's DPI makes it scale them to device pixels.
+    #[allow(clippy::cast_precision_loss, reason = "a DPI is far below f32's exact range")]
+    let dpi = crate::native::dpi::dpi_of(hwnd) as f32;
     let properties = D2D1_RENDER_TARGET_PROPERTIES {
         r#type: D2D1_RENDER_TARGET_TYPE_DEFAULT,
         pixelFormat: D2D1_PIXEL_FORMAT {
             format: DXGI_FORMAT_UNKNOWN,
             alphaMode: D2D1_ALPHA_MODE_UNKNOWN,
         },
-        // Canvas units are layout units, which this backend keeps in
-        // physical pixels; pinning 96 DPI makes one the other.
-        dpiX: 96.0,
-        dpiY: 96.0,
+        dpiX: dpi,
+        dpiY: dpi,
         usage: D2D1_RENDER_TARGET_USAGE_NONE,
         minLevel: D2D1_FEATURE_LEVEL_DEFAULT,
     };
