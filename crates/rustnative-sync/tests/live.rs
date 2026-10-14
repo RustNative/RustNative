@@ -50,9 +50,17 @@ impl Component for Counter {
             ],
         )
     }
+    fn render(&mut self, context: &mut rustnative_core::ComponentContext<'_, ()>) -> Node {
+        // Ctrl+K adds one too: a shortcut the session sends the browser.
+        context.command(rustnative_core::command::Command::new(ADD, "Add one").shortcut(
+            rustnative_core::command::Shortcut::ctrl(rustnative_core::KeyCode::Character('k')),
+        ));
+        self.view()
+    }
     fn update(&mut self, event: Event) {
         match event {
             Event::Click { target } if target == NodeId::from_key("increment") => self.count += 1,
+            Event::Command { id } if id == ADD => self.count += 1,
             Event::TextChanged { target, value } if target == NodeId::from_key("name") => {
                 self.name = value;
             }
@@ -63,6 +71,8 @@ impl Component for Counter {
         Some(json!({ "count": self.count, "name": self.name }))
     }
 }
+
+const ADD: rustnative_core::command::CommandId = rustnative_core::command::CommandId::new("add");
 
 struct CounterApp;
 
@@ -283,4 +293,18 @@ fn a_virtual_elements_action_reaches_the_server() {
     }))
     .unwrap();
     assert_eq!(unknown.into_event(), None, "an action this side does not know is dropped");
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn a_shortcut_reaches_its_command_on_the_server() {
+    let (_server, url) = server().await;
+    let client = LiveClient::connect(&url);
+    until("the first tree", || label(&client, "count").as_deref() == Some("Count 0")).await;
+    let ctrl = rustnative_core::KeyModifiers { ctrl: true, ..Default::default() };
+    client.send(&Event::KeyDown {
+        target: Some(NodeId::from_key("name")),
+        key: rustnative_core::KeyCode::Character('k'),
+        modifiers: ctrl,
+    });
+    until("the command", || label(&client, "count").as_deref() == Some("Count 1")).await;
 }

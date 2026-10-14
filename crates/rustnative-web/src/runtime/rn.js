@@ -2166,6 +2166,9 @@ export class LiveIsland {
         document.dispatchEvent(new CustomEvent("rn:live", { detail: { island: this.index, frames: this.frames } }));
         break;
       }
+      case "shortcuts":
+        this.shortcuts = frame.keys || [];
+        break;
       case "drain":
         if (frame.snapshot !== undefined && frame.snapshot !== null) this.snapshot = frame.snapshot;
         this.session = null;
@@ -2227,6 +2230,20 @@ export class LiveIsland {
       if (name === "input" || name === "select" || name === "textarea") return;
       if (name === "a" && found.element.getAttribute("href") === "#") event.preventDefault();
       this.send({ event: "click", target: found.key });
+    });
+    // A key the session's commands answer: kept from the browser's own
+    // default (Ctrl+S saving the page) and routed to the command on the
+    // server, from the focused node.
+    on("keydown", (event) => {
+      const key = keyCode(event);
+      const modifiers = { shift: event.shiftKey, ctrl: event.ctrlKey, alt: event.altKey, meta: event.metaKey };
+      const sameKey = (a, b) => JSON.stringify(a).toLowerCase() === JSON.stringify(b).toLowerCase();
+      const sameModifiers = (m) => ["shift", "ctrl", "alt", "meta"].every((name) => Boolean(m[name]) === modifiers[name]);
+      if ((this.shortcuts || []).some(([k, m]) => sameKey(k, key) && sameModifiers(m))) {
+        event.preventDefault();
+        const found = this.keyOf(event.target);
+        this.send({ event: "key_down", target: found ? found.key : null, key, modifiers });
+      }
     });
     on("keydown", (event) => {
       const virtual = virtualOf(event.target);

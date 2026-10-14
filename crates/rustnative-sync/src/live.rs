@@ -70,6 +70,17 @@ pub enum WireEvent {
         /// One past the last.
         last_exclusive: usize,
     },
+    /// A key pressed with one of the session's shortcuts
+    /// ([`ServerFrame::Shortcuts`]), routed through the command model from
+    /// the focused node.
+    KeyDown {
+        /// The focused node's wire key, if one has focus.
+        target: Option<String>,
+        /// The key.
+        key: rustnative_core::KeyCode,
+        /// The modifiers held.
+        modifiers: rustnative_core::KeyModifiers,
+    },
     /// Assistive technology activated one of a node's virtual elements (a
     /// chart's bar).
     AccessibilityAction {
@@ -136,6 +147,9 @@ impl WireEvent {
                 first: range.first,
                 last_exclusive: range.last_exclusive,
             },
+            Event::KeyDown { target, key: code, modifiers } => {
+                Self::KeyDown { target: target.map(key), key: *code, modifiers: *modifiers }
+            }
             Event::AccessibilityAction { target, element: Some(element), action } => {
                 Self::AccessibilityAction {
                     target: key(*target),
@@ -164,6 +178,9 @@ impl WireEvent {
                     target: node_id(&target),
                     range: rustnative_core::VirtualRange { first, last_exclusive },
                 }
+            }
+            Self::KeyDown { target, key, modifiers } => {
+                Event::KeyDown { target: target.as_deref().map(node_id), key, modifiers }
             }
             Self::AccessibilityAction { target, element, action } => Event::AccessibilityAction {
                 target: node_id(&target),
@@ -231,6 +248,13 @@ pub enum ServerFrame {
         acknowledged: u64,
         /// The root component's state.
         snapshot: Option<Value>,
+    },
+    /// The key combinations the session's enabled commands answer, sent
+    /// when they change: the browser keeps them from its own defaults and
+    /// sends them as [`WireEvent::KeyDown`].
+    Shortcuts {
+        /// Each shortcut's key and modifiers.
+        keys: Vec<(rustnative_core::KeyCode, rustnative_core::KeyModifiers)>,
     },
     /// This instance is going away: reconnect to `to` after a pause.
     Drain {
@@ -382,6 +406,8 @@ fn run_session<A: LiveApp>(app: &A, snapshot: Option<Value>, commands: &mpsc::Re
     let mut browser: Option<(BrowserEncoding, Value)> = None;
     let mut acknowledged = 0;
     let mut last: Option<Node> = None;
+    let mut shortcuts_sent: Option<Vec<(rustnative_core::KeyCode, rustnative_core::KeyModifiers)>> =
+        None;
     loop {
         let command = commands.recv_timeout(Duration::from_millis(25));
         match command {
@@ -390,8 +416,15 @@ fn run_session<A: LiveApp>(app: &A, snapshot: Option<Value>, commands: &mpsc::Re
                 if sequence > acknowledged {
                     // An action this side does not know is acknowledged and
                     // dropped, so the client stops resending it.
-                    if let Some(event) = event.into_event() {
-                        tree.dispatch(event);
+                    match event.into_event() {
+                        // A shortcut goes to its command, routed from focus;
+                        // a key no command takes is an ordinary key event.
+                        Some(Event::KeyDown { target, key, modifiers })
+                            if tree.handle_shortcut(key, modifiers, target) => {}
+                        Some(event) => {
+                            tree.dispatch(event);
+                        }
+                        None => {}
                     }
                     acknowledged = sequence;
                 }
@@ -400,6 +433,7 @@ fn run_session<A: LiveApp>(app: &A, snapshot: Option<Value>, commands: &mpsc::Re
                 outbound = Some(sender);
                 browser = encoding;
                 last = None;
+                shortcuts_sent = None;
             }
             Ok(Command::Detach) => outbound = None,
             Ok(Command::Snapshot(reply)) => {
@@ -451,6 +485,21 @@ fn run_session<A: LiveApp>(app: &A, snapshot: Option<Value>, commands: &mpsc::Re
             }
             if outbound.is_some() {
                 last = Some(view);
+            }
+        }
+        // The shortcuts the enabled commands answer, when they change.
+        let shortcuts: Vec<_> = tree
+            .commands()
+            .commands()
+            .filter(|command| command.is_enabled())
+            .filter_map(rustnative_core::command::Command::shortcut_key)
+            .map(|shortcut| (shortcut.key, shortcut.modifiers))
+            .collect();
+        if shortcuts_sent.as_ref() != Some(&shortcuts) {
+            if let Some(sender) = &outbound {
+                if sender.send(ServerFrame::Shortcuts { keys: shortcuts.clone() }).is_ok() {
+                    shortcuts_sent = Some(shortcuts);
+                }
             }
         }
     }
@@ -796,8 +845,9 @@ impl LiveClient {
                                 redirect = (!to.is_empty()).then_some(to);
                                 break;
                             }
-                            // This client never asks for elements.
-                            Ok(ServerFrame::Dom { .. }) | Err(_) => {}
+                            // This client never asks for elements, and a native
+                            // client's keys reach the server as they are.
+                            Ok(ServerFrame::Dom { .. } | ServerFrame::Shortcuts { .. }) | Err(_) => {}
                         }
                     }
                 }
