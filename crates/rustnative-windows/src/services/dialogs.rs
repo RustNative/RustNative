@@ -22,7 +22,7 @@
 //! module rather than added workspace-wide.
 //!
 //! Each dialog is shown with the owner window `request.owner` names, when it
-//! names a live top-level window this process created (`Audit.md`'s Phase 3
+//! names a live top-level window this process created (`docs/history/2026-08-29-engineering-audit.md`'s Phase 3
 //! roadmap item 15 — distinct from the "P1.15" severity-finding numbering
 //! used in `BUILD_STATUS.md`). A request with no owner, or one naming a
 //! `WindowId` this process does not currently recognize (already closed, or

@@ -1,7 +1,7 @@
 //! Long-running operations across the client/server boundary (`C87`). The
 //! server runs the work, and the client watches its progress and can
-//! cancel it. The states are the same as in
-//! `rustnative_data::OperationState`.
+//! cancel it. The states are `rustnative_data::OperationState`'s, and
+//! [`RemoteState::to_operation_state`] gives the client that type.
 //!
 //! - **Server:** an [`Operations`] registry mounted on a `rustnative-server`
 //!   application, at `GET /_ops/:id` and `POST /_ops/:id/cancel`.
@@ -50,6 +50,35 @@ impl RemoteState {
     #[must_use]
     pub const fn is_finished(&self) -> bool {
         !matches!(self, Self::Running { .. })
+    }
+
+    /// The same state as the client's `OperationState`, with the progress
+    /// and the result decoded from JSON — what a component watching a
+    /// server operation stores.
+    ///
+    /// # Errors
+    ///
+    /// The progress or the result is not a `P` or an `R`.
+    #[cfg(not(target_family = "wasm"))]
+    pub fn to_operation_state<P, R>(
+        &self,
+    ) -> Result<rustnative_data::OperationState<P, R>, serde_json::Error>
+    where
+        P: serde::de::DeserializeOwned,
+        R: serde::de::DeserializeOwned,
+    {
+        use rustnative_data::OperationState;
+        Ok(match self {
+            Self::Running { goal, progress } => OperationState::Running {
+                goal: goal.clone(),
+                progress: progress.clone().map(serde_json::from_value).transpose()?,
+            },
+            Self::Succeeded { result } => {
+                OperationState::Succeeded(serde_json::from_value(result.clone())?)
+            }
+            Self::Failed { error } => OperationState::Failed(error.clone()),
+            Self::Cancelled => OperationState::Cancelled,
+        })
     }
 }
 
@@ -245,4 +274,33 @@ pub async fn cancel(
         headers,
     );
     http.execute(request).await.map(|_| ()).map_err(|error| error.to_string())
+}
+
+#[cfg(all(test, not(target_family = "wasm")))]
+mod tests {
+    use rustnative_data::OperationState;
+    use serde_json::json;
+
+    use super::RemoteState;
+
+    #[test]
+    fn a_remote_state_is_the_clients_operation_state() {
+        let running = RemoteState::Running { goal: "export".into(), progress: Some(json!(40)) };
+        assert_eq!(
+            running.to_operation_state::<u8, String>().ok(),
+            Some(OperationState::Running { goal: "export".into(), progress: Some(40) })
+        );
+        let done = RemoteState::Succeeded { result: json!("notes.zip") };
+        assert_eq!(
+            done.to_operation_state::<u8, String>().ok(),
+            Some(OperationState::Succeeded("notes.zip".to_owned()))
+        );
+        assert_eq!(
+            RemoteState::Failed { error: "disk full".into() }
+                .to_operation_state::<u8, String>()
+                .ok(),
+            Some(OperationState::Failed("disk full".into()))
+        );
+        assert!(done.to_operation_state::<u8, u32>().is_err(), "a result of the wrong type");
+    }
 }

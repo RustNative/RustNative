@@ -58,7 +58,7 @@ where
 
     let (sender, receiver) = tokio::sync::oneshot::channel();
     std::thread::Builder::new()
-        .name("framework-dialog-sta".to_owned())
+        .name("rustnative-dialog-sta".to_owned())
         .spawn(move || {
             // SAFETY: `std::ptr::null()` is a documented-valid
             // `pvReserved` argument (it must always be null);

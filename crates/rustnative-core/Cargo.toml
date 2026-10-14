@@ -4,12 +4,12 @@ version = "0.1.0"
 edition.workspace = true
 rust-version.workspace = true
 license.workspace = true
-description.workspace = true
+description = "The portable runtime of Rust Native: components, the tree and its diff, layout, styling, the environment, capabilities, and service contracts"
 repository.workspace = true
 homepage.workspace = true
 readme.workspace = true
-keywords.workspace = true
-categories.workspace = true
+keywords = ["gui", "native", "cross-platform", "framework", "ui"]
+categories = ["gui"]
 
 [lib]
 name = "rustnative_core"
@@ -58,11 +58,6 @@ threads = ["dep:tokio"]
 # The operating system's random source, for the inspection server's token.
 # Off where there is none (`wasm32-unknown-unknown`).
 os-random = ["dep:getrandom"]
-# Before Milestone 30 this enabled `Serialize`/`Deserialize` on the id
-# types, ahead of persistence. Persistence is now part of the core, so
-# serde always is; the feature is kept, empty, so a manifest that asks for
-# it still builds.
-serde = []
 
 [dev-dependencies]
 tokio = { workspace = true, features = ["macros", "test-util"] }

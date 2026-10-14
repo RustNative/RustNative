@@ -62,7 +62,7 @@ impl MemoryWatcher {
         let (low, high, stop_for_thread) =
             (SendHandle(low as isize), SendHandle(high as isize), SendHandle(stop as isize));
         let thread = std::thread::Builder::new()
-            .name("framework-low-memory".into())
+            .name("rustnative-low-memory".into())
             .spawn(move || watch(low, high, stop_for_thread))
             .ok()?;
         Some(Self { stop: stop as isize, thread: Some(thread) })

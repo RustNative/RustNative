@@ -72,6 +72,19 @@ thread_local! {
 /// through the declarative tree (`Node`, `ComponentTree`, ...) is already
 /// `Rc`-based and therefore confined to a single thread; a lock would only
 /// add contention with no corresponding safety benefit.
+///
+/// Two consequences, stated rather than discovered:
+///
+/// - **A `NodeId` means something only on the thread that made it.** The
+///   same key interned on two threads can get two numbers, so ids never
+///   cross threads; what crosses (the wire, a Live session, the inspector)
+///   carries the *key* ([`crate::wire::key_of`]) and re-interns it.
+/// - **The table only grows.** A long-lived server that renders on a pool
+///   of threads interns every distinct key each thread sees, so keys made
+///   from data (`row-{id}`) accumulate per thread for the life of the
+///   process. [`NodeId::interned_keys`] reports the size for a metric.
+///   ponytail: an append-only table; a generation-swept or per-render
+///   scoped interner if a server's key vocabulary is unbounded in practice.
 struct KeyInterner {
     ids: HashMap<Box<str>, u64>,
     /// The reverse of `ids`, indexed by interned id — what lets a
@@ -127,6 +140,13 @@ impl NodeId {
     pub fn from_key(key: &str) -> Self {
         let interned = KEY_INTERNER.with(|interner| interner.borrow_mut().intern(key));
         Self(u128::from(interned))
+    }
+
+    /// How many distinct keys this thread has interned — the size of a
+    /// table that only grows, for a long-lived server to watch.
+    #[must_use]
+    pub fn interned_keys() -> usize {
+        KEY_INTERNER.with(|interner| interner.borrow().keys.len())
     }
 
     /// Combines a component-local identity with its owning component,

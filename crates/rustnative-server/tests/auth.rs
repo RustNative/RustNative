@@ -221,7 +221,7 @@ async fn a_revoked_session_opens_as_none() {
         let _ = get_with(&session_service(probe), "/me", Some(("cookie", cookie.clone()))).await;
         revoked.lock().unwrap().last().cloned().unwrap()
     };
-    assert!(!id.is_empty());
+    assert_ne!(id, "");
     assert_eq!(
         get_with(&service, "/me", Some(("cookie", cookie))).await.status(),
         StatusCode::UNAUTHORIZED

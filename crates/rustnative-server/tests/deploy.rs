@@ -174,7 +174,7 @@ async fn a_response_carrying_one_visitor_s_secrets_is_never_replayed_to_another(
             service.handle(Request::builder().uri("/page").body(Bytes::new()).unwrap(), None).await;
     }
     assert_eq!(renders.load(Ordering::SeqCst), 2, "rendered for each visitor");
-    assert!(cache.entries().is_empty());
+    assert_eq!(cache.entries(), []);
 }
 
 #[tokio::test]

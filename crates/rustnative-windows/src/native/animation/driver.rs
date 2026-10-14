@@ -89,7 +89,7 @@ impl FrameDriver {
         static STARTED: OnceLock<()> = OnceLock::new();
         STARTED.get_or_init(|| {
             let spawned = std::thread::Builder::new()
-                .name("framework-frames".to_owned())
+                .name("rustnative-frames".to_owned())
                 .spawn(move || self.run());
             // Without the thread, animations simply never advance; every
             // value still reaches its target the moment something else

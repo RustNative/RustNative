@@ -407,8 +407,10 @@ impl Application {
 
     /// Tells the application it is being suspended, resumed, or terminated.
     ///
-    /// Persisted state is flushed *first* for [`Lifecycle::Suspending`],
-    /// [`Lifecycle::Terminating`], and [`Lifecycle::LowMemory`] — a
+    /// Persisted state is flushed *first* for
+    /// [`Lifecycle::Suspending`](crate::lifecycle::Lifecycle::Suspending),
+    /// [`Lifecycle::Terminating`](crate::lifecycle::Lifecycle::Terminating), and
+    /// [`Lifecycle::LowMemory`](crate::lifecycle::Lifecycle::LowMemory) — a
     /// platform may not wait for anything after this returns — and then
     /// [`Event::Lifecycle`] is delivered to every open window's root,
     /// primary first, so a component in any window can do what is specific

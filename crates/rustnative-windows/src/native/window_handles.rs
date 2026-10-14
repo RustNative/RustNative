@@ -14,7 +14,7 @@
 //! `rustnative_core::WindowId` to a native handle from a *different* thread
 //! than the one that owns it.
 //!
-//! This closes exactly the gap `Audit.md`'s Phase 3 roadmap item 15
+//! This closes exactly the gap `docs/history/2026-08-29-engineering-audit.md`'s Phase 3 roadmap item 15
 //! describes: `FileDialogRequest::owner` (in `rustnative-core`) carries a
 //! window identity as far as the platform boundary, and this module is
 //! what lets `services::dialogs` turn that identity into a real `HWND` it

@@ -146,7 +146,7 @@ impl TokioExecutor {
     pub fn dedicated(worker_threads: usize) -> Self {
         let runtime = tokio::runtime::Builder::new_multi_thread()
             .worker_threads(worker_threads.max(1))
-            .thread_name("framework-async")
+            .thread_name("rustnative-async")
             .enable_time()
             .build()
             .expect("failed to start a dedicated framework async runtime");

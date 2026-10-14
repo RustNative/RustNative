@@ -119,7 +119,7 @@ impl TestWindow {
 
     fn create(parent: HWND, extra_style: u32) -> Self {
         let class_name = wide(format!(
-            "framework-test-window-{}",
+            "rustnative-test-window-{}",
             CLASS_COUNTER.fetch_add(1, Ordering::Relaxed)
         ));
         let instance = module_instance();

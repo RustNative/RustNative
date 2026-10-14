@@ -2755,7 +2755,7 @@ strings are empty without an IME).
 
 ## Previous: second standards-audit remediation pass — complete.
 
-An earlier revision of this document claimed every `Audit.md` finding was
+An earlier revision of this document claimed every `docs/history/2026-08-29-engineering-audit.md` finding was
 already closed. That claim was wrong, and this pass began by checking it
 rather than trusting it: the workspace was built, tested, linted, and read
 against the audit finding by finding on a real Windows machine with a real
@@ -2933,7 +2933,7 @@ A full audit of milestones 1–24 against a "production framework" bar found tha
 
 ## Standards audit remediation pass
 
-`Audit.md` (a from-scratch senior-engineer review against a "would this pass
+`docs/history/2026-08-29-engineering-audit.md` (a from-scratch senior-engineer review against a "would this pass
 review at a top-tier systems team" bar) found 3 P0s, 20 P1s, and 15 P2s.
 Every P0, every P1, and every P2 in that document is now closed, including
 every item in its Phase 1–3 roadmap — the two items (P0.2, P1.15's owner-
@@ -2954,7 +2954,7 @@ allocation, and a dedicated STA thread for native dialogs instead of the
 shared blocking pool — but, notably, *not* an actual CI workflow: this
 repository had none until this pass, see P1.17 below). This pass picked up
 from there and closed every remaining P0/P1/P2 finding and every roadmap
-item in `Audit.md`, once the compile/test breakthrough below made
+item in `docs/history/2026-08-29-engineering-audit.md`, once the compile/test breakthrough below made
 `rustnative-windows`'s Windows-only surface reachable by the same tools
 (`cargo build`/`test`/`clippy`/`fmt`) as `rustnative-core` already was.
 
@@ -3186,7 +3186,7 @@ full `-D warnings` policy against the real `x86_64-pc-windows-gnu` target
 via `tools/windows-cross-test.sh` — the same real verification this
 document describes for everything else in `native/`.
 
-**`Audit.md`'s Phase 3 roadmap item 15 — real owner/parent-window support —
+**`docs/history/2026-08-29-engineering-audit.md`'s Phase 3 roadmap item 15 — real owner/parent-window support —
 is now also closed.** `FileDialogRequest` (the cross-platform request type
 in `rustnative-core`, shared by every future platform backend) gained an
 `owner: Option<WindowId>` field. `rustnative-windows` resolves it to a real
