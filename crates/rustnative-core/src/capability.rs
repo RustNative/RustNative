@@ -127,6 +127,10 @@ pub enum Capability {
     /// A menu bar outside the window, owned by the desktop (the macOS menu
     /// bar, a global menu applet), rather than one drawn in each window.
     GlobalMenuBar,
+    /// The pointer captured and hidden, delivering relative motion (a game,
+    /// a 3-D view). Decided ahead of iPadOS, which has it, so every host
+    /// answers it: no shipped backend realizes it yet.
+    PointerLock,
 }
 
 impl Capability {
@@ -194,6 +198,7 @@ impl Capability {
         Self::WindowPlacement,
         Self::ServerSideDecorations,
         Self::GlobalMenuBar,
+        Self::PointerLock,
     ];
 }
 

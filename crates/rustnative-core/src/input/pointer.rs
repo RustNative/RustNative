@@ -92,6 +92,25 @@ pub struct PointerEvent {
     pressure: Option<Scalar>,
     timestamp: Duration,
     region: Option<u32>,
+    pen: PenState,
+    coalesced: Vec<PointerEvent>,
+    predicted: Vec<PointerEvent>,
+}
+
+/// What a pen reports beyond position and pressure, in the form the hosts
+/// that report most of it use (Apple Pencil, the browser's Pointer Events
+/// level 3): each part is `None` where the device does not report it.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+struct PenState {
+    /// Angle from the surface, radians: 0 lying flat, π/2 upright.
+    altitude: Option<Scalar>,
+    /// Direction the pen leans, radians clockwise from the positive x axis.
+    azimuth: Option<Scalar>,
+    /// Rotation about the pen's own axis, radians.
+    roll: Option<Scalar>,
+    /// Distance above the surface while hovering, in logical pixels; `None`
+    /// when touching or unknown.
+    hover: Option<Scalar>,
 }
 
 impl PointerEvent {
@@ -112,7 +131,91 @@ impl PointerEvent {
             pressure: None,
             timestamp,
             region: None,
+            pen: PenState::default(),
+            coalesced: Vec::new(),
+            predicted: Vec::new(),
         }
+    }
+
+    /// The pen's tilt as altitude (radians from the surface, `0..=π/2`) and
+    /// azimuth (radians clockwise from the positive x axis, `0..2π`).
+    #[must_use]
+    pub fn with_tilt(mut self, altitude: f32, azimuth: f32) -> Self {
+        let tau = std::f32::consts::TAU;
+        self.pen.altitude = Some(Scalar::new(altitude.clamp(0.0, std::f32::consts::FRAC_PI_2)));
+        self.pen.azimuth = Some(Scalar::new(azimuth.rem_euclid(tau)));
+        self
+    }
+
+    /// The pen's tilt from the pair Windows and the browser report: the
+    /// plane angles, in degrees (`-90..=90`), between the pen and the
+    /// surface's normal along x and along y — converted as the Pointer
+    /// Events specification converts them.
+    #[must_use]
+    pub fn with_tilt_xy(self, tilt_x: f32, tilt_y: f32) -> Self {
+        let (altitude, azimuth) = tilt_from_xy(tilt_x, tilt_y);
+        self.with_tilt(altitude, azimuth)
+    }
+
+    /// The pen's rotation about its own axis, radians.
+    #[must_use]
+    pub fn with_roll(mut self, roll: f32) -> Self {
+        self.pen.roll = Some(Scalar::new(roll.rem_euclid(std::f32::consts::TAU)));
+        self
+    }
+
+    /// How far above the surface a hovering pen is, in logical pixels.
+    #[must_use]
+    pub fn with_hover_distance(mut self, distance: f32) -> Self {
+        self.pen.hover = Some(Scalar::new(distance.max(0.0)));
+        self
+    }
+
+    /// The samples the host merged into this one since the last delivered
+    /// event, oldest first — for drawing a stroke at the device's rate.
+    #[must_use]
+    pub fn with_coalesced(mut self, samples: Vec<Self>) -> Self {
+        self.coalesced = samples;
+        self
+    }
+
+    /// The host's prediction of the next samples, for drawing ahead of the
+    /// pen to hide latency; replaced, not kept, when the real ones arrive.
+    #[must_use]
+    pub fn with_predicted(mut self, samples: Vec<Self>) -> Self {
+        self.predicted = samples;
+        self
+    }
+
+    /// Altitude and azimuth, radians, if the device reports tilt.
+    #[must_use]
+    pub fn tilt(&self) -> Option<(f32, f32)> {
+        Some((self.pen.altitude?.get(), self.pen.azimuth?.get()))
+    }
+
+    /// Rotation about the pen's axis, radians, if reported.
+    #[must_use]
+    pub fn roll(&self) -> Option<f32> {
+        self.pen.roll.map(Scalar::get)
+    }
+
+    /// Hover distance in logical pixels, if hovering and reported.
+    #[must_use]
+    pub fn hover_distance(&self) -> Option<f32> {
+        self.pen.hover.map(Scalar::get)
+    }
+
+    /// The merged samples behind this one, oldest first (empty when the
+    /// host merged none or does not say).
+    #[must_use]
+    pub fn coalesced(&self) -> &[Self] {
+        &self.coalesced
+    }
+
+    /// The predicted samples after this one.
+    #[must_use]
+    pub fn predicted(&self) -> &[Self] {
+        &self.predicted
     }
 
     /// The canvas hit region this sample landed in (see
@@ -249,9 +352,65 @@ impl WheelDelta {
     pub const DETENT: i32 = 120;
 }
 
+/// Tilt-X/tilt-Y in degrees to altitude and azimuth in radians (Pointer
+/// Events level 3, "converting between tiltX/tiltY and altitudeAngle/
+/// azimuthAngle").
+fn tilt_from_xy(tilt_x: f32, tilt_y: f32) -> (f32, f32) {
+    use std::f32::consts::{FRAC_PI_2, TAU};
+    let (x, y) = (tilt_x.clamp(-90.0, 90.0), tilt_y.clamp(-90.0, 90.0));
+    if x == 0.0 && y == 0.0 {
+        return (FRAC_PI_2, 0.0);
+    }
+    // Clamped above, so "at least 90" is "exactly 90".
+    if x.abs() >= 90.0 || y.abs() >= 90.0 {
+        // Lying flat: the azimuth is the axis it lies along.
+        let azimuth = y.to_radians().sin().atan2(x.to_radians().sin());
+        return (0.0, azimuth.rem_euclid(TAU));
+    }
+    let (tan_x, tan_y) = (x.to_radians().tan(), y.to_radians().tan());
+    let azimuth = tan_y.atan2(tan_x).rem_euclid(TAU);
+    let altitude = (1.0 / tan_x.hypot(tan_y)).atan();
+    (altitude, azimuth)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn a_pens_tilt_pair_converts_to_altitude_and_azimuth() {
+        use std::f32::consts::{FRAC_PI_2, FRAC_PI_4, PI};
+        let close = |a: f32, b: f32| (a - b).abs() < 1e-4;
+        let pen = |x: f32, y: f32| {
+            PointerEvent::new(1, PointerKind::Pen, Point::new(0, 0), Duration::ZERO)
+                .with_tilt_xy(x, y)
+                .tilt()
+                .unwrap()
+        };
+        let (altitude, _) = pen(0.0, 0.0);
+        assert!(close(altitude, FRAC_PI_2), "upright");
+        let (altitude, azimuth) = pen(45.0, 0.0);
+        assert!(close(altitude, FRAC_PI_4) && close(azimuth, 0.0), "leaning toward +x");
+        let (altitude, azimuth) = pen(0.0, -45.0);
+        assert!(close(altitude, FRAC_PI_4) && close(azimuth, 3.0 * FRAC_PI_2), "toward -y");
+        let (altitude, azimuth) = pen(-90.0, 0.0);
+        assert!(close(altitude, 0.0) && close(azimuth, PI), "flat along -x");
+    }
+
+    #[test]
+    fn coalesced_and_predicted_samples_ride_along() {
+        let at = |x| PointerEvent::new(1, PointerKind::Pen, Point::new(x, 0), Duration::ZERO);
+        let sample = at(3)
+            .with_coalesced(vec![at(1), at(2)])
+            .with_predicted(vec![at(4)])
+            .with_roll(7.0)
+            .with_hover_distance(-2.0);
+        assert_eq!(sample.coalesced().len(), 2);
+        assert_eq!(sample.predicted()[0].position(), Point::new(4, 0));
+        assert!(sample.roll().is_some_and(|roll| roll < std::f32::consts::TAU));
+        assert_eq!(sample.hover_distance(), Some(0.0));
+        assert_eq!(at(0).tilt(), None, "a mouse reports no tilt");
+    }
 
     #[test]
     fn buttons_are_a_set() {

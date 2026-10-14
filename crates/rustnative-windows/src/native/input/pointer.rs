@@ -396,16 +396,48 @@ pub(crate) fn pointer_message(runtime: &mut Runtime, message: &MSG) {
     if unsafe { GetPointerInfo(pointer_id, &raw mut info) } == 0 {
         return;
     }
-    let pressure = (info.pointerType == PT_PEN).then(|| {
+    let pen = (info.pointerType == PT_PEN).then(|| {
         let mut pen = POINTER_PEN_INFO::default();
         // SAFETY: as for `GetPointerInfo` above.
         let known = unsafe { GetPointerPenInfo(pointer_id, &raw mut pen) } != 0;
-        // Pen pressure is reported in 0..=1024.
-        #[allow(clippy::cast_precision_loss)]
-        let pressure = pen.pressure as f32 / 1024.0;
-        known.then_some(pressure)
+        known.then(|| PenReading::from_info(&pen))
     });
-    touch_or_pen(runtime, message.hwnd, pointer_id, phase, &info, pressure.flatten());
+    touch_or_pen(runtime, message.hwnd, pointer_id, phase, &info, pen.flatten());
+}
+
+/// What `POINTER_PEN_INFO` reports, in the portable units.
+#[derive(Debug, Clone, Copy, Default)]
+pub(crate) struct PenReading {
+    /// `0..=1`.
+    pressure: Option<f32>,
+    /// Degrees from the normal along x and y, `-90..=90`.
+    tilt: Option<(f32, f32)>,
+    /// Degrees about the pen's axis, `0..360`.
+    rotation: Option<f32>,
+}
+
+impl PenReading {
+    #[allow(clippy::cast_precision_loss, reason = "pen axes are small integers")]
+    fn from_info(pen: &POINTER_PEN_INFO) -> Self {
+        // `penMask` says which axes this pen reports.
+        const PRESSURE: u32 = 0x1;
+        const ROTATION: u32 = 0x2;
+        const TILT_X: u32 = 0x4;
+        const TILT_Y: u32 = 0x8;
+        let mask = pen.penMask;
+        Self {
+            // Pen pressure is reported in 0..=1024.
+            pressure: (mask & PRESSURE != 0).then(|| pen.pressure as f32 / 1024.0),
+            tilt: (mask & (TILT_X | TILT_Y) != 0).then_some((pen.tiltX as f32, pen.tiltY as f32)),
+            rotation: (mask & ROTATION != 0).then_some(pen.rotation as f32),
+        }
+    }
+
+    /// A reading with tilt and rotation, for a test.
+    #[cfg(test)]
+    pub(crate) const fn tilted(tilt_x: f32, tilt_y: f32, rotation: f32) -> Self {
+        Self { pressure: None, tilt: Some((tilt_x, tilt_y)), rotation: Some(rotation) }
+    }
 }
 
 /// Delivers one touch or pen sample Windows described with `info`, which
@@ -418,7 +450,7 @@ pub(crate) fn touch_or_pen(
     pointer_id: u32,
     phase: PointerPhase,
     info: &POINTER_INFO,
-    pressure: Option<f32>,
+    pen: Option<PenReading>,
 ) {
     let kind = match info.pointerType {
         PT_TOUCH => PointerKind::Touch,
@@ -458,8 +490,15 @@ pub(crate) fn touch_or_pen(
     if phase != PointerPhase::Up && phase != PointerPhase::Cancel {
         sample = sample.with_buttons(PointerButtons::none().with(PointerButton::Primary));
     }
-    if let Some(pressure) = pressure {
+    let pen = pen.unwrap_or_default();
+    if let Some(pressure) = pen.pressure {
         sample = sample.with_pressure(pressure);
+    }
+    if let Some((tilt_x, tilt_y)) = pen.tilt {
+        sample = sample.with_tilt_xy(tilt_x, tilt_y);
+    }
+    if let Some(rotation) = pen.rotation {
+        sample = sample.with_roll(rotation.to_radians());
     }
 
     deliver(runtime, target, phase, &sample);

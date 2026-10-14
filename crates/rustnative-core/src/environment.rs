@@ -361,6 +361,10 @@ pub enum WindowMode {
         /// The share of the display.
         fraction: Scalar,
     },
+    /// Floating over another application's window: the iPad's overlay
+    /// window, a desktop's always-on-top utility window. A backend reports
+    /// it where its window manager produces it; the browser never does.
+    Overlay,
 }
 
 /// A locale, as a BCP 47 tag (`en-US`, `ar-EG`, `pl`).

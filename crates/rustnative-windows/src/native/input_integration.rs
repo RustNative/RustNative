@@ -58,7 +58,16 @@ fn name(id: NodeId) -> String {
 fn describe(event: &Event) -> String {
     match event {
         Event::PointerDown { target, pointer } => {
-            format!("down:{}@{},{}", name(*target), pointer.position().x, pointer.position().y)
+            let pen = pointer.tilt().map_or_else(String::new, |(altitude, azimuth)| {
+                let roll = pointer.roll().unwrap_or_default();
+                format!(
+                    " altitude={:.0} azimuth={:.0} roll={:.0}",
+                    altitude.to_degrees(),
+                    azimuth.to_degrees(),
+                    roll.to_degrees()
+                )
+            });
+            format!("down:{}@{},{}{pen}", name(*target), pointer.position().x, pointer.position().y)
         }
         Event::PointerMove { target, pointer } => {
             format!("move:{}@{},{}", name(*target), pointer.position().x, pointer.position().y)
@@ -818,4 +827,33 @@ fn native_touch_contacts_are_implicitly_captured_and_pinch() {
         assert_eq!(runtime.input.pointer.captured(7), None, "released contacts are forgotten");
         assert_eq!(runtime.input.pointer.captured(8), None);
     });
+}
+
+/// A pen contact's tilt and barrel rotation, as `POINTER_PEN_INFO` reports
+/// them, reach the component as altitude, azimuth, and roll.
+///
+/// Catches: pen axes dropped in translation, or the tilt pair handed on
+/// unconverted.
+#[test]
+fn a_pens_tilt_and_rotation_reach_the_component() {
+    const PT_PEN: i32 = 3;
+    let fixture = Fixture::new();
+    let mut application = fixture.application(false);
+    // SAFETY: `application` outlives `harness`.
+    let mut harness = unsafe { NativeHarness::attach(&mut application) };
+    let pad = harness.expect_control(WindowId::PRIMARY, "pad");
+    let origin = screen_rect(pad);
+    fixture.take();
+    let tip = POINTER_INFO {
+        pointerType: PT_PEN,
+        ptPixelLocation: POINT { x: origin.left + 5, y: origin.top + 6 },
+        ..POINTER_INFO::default()
+    };
+    harness.with_runtime_mut(WindowId::PRIMARY, |runtime| {
+        let reading = pointer::PenReading::tilted(45.0, 0.0, 90.0);
+        pointer::touch_or_pen(runtime, pad, 3, PointerPhase::Down, &tip, Some(reading));
+        pointer::touch_or_pen(runtime, pad, 3, PointerPhase::Up, &tip, Some(reading));
+    });
+    let log = fixture.take();
+    assert_eq!(log.first().map(String::as_str), Some("down:pad@5,6 altitude=45 azimuth=0 roll=90"));
 }
