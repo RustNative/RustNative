@@ -124,6 +124,9 @@ jobs:
     # NDK are used; Gradle 8.10.2 builds the generated project.
     name: Android backend (emulator, API 35)
     runs-on: ubuntu-latest
+    # The suite and the budgets take about half an hour; a stalled emulator
+    # fails the job instead of holding the runner for six hours.
+    timeout-minutes: 75
     env:
       RUSTNATIVE_ANDROID_API: "26"
     steps:

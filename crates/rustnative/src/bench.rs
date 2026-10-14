@@ -461,7 +461,9 @@ fn android(root: &Path) -> Result<BTreeMap<String, f64>> {
         adb(&["shell", "am", "force-stop", &package])?;
         std::thread::sleep(std::time::Duration::from_secs(2));
         adb(&["logcat", "-c"])?;
-        let started = adb(&["shell", "am", "start", "-W", "-n", &component])?;
+        // `-W` waits for the first draw; a launch that never draws (a crash
+        // dialog, an emulator that stalled) must fail the run, not hang it.
+        let started = adb(&["shell", "timeout", "60", "am", "start", "-W", "-n", &component])?;
         let total = started
             .lines()
             .find_map(|line| line.trim().strip_prefix("TotalTime:"))

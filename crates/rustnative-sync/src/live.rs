@@ -192,10 +192,28 @@ impl WireEvent {
     }
 }
 
+/// What a browser knows of the page it shows a session in: the host traits
+/// a native backend feeds its tree, as the browser measures them.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct HostFacts {
+    /// The viewport's width and height, in CSS pixels (the window's size
+    /// classes).
+    pub viewport: (u32, u32),
+    /// The safe area's insets: top, end, bottom, start
+    /// (`env(safe-area-inset-*)`).
+    pub safe_area: (i32, i32, i32, i32),
+    /// The laid-out size of each node the session watches
+    /// ([`ServerFrame::Watch`]), by wire key.
+    pub sizes: Vec<(String, u32, u32)>,
+}
+
 /// What the client sends.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(tag = "frame", rename_all = "snake_case")]
 pub enum ClientFrame {
+    /// The page's host facts, when they change; the latest wins, so they are
+    /// not numbered as events are.
+    Host(HostFacts),
     /// The first frame: the session to resume, and the state to start
     /// from if the server no longer has it.
     Hello {
@@ -248,6 +266,13 @@ pub enum ServerFrame {
         acknowledged: u64,
         /// The root component's state.
         snapshot: Option<Value>,
+    },
+    /// The nodes whose laid-out size a component reads (container-relative
+    /// decisions), by wire key, sent when they change: the browser reports
+    /// their sizes in [`ClientFrame::Host`].
+    Watch {
+        /// The watched nodes' wire keys.
+        keys: Vec<String>,
     },
     /// The key combinations the session's enabled commands answer, sent
     /// when they change: the browser keeps them from its own defaults and
@@ -360,6 +385,7 @@ pub type BrowserEncoding = Arc<dyn Fn(&Node, &Value) -> Value + Send + Sync>;
 
 enum Command {
     Event(WireEvent, u64),
+    Host(HostFacts),
     Attach(async_mpsc::UnboundedSender<ServerFrame>, Option<(BrowserEncoding, Value)>),
     Detach,
     Snapshot(oneshot::Sender<Option<Value>>),
@@ -397,6 +423,26 @@ fn root_snapshot(tree: &ComponentTree) -> Option<Value> {
         .and_then(|root| root.state)
 }
 
+/// Feeds a browser's host facts to the session's tree, as a native backend
+/// feeds its own: the window's size classes, the safe area, and the sizes of
+/// the nodes a component reads.
+fn apply_host(tree: &mut ComponentTree, facts: HostFacts) {
+    use rustnative_core::environment::{SizeClasses, keys};
+    let (width, height) = facts.viewport;
+    tree.set_environment(&keys::SIZE_CLASS, SizeClasses::of(width, height));
+    let (top, end, bottom, start) = facts.safe_area;
+    tree.set_environment(
+        &keys::SAFE_AREA,
+        rustnative_core::EdgeInsets::logical(top, end, bottom, start),
+    );
+    tree.report_sizes(
+        facts
+            .sizes
+            .into_iter()
+            .map(|(key, width, height)| (node_id(&key), rustnative_core::Size::new(width, height))),
+    );
+}
+
 /// One session's thread: owns the tree, applies events, pumps tasks, and
 /// sends the tree whenever it changed.
 fn run_session<A: LiveApp>(app: &A, snapshot: Option<Value>, commands: &mpsc::Receiver<Command>) {
@@ -408,6 +454,7 @@ fn run_session<A: LiveApp>(app: &A, snapshot: Option<Value>, commands: &mpsc::Re
     let mut last: Option<Node> = None;
     let mut shortcuts_sent: Option<Vec<(rustnative_core::KeyCode, rustnative_core::KeyModifiers)>> =
         None;
+    let mut watch_sent: Option<Vec<String>> = None;
     loop {
         let command = commands.recv_timeout(Duration::from_millis(25));
         match command {
@@ -429,11 +476,13 @@ fn run_session<A: LiveApp>(app: &A, snapshot: Option<Value>, commands: &mpsc::Re
                     acknowledged = sequence;
                 }
             }
+            Ok(Command::Host(facts)) => apply_host(&mut tree, facts),
             Ok(Command::Attach(sender, encoding)) => {
                 outbound = Some(sender);
                 browser = encoding;
                 last = None;
                 shortcuts_sent = None;
+                watch_sent = None;
             }
             Ok(Command::Detach) => outbound = None,
             Ok(Command::Snapshot(reply)) => {
@@ -485,6 +534,16 @@ fn run_session<A: LiveApp>(app: &A, snapshot: Option<Value>, commands: &mpsc::Re
             }
             if outbound.is_some() {
                 last = Some(view);
+            }
+        }
+        // The nodes a component reads the size of, when they change.
+        let watched: Vec<String> =
+            tree.watched_nodes().into_iter().map(rustnative_core::wire::key_of).collect();
+        if watch_sent.as_ref() != Some(&watched) {
+            if let Some(sender) = &outbound {
+                if sender.send(ServerFrame::Watch { keys: watched.clone() }).is_ok() {
+                    watch_sent = Some(watched);
+                }
             }
         }
         // The shortcuts the enabled commands answer, when they change.
@@ -665,8 +724,14 @@ impl<A: LiveApp> LiveServer<A> {
                 message = stream.next() => {
                     match message {
                         Some(Ok(Message::Text(text))) => {
-                            if let Ok(ClientFrame::Event { event, sequence }) = serde_json::from_str(&text) {
-                                let _ = commands.send(Command::Event(event, sequence));
+                            match serde_json::from_str(&text) {
+                                Ok(ClientFrame::Event { event, sequence }) => {
+                                    let _ = commands.send(Command::Event(event, sequence));
+                                }
+                                Ok(ClientFrame::Host(facts)) => {
+                                    let _ = commands.send(Command::Host(facts));
+                                }
+                                _ => {}
                             }
                         }
                         Some(Ok(Message::Close(_)) | Err(_)) | None => break,
@@ -847,7 +912,12 @@ impl LiveClient {
                             }
                             // This client never asks for elements, and a native
                             // client's keys reach the server as they are.
-                            Ok(ServerFrame::Dom { .. } | ServerFrame::Shortcuts { .. }) | Err(_) => {}
+                            Ok(
+                                ServerFrame::Dom { .. }
+                                | ServerFrame::Shortcuts { .. }
+                                | ServerFrame::Watch { .. },
+                            )
+                            | Err(_) => {}
                         }
                     }
                 }
@@ -1127,5 +1197,72 @@ impl Component for Subtree {
             Changed
         });
         self.props.client.view().unwrap_or_else(|| Node::label("connecting", "Connecting…"))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use rustnative_core::environment::{SizeClass, keys};
+    use rustnative_core::{Component, ComponentContext, ComponentTree, EdgeInsets, Event, Node};
+
+    use super::{HostFacts, apply_host};
+
+    /// Chooses its arrangement from its own container's width.
+    struct Adaptive;
+
+    impl Component for Adaptive {
+        type Props = ();
+        type Message = ();
+        fn new((): ()) -> Self {
+            Self
+        }
+        fn props(&self) -> &() {
+            &()
+        }
+        fn set_props(&mut self, (): ()) {}
+        fn view(&self) -> Node {
+            Node::column("panel", [])
+        }
+        fn update(&mut self, _: Event) {}
+        fn render(&mut self, context: &mut ComponentContext<'_, ()>) -> Node {
+            let label = match context.container_classes("panel").map(|classes| classes.width) {
+                Some(SizeClass::Compact) | None => "compact",
+                Some(_) => "roomy",
+            };
+            Node::column("panel", [Node::label("arrangement", label)])
+        }
+    }
+
+    fn arrangement(tree: &ComponentTree) -> String {
+        use rustnative_core::wire::{WireKind, WireNode};
+        fn label(node: &WireNode) -> Option<String> {
+            match &node.content {
+                WireKind::Label { text } => Some(text.clone()),
+                WireKind::Column { children, .. } => children.iter().find_map(label),
+                _ => None,
+            }
+        }
+        label(&WireNode::from_node(&tree.view())).unwrap_or_default()
+    }
+
+    #[test]
+    fn a_browsers_host_facts_reach_the_session_tree() {
+        let mut tree = ComponentTree::new(Adaptive);
+        let _ = tree.render();
+        assert_eq!(arrangement(&tree), "compact");
+        let watched: Vec<String> =
+            tree.watched_nodes().into_iter().map(rustnative_core::wire::key_of).collect();
+        assert_eq!(watched, ["panel"], "the browser is told what to measure");
+        apply_host(
+            &mut tree,
+            HostFacts {
+                viewport: (1280, 800),
+                safe_area: (24, 0, 0, 16),
+                sizes: vec![("panel".to_owned(), 1000, 300)],
+            },
+        );
+        assert_eq!(arrangement(&tree), "roomy", "the container decides by its own size");
+        assert_eq!(tree.environment(&keys::SIZE_CLASS).width, SizeClass::Expanded);
+        assert_eq!(tree.environment(&keys::SAFE_AREA), EdgeInsets::logical(24, 0, 0, 16));
     }
 }

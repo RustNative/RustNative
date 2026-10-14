@@ -2147,6 +2147,12 @@ export class LiveIsland {
       case "welcome":
         this.session = frame.session;
         this.retries = 0;
+        this.lastHost = null;
+        this.reportHost();
+        break;
+      case "watch":
+        this.watched = frame.keys || [];
+        this.observe();
         break;
       case "dom": {
         this.unacknowledged = this.unacknowledged.filter(([, sequence]) => sequence > frame.acknowledged);
@@ -2163,6 +2169,8 @@ export class LiveIsland {
         }
         this.tree = element;
         this.frames++;
+        // A patch may have replaced a watched element.
+        this.observe();
         document.dispatchEvent(new CustomEvent("rn:live", { detail: { island: this.index, frames: this.frames } }));
         break;
       }
@@ -2186,6 +2194,55 @@ export class LiveIsland {
     node.setAttribute("data-rn-i", String(this.index));
     if (swap) this.root.replaceWith(node);
     this.root = node;
+  }
+
+  /// Watches the elements of the nodes the session reads the size of.
+  observe() {
+    if (typeof ResizeObserver === "undefined") return;
+    if (!this.resizer) this.resizer = new ResizeObserver(() => this.reportHost());
+    this.resizer.disconnect();
+    for (const key of this.watched || []) {
+      const element = document.getElementById(this.scope + key);
+      if (element) this.resizer.observe(element);
+    }
+    this.reportHost();
+  }
+
+  /// Sends the page's host facts — the viewport, the safe area, and the
+  /// watched nodes' sizes — once per frame, and only when they changed.
+  reportHost() {
+    if (this.hostScheduled || typeof requestAnimationFrame === "undefined") return;
+    this.hostScheduled = true;
+    requestAnimationFrame(() => {
+      this.hostScheduled = false;
+      if (!this.socket || this.socket.readyState !== 1) return;
+      if (!this.safeProbe) {
+        const probe = document.createElement("div");
+        probe.setAttribute("aria-hidden", "true");
+        probe.style.cssText = "position:fixed;visibility:hidden;pointer-events:none;padding:env(safe-area-inset-top,0px) env(safe-area-inset-right,0px) env(safe-area-inset-bottom,0px) env(safe-area-inset-left,0px)";
+        document.body.appendChild(probe);
+        this.safeProbe = probe;
+      }
+      const inset = getComputedStyle(this.safeProbe);
+      const px = (value) => Math.round(parseFloat(value) || 0);
+      const [left, right] = [px(inset.paddingLeft), px(inset.paddingRight)];
+      const rtl = getComputedStyle(this.root).direction === "rtl";
+      const sizes = (this.watched || []).flatMap((key) => {
+        const element = document.getElementById(this.scope + key);
+        if (!element) return [];
+        const box = element.getBoundingClientRect();
+        return [[key, Math.round(box.width), Math.round(box.height)]];
+      });
+      const facts = {
+        viewport: [Math.round(innerWidth), Math.round(innerHeight)],
+        safe_area: [px(inset.paddingTop), rtl ? left : right, px(inset.paddingBottom), rtl ? right : left],
+        sizes,
+      };
+      const text = JSON.stringify(facts);
+      if (text === this.lastHost) return;
+      this.lastHost = text;
+      this.socket.send(JSON.stringify({ frame: "host", ...facts }));
+    });
   }
 
   send(event) {
@@ -2268,6 +2325,7 @@ export class LiveIsland {
       const found = this.keyOf(event.target);
       if (found && found.element.type === "checkbox") this.send({ event: "toggled", target: found.key, on: found.element.checked });
     });
+    addEventListener("resize", () => this.reportHost(), { signal: this.listening.signal });
     const ranges = new Map();
     document.addEventListener("scroll", (event) => {
       const list = event.target;
