@@ -468,7 +468,7 @@ impl LocalAdapter {
 /// Every description keeps the root filesystem read-only and gives the
 /// application one writable place for its state — the SQLite database, the
 /// durable job queue, workflows, actors (`db` is a default feature) — at
-/// [`DATA_DIR`] (or systemd's state directory), which is also the working
+/// [`DATA_DIR`](container::DATA_DIR) (or systemd's state directory), which is also the working
 /// directory, so a relative database path such as `app.db` lands there and
 /// [`crate::data_dir`] names it. That state belongs to one instance, so the
 /// descriptions run one: move the state to a database the instances share

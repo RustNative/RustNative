@@ -8,16 +8,71 @@ runs long-lived, serverless, and at the edge. Every milestone through 58, the
 Web milestones A–K, Milestones 34 and 35, and the first part of Milestone 69
 (Windows per-monitor DPI scaling) are built. The backends not yet built —
 macOS (33), iOS (36), embedded (37), the terminal (38), and iPadOS (70) — owe
-the standard in PLAN.md section 8 and
-docs/conformance/new-backend-checklist.md, row by row. The 2026-10-12
+the standard in `PLAN.md` section 8 and
+`docs/conformance/new-backend-checklist.md`, row by row. The 2026-10-12
 whole-framework review and the fixes it led to are the first entry below.
 
 History: Milestones 39–58 were scoped on 2026-09-23
-(docs/superpowers/plans/2026-09-23-milestones-39-58.md) as Windows-first,
+(`docs/superpowers/plans/2026-09-23-milestones-39-58.md`) as Windows-first,
 with each item that only another backend could realize built as a portable
 contract and a test double and recorded as **owed** by that backend; the
 entries below keep that wording where it was true when written, and each
 backend's own entry records what it paid.
+
+**The whole-framework review and its fixes (2026-10-12 to 2026-10-14).** A
+review of every crate, backend, document, and plan against the definition of a
+finished backend (`PLAN.md` §8) found one production blocker, a red CI, and a
+list of coherence gaps; all of it was fixed, in these commits:
+
+- **CI green again**: visual goldens per machine class; the Android
+  transition test samples every frame.
+- **The seam**: capabilities reach components through the environment
+  (`keys::CAPABILITIES`); reduced motion is one channel (the environment key
+  and the timelines together); closing a window flushes its persisted state;
+  lifecycle reaches every window; the surface queue is bounded; Android
+  advertises what it realizes.
+- **Windows per-monitor DPI** (the production blocker; Milestone 69's first
+  part): layout in logical pixels, everything converted where it reaches Win32
+  (`native/dpi.rs`, held at 150 % by `native::dpi_integration`).
+- **Server security**: single-use passkey challenges with user verification;
+  a response cache that never stores a page and keys on `Vary`, bounded;
+  forwarded addresses trusted only from configured proxies; the bearer CSRF
+  exemption only for an authenticated bearer; session-key rotation and
+  revocation; deploy exports that provision state; a CSP nonce placeholder for
+  prerendered shells.
+- **Style targets**: unavailable-property checks follow `[style] targets`
+  rather than the compiling OS.
+- **Portable contracts and one host layer**: share, background work, and
+  documents are core services; `rustnative-host` picks the backend, so no
+  application or template names a platform.
+- **`rustnative-update`**: one signed manifest for every self-updating host —
+  a signature over the published bytes, the application id checked, an
+  expiry, pre-releases ordered.
+- **Portable crash capture** (`rustnative_core::crash`), installed per host;
+  Windows adds a minidump.
+- **Web**: a scrolled virtual list sends `VisibleRangeChanged`; canvas virtual
+  elements become an ARIA tree.
+- **Smaller fixes**: one crash-safe state store in the core; Linux and Android
+  report best-effort failures; `HlcClock` reads a core `Clock`; Live caps its
+  session threads; `RemoteState` converts to `OperationState`; the interner's
+  limits stated; thread names; the iPadOS Phase 0 widenings (pen axes,
+  `WindowMode::Overlay`, `Capability::PointerLock`); the CLI knows `ipados`,
+  `tui`, and `embedded-linux`; publishable crate metadata; CI enforces every
+  target's budgets and checks the portable crates for macOS and iOS.
+- **Documents**: README, PLAN, this file, the checklist, permissions, update
+  rules, and plans for macOS, iOS, the terminal, and embedded brought to what
+  the code does; `Audit.md` archived under `docs/history/`.
+
+Verified: clippy (stable and 1.99) and the Windows workspace tests; the Linux
+gate in WSL (fmt, clippy, the portable tests, the GTK backend on Wayland, X11,
+and Xvfb, docs, the MSRV, `cargo deny`); the Android backend linted for the
+device target. **Not verified here:** the Android device suite on the phone
+for these changes, and the new CI legs (budgets for Linux, the Web,
+serverless, and Android; the Apple check) until CI runs them. **Still owed,
+by decision:** the Web checklist rows `PLAN.md` lists for the Web (safe areas,
+gesture arbitration, inspection, and others), browser delivery of virtual
+elements' actions, and the remaining iPadOS Phase 0 items (the `ipados:` style
+variant, per-window lifecycle, the headless iPad profile).
 
 **The Web track (2026-09-27 to 2026-09-28).** Web milestones A–K are built,
 with every web half those milestones had recorded as owed. See the Web
