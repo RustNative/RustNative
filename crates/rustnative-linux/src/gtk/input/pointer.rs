@@ -613,6 +613,16 @@ pub(crate) fn prune(runtime: &mut WindowRuntime) {
     }
 }
 
+/// A pen's tilt, in degrees from the surface normal along x and y: GDK
+/// reports each tilt axis normalized to `-1..=1` of a quarter turn.
+fn tilt_of(event: &gdk::Event) -> Option<(f64, f64)> {
+    let x = event.axis(gdk::AxisUse::Xtilt);
+    let y = event.axis(gdk::AxisUse::Ytilt);
+    (x.is_some() || y.is_some()).then(|| {
+        (x.unwrap_or(0.0).clamp(-1.0, 1.0) * 90.0, y.unwrap_or(0.0).clamp(-1.0, 1.0) * 90.0)
+    })
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -649,14 +659,4 @@ mod tests {
             PointerButtons::none().with(PointerButton::Primary).with(PointerButton::Secondary)
         );
     }
-}
-
-/// A pen's tilt, in degrees from the surface normal along x and y: GDK
-/// reports each tilt axis normalized to `-1..=1` of a quarter turn.
-fn tilt_of(event: &gdk::Event) -> Option<(f64, f64)> {
-    let x = event.axis(gdk::AxisUse::Xtilt);
-    let y = event.axis(gdk::AxisUse::Ytilt);
-    (x.is_some() || y.is_some()).then(|| {
-        (x.unwrap_or(0.0).clamp(-1.0, 1.0) * 90.0, y.unwrap_or(0.0).clamp(-1.0, 1.0) * 90.0)
-    })
 }
