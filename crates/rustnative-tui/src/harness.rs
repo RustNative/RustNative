@@ -284,8 +284,23 @@ impl TuiHarness {
             Arc::new(executor.clone()) as Arc<dyn Executor>,
         );
         let config = TuiConfig { suspend_key: false, ..TuiConfig::default() };
-        let mut session =
-            Session::new(terminal.clone(), app, Arc::new(executor.clone()), config, channel);
+        // The same environment on every machine: a true-colour xterm, no
+        // locale, no reduced motion.
+        let environment = crate::color::DetectInput {
+            vars: vec![
+                ("TERM".into(), "xterm-256color".into()),
+                ("COLORTERM".into(), "truecolor".into()),
+            ],
+            windows_vt: false,
+        };
+        let mut session = Session::with_environment(
+            terminal.clone(),
+            app,
+            Arc::new(executor.clone()),
+            config,
+            channel,
+            &environment,
+        );
         session.start();
         let mut harness = Self { session, terminal, executor, state };
         harness.settle();

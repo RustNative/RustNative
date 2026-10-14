@@ -181,6 +181,19 @@ pub fn paint_window(
             }));
         }
     }
+    // Scroll bars go over the content they scroll, drawn after it.
+    let scrollers: Vec<_> = model
+        .nodes()
+        .filter(|node| {
+            !invisible.contains(&node.id)
+                && node.overflow == Some(Overflow::Scroll)
+                && node.scroll_range.height > 0
+        })
+        .cloned()
+        .collect();
+    for node in &scrollers {
+        draw_scrollbar(grid, node, context, context.mapping);
+    }
     // An open select's list is drawn over everything else.
     if let Some(focused) = model.focused() {
         if let Some(node) = model.get(focused).cloned() {
@@ -313,6 +326,12 @@ fn draw_scrollbar(
         );
         grid.print(column, y, glyph, style, node.visible_cells, context.width);
     }
+}
+
+/// The cells a spinner's value takes (the widest of its range).
+#[must_use]
+pub fn spinner_digits(min: i64, max: i64) -> usize {
+    min.to_string().len().max(max.to_string().len())
 }
 
 /// The columns each tab takes, relative to the bar: `(start, end)`.
@@ -492,7 +511,7 @@ fn paint_node(
     let (style, border) = style_of(model, node, context);
     let clip = node.visible_cells;
     let rect = node.cells;
-    let rtl = model.direction() == LayoutDirection::Rtl;
+    let rtl = node.direction == LayoutDirection::Rtl;
     let focused = model.focused() == Some(node.id);
     fill_background(grid, rect.intersect(&clip), style.bg, context);
     let text_style =
@@ -507,9 +526,6 @@ fn paint_node(
                     let mut target = CellTarget { grid, clip, context };
                     let _ = rasterize(list, rect, context.mapping, &mut target);
                 }
-            }
-            if node.overflow == Some(Overflow::Scroll) && node.scroll_range.height > 0 {
-                draw_scrollbar(grid, node, context, context.mapping);
             }
             None
         }
@@ -841,9 +857,9 @@ fn paint_control(
             }
             spot(cursor)
         }
-        Control::Spinner { value, .. } => {
-            let inner = usize::try_from((rect.width - 4).max(1)).unwrap_or(1);
-            let text = format!("< {:>inner$} >", value);
+        Control::Spinner { value, min, max } => {
+            let inner = spinner_digits(*min, *max);
+            let text = format!("< {value:>inner$} >");
             grid.print(rect.x, y, &text, focus(base), clip, context.width);
             spot(rect.x + 2)
         }

@@ -216,10 +216,13 @@ pub struct Session<T: Terminal> {
     titles: HashMap<WindowId, String>,
     capabilities: PlatformCapabilities,
     last_press_column: Option<i32>,
+    locale: Option<String>,
 }
 
-fn reduced_motion_from_env() -> MotionPreference {
-    let set = |name: &str| std::env::var(name).is_ok_and(|value| !value.is_empty() && value != "0");
+fn reduced_motion_from(input: &DetectInput) -> MotionPreference {
+    let set = |name: &str| {
+        input.vars.iter().any(|(key, value)| key == name && !value.is_empty() && value != "0")
+    };
     if set("NO_MOTION") || set("RUSTNATIVE_REDUCED_MOTION") {
         MotionPreference::Reduced
     } else {
@@ -227,17 +230,21 @@ fn reduced_motion_from_env() -> MotionPreference {
     }
 }
 
-fn locale_from_env() -> Option<String> {
+fn locale_from(input: &DetectInput) -> Option<String> {
     ["LC_ALL", "LC_MESSAGES", "LANG"].iter().find_map(|name| {
-        std::env::var(name)
-            .ok()
+        input
+            .vars
+            .iter()
+            .find(|(key, _)| key == name)
+            .map(|(_, value)| value.clone())
             .filter(|value| !value.is_empty() && value != "C" && value != "POSIX")
             .map(|value| value.split('.').next().unwrap_or(&value).replace('_', "-"))
     })
 }
 
 impl<T: Terminal> Session<T> {
-    /// A session running `app` on `terminal`, timed by `clock`.
+    /// A session running `app` on `terminal`, timed by `clock`, in the
+    /// process's environment.
     pub fn new(
         terminal: T,
         app: Application,
@@ -246,8 +253,24 @@ impl<T: Terminal> Session<T> {
         channel: Arc<Channel>,
     ) -> Self {
         let input = DetectInput::from_process(terminal.is_windows_console());
-        let profile = TerminalProfile::from_environment(&input, terminal.name());
-        let width = Width::for_locale(&locale_from_env().unwrap_or_default());
+        Self::with_environment(terminal, app, clock, config, channel, &input)
+    }
+
+    /// A session that reads `input` for everything the environment
+    /// decides — colour depth, the terminal's identity, reduced motion, the
+    /// locale — instead of the process's (what makes the harness the same on
+    /// every machine).
+    pub fn with_environment(
+        terminal: T,
+        app: Application,
+        clock: Arc<dyn Clock>,
+        config: TuiConfig,
+        channel: Arc<Channel>,
+        input: &DetectInput,
+    ) -> Self {
+        let profile = TerminalProfile::from_environment(input, terminal.name());
+        let locale = locale_from(input);
+        let width = Width::for_locale(locale.as_deref().unwrap_or_default());
         let (columns, rows) = terminal.size();
         let capabilities = capabilities_for(&profile);
         channel.set_profile(profile.clone());
@@ -280,7 +303,8 @@ impl<T: Terminal> Session<T> {
             quit: false,
             failure: None,
             entered: false,
-            motion: reduced_motion_from_env(),
+            motion: reduced_motion_from(input),
+            locale,
             cursor: None,
             baseline: Theme::default(),
             titles: HashMap::new(),
@@ -460,7 +484,7 @@ impl<T: Terminal> Session<T> {
         self.write(out.as_bytes());
         self.entered = true;
         self.app.set_motion_preference(self.motion);
-        if let Some(locale) = locale_from_env() {
+        if let Some(locale) = self.locale.clone() {
             self.app.set_locale(rustnative_core::Locale::new(locale));
         }
         self.app.set_environment(&rustnative_core::keys::CAPABILITIES, self.capabilities.clone());
@@ -471,7 +495,13 @@ impl<T: Terminal> Session<T> {
 
     fn sync_windows(&mut self) {
         let open = self.app.window_ids();
+        let before = self.stack.len();
         self.stack.retain(|id| open.contains(id));
+        if self.stack.len() != before {
+            // The window beneath is shown again, all of it.
+            self.full_redraw = true;
+            self.dirty = true;
+        }
         let mut new: Vec<WindowId> =
             open.iter().copied().filter(|id| !self.stack.contains(id)).collect();
         new.sort_by_key(|id| id.get());
@@ -1868,8 +1898,9 @@ impl<T: Terminal> Session<T> {
                 self.dirty = true;
             }
             (_, Some(Control::Spinner { value, min, max })) => {
-                // The left half steps down, the right half up.
-                let half = node.cells.x + node.cells.width / 2;
+                // `<` and the value's left half step down; the rest up.
+                let drawn = i32::try_from(paint::spinner_digits(*min, *max)).unwrap_or(1) + 4;
+                let half = node.cells.x + drawn / 2;
                 let pressed_left = self.last_press_column(window).is_some_and(|x| x < half);
                 let next = if pressed_left { value - 1 } else { value + 1 };
                 let next = next.clamp(*min, *max);

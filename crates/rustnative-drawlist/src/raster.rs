@@ -538,13 +538,27 @@ impl<T: RasterTarget> State<'_, T> {
             return;
         }
         let opacity = self.opacities.last().copied().unwrap_or(1.0);
+        // An image smaller than the units it covers is sampled across those
+        // units, so a tiny image still shows its whole self.
+        #[allow(clippy::cast_precision_loss, reason = "small grid coordinates")]
+        let (sx0, sx1) = if x1 - x0 < units.width as f32 {
+            (units.x as f32, units.right() as f32)
+        } else {
+            (x0, x1)
+        };
+        #[allow(clippy::cast_precision_loss, reason = "small grid coordinates")]
+        let (sy0, sy1) = if y1 - y0 < units.height as f32 {
+            (units.y as f32, units.bottom() as f32)
+        } else {
+            (y0, y1)
+        };
         for y in visible.y..visible.bottom() {
             for x in visible.x..visible.right() {
                 #[allow(clippy::cast_precision_loss, reason = "small grid coordinates")]
                 let (fx, upper_y, lower_y) = (x as f32 + 0.5, y as f32 + 0.25, y as f32 + 0.75);
                 let sample = |sy: f32| {
-                    let u = ((fx - x0) / (x1 - x0)).clamp(0.0, 0.999_999);
-                    let v = ((sy - y0) / (y1 - y0)).clamp(0.0, 0.999_999);
+                    let u = ((fx - sx0) / (sx1 - sx0)).clamp(0.0, 0.999_999);
+                    let v = ((sy - sy0) / (sy1 - sy0)).clamp(0.0, 0.999_999);
                     pixel(image, u, v, opacity)
                 };
                 self.target.image(x, y, sample(upper_y), sample(lower_y));

@@ -83,6 +83,8 @@ pub struct RealizedNode {
     pub item_index: Option<usize>,
     /// The properties it transitions when they change.
     pub transitions: Vec<rustnative_core::NodeTransition>,
+    /// Its layout direction: its own, or its parent's, or the window's.
+    pub direction: LayoutDirection,
 }
 
 impl RealizedNode {
@@ -327,6 +329,11 @@ impl TuiModel {
                     node.text.clone()
                 };
             let cells = mapping.rect(window_rect);
+            let node_direction = node.layout.direction.unwrap_or_else(|| {
+                node.parent
+                    .and_then(|parent| nodes.get(&parent))
+                    .map_or(direction, |parent| parent.direction)
+            });
             let visible_cells = if visible_rect.width > 0 && visible_rect.height > 0 {
                 mapping.rect(visible_rect).intersect(&cells)
             } else {
@@ -364,6 +371,7 @@ impl TuiModel {
                     virtualization: node.virtualization,
                     item_index: node.item_index,
                     transitions: node.transitions.clone(),
+                    direction: node_direction,
                 },
             );
         }

@@ -1,0 +1,36 @@
+clicks 0 links 0
+[                     Press                      ]
+
+~UUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUU
+[ ] Check
+(*) A
+( ) B
+[off] Switch
+━━━━━━━━━━━━━━━━━━━━━━●─────────────────────── 50
+[█████████████████░░░░░░░░░░░░░░░░░░░░░░░░░░] 40%
+Green                                            ▾
+~RRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRR
+┌────────────────────────────────────────────────┐
+│ Red                                            │
+│ Green                                          │
+~ RRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRR
+│ Blue                                           │
+└────────────────────────────────────────────────┘
+ Item 6
+2026-01-31
+~UUUU UU UU
+< 5 >
+──────────────────────────────────────────────────
+~FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF
+Details
+~UUUUUUU
+ First   Second   Third
+~RRRRRRR
+
+
+
+
+
+[                    Disabled                    ]
+~FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF
+cursor 1,12
