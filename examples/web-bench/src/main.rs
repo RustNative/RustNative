@@ -9,7 +9,8 @@
 //!   because each route loads only its own modules;
 //! - on a throttled profile (CPU ×4, 150 ms and 1.6 Mb/s), in headless
 //!   Edge: `startup_ms` (to the islands being ready), `lcp_ms` (largest
-//!   contentful paint), `cls` (cumulative layout shift), and `inp_ms` (a
+//!   contentful paint), `cls` (cumulative layout shift), `js_heap_mb` (the
+//!   page's JavaScript heap after a collection), and `inp_ms` (a
 //!   click's interaction to next paint).
 
 #![allow(
@@ -232,7 +233,15 @@ fn browser_metrics() -> serde_json::Value {
             rustnative_web::runtime::runtime_url("/_rn/")
         ))
         .expect("the metrics");
+    // The page's live JavaScript heap once the island has run, collected
+    // first so the number is what the page keeps, not garbage awaiting it.
+    page.call("HeapProfiler.enable", json!({})).expect("the heap profiler");
+    page.call("HeapProfiler.collectGarbage", json!({})).expect("a collection");
+    let heap = page.call("Runtime.getHeapUsage", json!({})).expect("the heap usage");
+    #[allow(clippy::cast_precision_loss, reason = "megabytes")]
+    let js_heap_mb = heap["usedSize"].as_f64().unwrap_or(f64::MAX) / (1024.0 * 1024.0);
     json!({
+        "js_heap_mb": js_heap_mb,
         "startup_ms": metrics["ready"].as_f64().unwrap_or(f64::MAX),
         "lcp_ms": metrics["lcp"].as_f64().unwrap_or(f64::MAX),
         "cls": metrics["cls"].as_f64().unwrap_or(f64::MAX),

@@ -11,6 +11,8 @@ input_latency_ms = { max = 4, tolerance = 1.0 }           # 1.6–2.5
 # A keystroke into the filter over 200 000 rows (Milestone 54): the event
 # and the render it causes, the filter not waited for.
 filter_input_latency_ms = { max = 4, tolerance = 1.0 }    # 0.08
+# The resident set with the bench screen and the 200 000-row filter alive.
+resident_memory_mb = { max = 32, tolerance = 0.25 }       # 23.8
 
 tree_diff_us_1k_nodes = { max = 600, tolerance = 1.0 }
 layout_us_1k_nodes = { max = 900, tolerance = 1.0 }

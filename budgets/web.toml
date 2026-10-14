@@ -18,3 +18,5 @@ lcp_ms = { max = 1500, tolerance = 0.5 }                     # 916
 cls = { max = 0, tolerance = 0 }                             # 0
 # A click's interaction to next paint, throttled.
 inp_ms = { max = 200, tolerance = 0.5 }                      # 32
+# The page's live JavaScript heap after the island ran and a collection.
+js_heap_mb = { max = 2, tolerance = 0.25 }                  # 0.8

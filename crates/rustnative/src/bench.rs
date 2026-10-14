@@ -625,9 +625,16 @@ fn kilobytes(path: &Path) -> Result<f64> {
     Ok(size as f64 / 1024.0)
 }
 
-/// The largest the process named `name` has been, in megabytes (the peak
-/// working set; Windows, the reference machine).
+/// The largest the running process named `name` has been, in megabytes:
+/// its peak working set on Windows, its peak resident set (`VmHWM`) on
+/// Linux. `None` elsewhere, or when no such process is running.
 fn peak_memory_mb(name: &str) -> Option<f64> {
+    if cfg!(target_os = "linux") {
+        return peak_resident_linux(name);
+    }
+    if !cfg!(windows) {
+        return None;
+    }
     let output = Command::new("powershell")
         .args(["-NoProfile", "-Command"])
         .arg(format!(
@@ -637,6 +644,26 @@ fn peak_memory_mb(name: &str) -> Option<f64> {
         .ok()?;
     let bytes: f64 = String::from_utf8_lossy(&output.stdout).trim().parse().ok()?;
     Some(bytes / (1024.0 * 1024.0))
+}
+
+/// The largest `VmHWM` among running processes named `name` (the kernel
+/// keeps the first 15 bytes of a name in `comm`).
+fn peak_resident_linux(name: &str) -> Option<f64> {
+    let comm: String = name.chars().take(15).collect();
+    std::fs::read_dir("/proc")
+        .ok()?
+        .flatten()
+        .filter(|entry| {
+            std::fs::read_to_string(entry.path().join("comm"))
+                .is_ok_and(|found| found.trim_end() == comm)
+        })
+        .filter_map(|entry| {
+            let status = std::fs::read_to_string(entry.path().join("status")).ok()?;
+            let line = status.lines().find_map(|line| line.strip_prefix("VmHWM:"))?;
+            let kilobytes: f64 = line.trim().trim_end_matches("kB").trim().parse().ok()?;
+            Some(kilobytes / 1024.0)
+        })
+        .reduce(f64::max)
 }
 
 /// The serverless budgets' measurements (`W-SL-1`, `W-ED-2`): the notes
@@ -755,6 +782,15 @@ fn serverless(root: &Path) -> Result<BTreeMap<String, f64>> {
 mod tests {
     use super::*;
 
+    #[cfg(target_os = "linux")]
+    #[test]
+    fn a_running_process_s_peak_memory_is_read_on_linux() {
+        let name = std::fs::read_to_string("/proc/self/comm").unwrap();
+        let peak = peak_resident_linux(name.trim_end()).unwrap();
+        assert!(peak > 0.0, "this test process has a peak resident set: {peak}");
+        assert_eq!(peak_resident_linux("no-such-process-anywhere"), None);
+    }
+
     #[test]
     fn the_web_budget_fails_an_inflated_route() {
         let text = include_str!("../../../budgets/web.toml");
@@ -767,6 +803,7 @@ mod tests {
                 ("lcp_ms".to_owned(), 900.0),
                 ("cls".to_owned(), 0.0),
                 ("inp_ms".to_owned(), 30.0),
+                ("js_heap_mb".to_owned(), 0.8),
             ])
         };
         assert!(judge(&budgets, &measured(122.7, 0.0), false, false).passes());

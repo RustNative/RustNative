@@ -81,6 +81,7 @@ labelled text fields, 125 native controls in all.
 | `launch_ms` | launching the bench screen on the headless backend and settling it |
 | `input_latency_ms` | a click through hit-testing and the input path, to the settled change |
 | `filter_input_latency_ms` | a keystroke into `examples/filter-demo`'s filter over 200 000 rows: the event and the render it causes (median of 12) |
+| `resident_memory_mb` | the process's resident set with the bench screen and the 200 000-row filter both alive (working set on Windows, `VmRSS` on Linux) |
 
 ### Shared core and compile steps (both targets)
 
@@ -127,6 +128,7 @@ comments.
 | `lcp_ms` | Largest contentful paint on that profile. |
 | `cls` | Cumulative layout shift (framework-controlled content reserves its size). |
 | `inp_ms` | A click's interaction to next paint on that profile. |
+| `js_heap_mb` | The page's live JavaScript heap after the island has run and a collection (`Runtime.getHeapUsage`). |
 
 
 ## Serverless keys (`serverless.toml`)
@@ -140,7 +142,7 @@ lambda` and as a `wasm32-wasip1` module behind `serve wagi`.
 | `lambda_artifact_kb` | The release function binary. |
 | `lambda_cold_start_ms` | Process start, the runtime-API handshake, and the first response. |
 | `lambda_warm_ms` | A warm invocation, median of five. |
-| `lambda_memory_mb` | The function's peak working set (Windows). |
+| `lambda_memory_mb` | The function's peak memory: its peak working set on Windows, its peak resident set (`VmHWM`) on Linux. |
 | `edge_artifact_kb` | The release edge module. |
 | `edge_cold_start_ms` | Compiling the module in the emulator's interpreter, and the first request. |
 | `edge_warm_ms` | A request on a fresh instance of the compiled module, median of five. |

@@ -42,7 +42,7 @@ fn close() {
 }
 
 /// The resident set, from `/proc/self/status`.
-fn resident_mb() -> f64 {
+pub(super) fn resident_mb() -> f64 {
     let status = std::fs::read_to_string("/proc/self/status").unwrap_or_default();
     let kilobytes = status
         .lines()

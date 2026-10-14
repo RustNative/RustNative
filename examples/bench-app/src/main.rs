@@ -302,7 +302,19 @@ fn headless() -> Value {
         "launch_ms": millis(launch),
         "input_latency_ms": millis(latency),
         "filter_input_latency_ms": millis(keystroke),
+        // Both screens are alive, the filter holding its 200 000 rows.
+        "resident_memory_mb": resident_memory_mb(),
     })
+}
+
+/// This process's resident memory, in megabytes (`NaN` where it is not
+/// read: neither Windows nor Linux).
+fn resident_memory_mb() -> f64 {
+    #[cfg(any(windows, target_os = "linux"))]
+    let resident = native::resident_mb();
+    #[cfg(not(any(windows, target_os = "linux")))]
+    let resident = f64::NAN;
+    resident
 }
 
 #[cfg(target_os = "linux")]
@@ -345,7 +357,7 @@ mod native {
         }
     }
 
-    fn resident_mb() -> f64 {
+    pub(super) fn resident_mb() -> f64 {
         let mut counters = PROCESS_MEMORY_COUNTERS {
             cb: u32::try_from(std::mem::size_of::<PROCESS_MEMORY_COUNTERS>()).unwrap_or(0),
             ..PROCESS_MEMORY_COUNTERS::default()
