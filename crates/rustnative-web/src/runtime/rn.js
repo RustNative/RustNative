@@ -1491,10 +1491,28 @@ const POINTER_BUTTONS = ["Primary", "Middle", "Secondary", "Back", "Forward"];
 
 /// A DOM pointer event as the framework's `PointerEvent`, in the target's
 /// own coordinates.
-export function pointerOf(event, element) {
+export function pointerOf(event, element, samples = true) {
   const box = element.getBoundingClientRect();
   const changed = event.type === "pointerdown" || event.type === "pointerup";
+  const pen = event.pointerType === "pen";
+  const tau = 2 * Math.PI;
+  // Pointer Events level 3: altitude and azimuth where the browser has them,
+  // converted from tilt-X/tilt-Y where it has only those.
+  let tilt = null;
+  if (pen && typeof event.altitudeAngle === "number") {
+    tilt = [Math.fround(event.altitudeAngle), Math.fround(((event.azimuthAngle % tau) + tau) % tau)];
+  } else if (pen && (event.tiltX || event.tiltY)) {
+    const [x, y] = [event.tiltX * Math.PI / 180, event.tiltY * Math.PI / 180];
+    const azimuth = ((Math.atan2(Math.tan(y), Math.tan(x)) % tau) + tau) % tau;
+    tilt = [Math.fround(Math.atan(1 / Math.hypot(Math.tan(x), Math.tan(y)))), Math.fround(azimuth)];
+  }
+  const more = (list) => samples && typeof list === "function" ? list.call(event).map((sample) => pointerOf(sample, element, false)) : [];
   return {
+    tilt,
+    roll: pen && event.twist ? Math.fround((event.twist * Math.PI) / 180) : null,
+    hover: null,
+    coalesced: more(event.getCoalescedEvents),
+    predicted: more(event.getPredictedEvents),
     pointer_id: event.pointerId,
     kind: POINTER_KINDS[event.pointerType] ?? "Mouse",
     position: { x: Math.round(event.clientX - box.left), y: Math.round(event.clientY - box.top) },

@@ -55,6 +55,7 @@ pub const EVENT_NAMES: &[&str] = &[
     "ShareReceived",
     "DeepLink",
     "Lifecycle",
+    "WindowLifecycle",
     "SurfaceResized",
     "VisibleRangeChanged",
     "AnimationFinished",
@@ -379,6 +380,11 @@ pub enum Event {
     /// anything itself; it is told so it can do what is specific to it
     /// (pause playback, close a connection).
     Lifecycle(Lifecycle),
+    /// This window was backgrounded, foregrounded, discarded, or restored
+    /// while the process runs (see [`crate::lifecycle::WindowLifecycle`]).
+    /// Its persisted state is flushed before a backgrounding or a discard
+    /// is delivered.
+    WindowLifecycle(crate::lifecycle::WindowLifecycle),
     /// A native surface was realized, or changed size.
     ///
     /// Delivered after layout gives the surface its first size and after
@@ -480,7 +486,8 @@ impl Event {
             | Self::Command { .. }
             | Self::BackProgress { .. }
             | Self::ShareReceived { .. }
-            | Self::Lifecycle(_) => None,
+            | Self::Lifecycle(_)
+            | Self::WindowLifecycle(_) => None,
         }
     }
 
@@ -536,7 +543,8 @@ impl Event {
             | Self::Command { .. }
             | Self::BackProgress { .. }
             | Self::ShareReceived { .. }
-            | Self::Lifecycle(_) => {}
+            | Self::Lifecycle(_)
+            | Self::WindowLifecycle(_) => {}
         }
         self
     }

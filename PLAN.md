@@ -1268,7 +1268,7 @@ Implementation plan: `docs/superpowers/plans/2026-10-13-terminal-milestone-38.md
 
 The Web track is lettered rather than numbered because it predates the numbering and because `rustnative` names no milestone for `web`. It is one backend like the others; it is longer because the browser is not one deployment target but three.
 
-**Status: built, with checklist rows owed.** Web milestones A–K are built (`docs/web.md`), and by this section's definition the backend is not yet finished: the Web column of `docs/conformance/new-backend-checklist.md` holds no test for rows 4, 6, 8–16, 19, 22, and 26 (among them safe areas, gesture arbitration against `touch-action`, runtime token switching without a reload, and the inspection protocol). Virtual-list range events and canvas virtual elements, owed until the 2026-10-12 review, are built there.
+**Status: built.** Web milestones A–K are built (`docs/web.md`), and the Web column of `docs/conformance/new-backend-checklist.md` holds a test for every row a shipped backend answers — safe areas, gesture arbitration, ownership, the escape hatch, panic containment, the typed environment, commands, adaptive layout, mappers, surfaces, cursors, runtime token switching, and the inspection protocol, added on 2026-10-14 after the 2026-10-12 review found them untested. Rows 23–25 are Milestone 67's and no backend answers them yet. Virtual-list range events and canvas virtual elements (with their actions over a server-interactive session) are built.
 
 ### Web deployment modes
 

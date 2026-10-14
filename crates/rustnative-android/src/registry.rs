@@ -50,6 +50,9 @@ pub(crate) struct WindowRuntime {
     pub(crate) back_claimed: bool,
     /// Whether the activity is started (visible).
     pub(crate) started: bool,
+    /// Whether the activity was stopped since it was last seen (a start then
+    /// brings it forward, rather than creating it).
+    pub(crate) backgrounded: bool,
     /// The options menu last sent to the activity.
     pub(crate) menu: Option<Vec<crate::menus::Entry>>,
     /// Running animations and transitions (`animation`).
@@ -161,6 +164,7 @@ impl WindowRegistry {
             input: crate::input::InputState::default(),
             back_claimed: false,
             started: false,
+            backgrounded: false,
             menu: None,
             animation: crate::animation::AnimationState::default(),
             overlay: None,
@@ -682,6 +686,7 @@ impl WindowRegistry {
                     input: crate::input::InputState::default(),
                     back_claimed: false,
                     started: false,
+                    backgrounded: false,
                     menu: None,
                     animation: crate::animation::AnimationState::default(),
                     overlay: None,
@@ -770,6 +775,20 @@ impl WindowRegistry {
             }
         }
         Ok(())
+    }
+
+    /// Reports one activity's own transition to its window
+    /// (`WindowLifecycle`), logging a flush that failed.
+    pub(crate) fn window_lifecycle(
+        &mut self,
+        window: WindowId,
+        phase: rustnative_core::WindowLifecycle,
+    ) {
+        let flushed =
+            self.with_application(|application| application.window_lifecycle(window, phase));
+        if let Err(error) = flushed {
+            crate::log::warn(&format!("the window's state was not flushed: {error}"));
+        }
     }
 
     /// Delivers a lifecycle event (state is flushed first by the core).

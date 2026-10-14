@@ -69,11 +69,36 @@ and Xvfb, docs, the MSRV, `cargo deny`); the Android backend linted for the
 device target; CI green on `b9ff181`, its new legs included (budgets for
 Linux, the Web, serverless, and Android on the emulator; the Apple check).
 **Not verified here:** the Android device suite on the phone for these
-changes (CI ran it on the emulator). **Still owed,
-by decision:** the Web checklist rows `PLAN.md` lists for the Web (safe areas,
-gesture arbitration, inspection, and others), browser delivery of virtual
-elements' actions, and the remaining iPadOS Phase 0 items (the `ipados:` style
-variant, per-window lifecycle, the headless iPad profile).
+changes (CI ran it on the emulator).
+
+**What the review left owed, built (2026-10-14).**
+
+- **Memory in every budget.** The headless budget measures the resident set
+  with the 200 000-row filter alive (`resident_memory_mb`), the Web budget the
+  page's JavaScript heap after a collection (`js_heap_mb`, through CDP), and the
+  Lambda's peak memory is read on Linux from `VmHWM` as on Windows from the
+  peak working set — no budget key is left unmeasured on its CI host.
+- **The Web column of the checklist.** Every row a shipped backend answers now
+  has a Web test, most in a real browser (`rustnative-server/tests/checklist_browser.rs`):
+  cursors; runtime token switching (`rn.applyTokens`) and scheme changes with no
+  re-render; an island's panic releasing its pointer capture; island ownership
+  (patched in place, census unchanged); the Web's capability answer on the
+  portable enum (`rustnative_web::capabilities`, in every page render's
+  environment); the inspection protocol in the browser (`rn.inspect`, with the
+  capability and style tables at `/_rn/inspect.json`); per-property mappers
+  (`rustnative_web::mappers`); gesture arbitration as the browser applies it
+  (`data-gestures`, and `with_input` in the client subset). Over a
+  server-interactive session: shortcuts routed through the command model, the
+  browser's viewport, safe area, and container sizes fed to the session's tree,
+  and virtual elements' actions delivered. The Web's platform-group decision and
+  its pass of the portable API audit are recorded.
+- **CI.** The Android job is bounded (75 minutes) after two runs stalled on the
+  emulator, and the bench's `am start -W` is bounded on the device.
+
+**Still owed:** rows 23–25 of the checklist, which are Milestone 67's and which
+no backend answers yet; the remaining iPadOS Phase 0 items (the `ipados:` style
+variant, which is a Milestone 67 guard, per-window lifecycle, the headless iPad
+profile); Linux and the Web filling the new pen axes.
 
 **The Web track (2026-09-27 to 2026-09-28).** Web milestones A–K are built,
 with every web half those milestones had recorded as owed. See the Web
@@ -589,7 +614,7 @@ export, element}.rs`, `the_ui_is_the_same_in_every_mode`, and
   toolchain.
 - **Web checklist rows marked `—`:** safe-area insets, gesture arbitration
   against the browser's, runtime token switches without a reload, and
-  others.
+  others. (Built on 2026-10-14: see "What the review left owed" above.)
 
 ### Milestone 52 — The project around the framework — complete for Windows (device end owed)
 

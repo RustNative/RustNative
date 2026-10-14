@@ -6,9 +6,9 @@ it for the backends that exist today: **Windows** (`rustnative-windows`),
 **Linux** (`rustnative-linux`, whose tests run on Wayland, Xwayland, and Xvfb),
 **Android** (`rustnative-android`, whose `device_tests::` run on a phone and
 an emulator through `tools/android-device-test.sh`),
-**headless** (`rustnative-headless`), and the **Web** (`rustnative-web`, whose
-column says `—` where no test holds the item yet: those items are not
-satisfied on the Web). A future backend adds its column and
+**headless** (`rustnative-headless`), and the **Web** (`rustnative-web`, held
+in a real browser by `rustnative-server/tests/checklist_browser.rs` where the
+item is the browser's). A future backend adds its column and
 its tests; an item with no test is not satisfied.
 
 Test paths are relative to the crate named; `native::…` tests live in

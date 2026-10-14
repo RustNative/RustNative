@@ -27,6 +27,8 @@ attach to it and detach from it:
 |---|---|
 | primary `onResume` | `Lifecycle::Resuming` |
 | primary `onPause` | state flushed, then `Lifecycle::Suspending` |
+| any activity's `onStop` | that window's state flushed, then `WindowLifecycle::Backgrounded` to that window only |
+| its `onStart` after a stop | `WindowLifecycle::Foregrounded` to that window |
 | `onSaveInstanceState` | state flushed: the process may be killed next |
 | primary `onDestroy`, finishing | `Lifecycle::Terminating`; the application ends |
 | another window's `onDestroy`, finishing | the window closes (`Application::close_window`) |

@@ -441,6 +441,29 @@ impl Application {
         flushed
     }
 
+    /// Tells window `id` it was backgrounded, foregrounded, discarded, or
+    /// restored while the process runs (an Android activity, an iPad
+    /// scene). That window's persisted state is flushed first when it may
+    /// not be seen again ([`crate::WindowLifecycle::flushes`]), then
+    /// [`Event::WindowLifecycle`] is delivered to its root — only that
+    /// window's; the others are not told.
+    ///
+    /// # Errors
+    ///
+    /// The flush's error; the event is delivered either way.
+    pub fn window_lifecycle(
+        &mut self,
+        id: WindowId,
+        phase: crate::lifecycle::WindowLifecycle,
+    ) -> Result<(), crate::services::ServiceError> {
+        let flushed = match self.windows.get(&id) {
+            Some(entry) if phase.flushes() => entry.components.flush_state(),
+            _ => Ok(()),
+        };
+        self.dispatch_to_window(id, Event::WindowLifecycle(phase));
+        flushed
+    }
+
     /// Asks the application to open `url`, delivering [`Event::DeepLink`]
     /// to the primary window's root component. Returns whether it was
     /// handled.

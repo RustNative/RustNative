@@ -726,6 +726,18 @@ impl HeadlessApp {
         self.settle();
     }
 
+    /// Reports one window's own transition — backgrounded, foregrounded,
+    /// discarded, or restored — as a host with several window roots (an
+    /// Android activity, an iPad scene) does.
+    pub fn window_lifecycle(
+        &mut self,
+        window: rustnative_core::WindowId,
+        phase: rustnative_core::WindowLifecycle,
+    ) {
+        let _ = self.app.window_lifecycle(window, phase);
+        self.settle();
+    }
+
     /// Dispatches `event` to the current window and settles. Prefer the
     /// interaction methods above: this bypasses hit-testing and focus.
     pub fn dispatch(&mut self, event: Event) {

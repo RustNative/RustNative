@@ -409,7 +409,7 @@ pub use layout::{
     GridStyle, IntrinsicMeasurer, LayoutDirection, LayoutEngine, LayoutInvalidation, LayoutResult,
     LayoutStyle, MeasuredItem, Overflow, Point, Rect, RowStyle, Size, SizeMode, Track,
 };
-pub use lifecycle::Lifecycle;
+pub use lifecycle::{Lifecycle, WindowLifecycle};
 pub use menu::{MenuBar, MenuItem};
 pub use navigation::{
     EntryId, NavigationCommand, NavigationEntry, NavigationStack, Navigator, Route, RouteError,

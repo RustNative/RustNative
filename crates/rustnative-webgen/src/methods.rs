@@ -1615,6 +1615,14 @@ impl Cx<'_> {
                 "modifiers" => done!(format!("{r}.modifiers"), Ty::Modifiers),
                 "pressure" => done!(format!("{r}.pressure"), Ty::Opt(Box::new(Ty::Float(true)))),
                 "region" => done!(format!("{r}.region"), Ty::Opt(Box::new(Ty::Int(IntK::U32)))),
+                "tilt" => done!(
+                    format!("{r}.tilt"),
+                    Ty::Opt(Box::new(Ty::Tuple(vec![Ty::Float(true), Ty::Float(true)])))
+                ),
+                "roll" => done!(format!("{r}.roll"), Ty::Opt(Box::new(Ty::Float(true)))),
+                "hover_distance" => done!(format!("{r}.hover"), Ty::Opt(Box::new(Ty::Float(true)))),
+                "coalesced" => done!(format!("{r}.coalesced"), Ty::Vec(Box::new(Ty::Pointer))),
+                "predicted" => done!(format!("{r}.predicted"), Ty::Vec(Box::new(Ty::Pointer))),
                 _ => unknown(self, &ty),
             },
             Ty::PointerButtons => match method {

@@ -6,6 +6,8 @@
 //! |---|---|
 //! | primary `onResume` | `Lifecycle::Resuming` |
 //! | primary `onPause` | state flushed, then `Lifecycle::Suspending` |
+//! | any activity's `onStop` | its window's state flushed, then `WindowLifecycle::Backgrounded` to that window |
+//! | its `onStart` after a stop | `WindowLifecycle::Foregrounded` to that window |
 //! | `onSaveInstanceState` | state flushed (the process may be killed next) |
 //! | primary `onDestroy`, finishing | state flushed, `Lifecycle::Terminating`; the application ends |
 //! | another window's `onDestroy`, finishing | the window closes (`Application::close_window`) |
@@ -40,7 +42,7 @@ pub(crate) use platform::step;
 
 #[cfg(target_os = "android")]
 mod platform {
-    use rustnative_core::{Lifecycle, WindowId};
+    use rustnative_core::{Lifecycle, WindowId, WindowLifecycle};
 
     use crate::Error;
     use crate::backend::Flow;
@@ -57,14 +59,24 @@ mod platform {
         let primary = window == WindowId::PRIMARY;
         match what {
             protocol::LC_START => {
-                if let Some(runtime) = registry.windows.get_mut(&window) {
+                let returning = registry.windows.get_mut(&window).is_some_and(|runtime| {
                     runtime.started = true;
+                    std::mem::take(&mut runtime.backgrounded)
+                });
+                // This activity can be seen again; its first start is its
+                // creation, not a return.
+                if returning {
+                    registry.window_lifecycle(window, WindowLifecycle::Foregrounded);
                 }
             }
             protocol::LC_STOP => {
                 if let Some(runtime) = registry.windows.get_mut(&window) {
                     runtime.started = false;
+                    runtime.backgrounded = true;
                 }
+                // This activity can no longer be seen, while the process
+                // (and its other activities) may run on.
+                registry.window_lifecycle(window, WindowLifecycle::Backgrounded);
             }
             protocol::LC_RESUME if primary => registry.lifecycle(Lifecycle::Resuming)?,
             protocol::LC_PAUSE if primary => registry.lifecycle(Lifecycle::Suspending)?,

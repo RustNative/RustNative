@@ -63,6 +63,10 @@ pub(crate) enum Raw {
         buttons: PointerButtons,
         modifiers: KeyModifiers,
         pressure: Option<f64>,
+        /// A pen's tilt from the surface normal along x and y, in degrees.
+        tilt: Option<(f64, f64)>,
+        /// A pen's rotation about its axis, in degrees.
+        rotation: Option<f64>,
     },
     /// The pointer left the window.
     Left,
@@ -189,6 +193,8 @@ fn translate(native: &gtk::Native, root: &RnLayout, event: &gdk::Event) -> Optio
             buttons: buttons_of(modifier),
             modifiers: keys::modifiers(modifier),
             pressure: event.axis(gdk::AxisUse::Pressure),
+            tilt: tilt_of(event),
+            rotation: event.axis(gdk::AxisUse::Rotation),
         })
     };
     let mouse_or_pen = if kind == PointerKind::Pen { PEN } else { MOUSE };
@@ -218,6 +224,8 @@ fn translate(native: &gtk::Native, root: &RnLayout, event: &gdk::Event) -> Optio
                 buttons: buttons_of(held),
                 modifiers: keys::modifiers(modifier),
                 pressure: event.axis(gdk::AxisUse::Pressure),
+                tilt: tilt_of(event),
+                rotation: event.axis(gdk::AxisUse::Rotation),
             })
         }
         gdk::EventType::MotionNotify => sample(PointerPhase::Move, None, mouse_or_pen, None),
@@ -345,6 +353,8 @@ impl WindowRegistry {
                 buttons,
                 modifiers,
                 pressure,
+                tilt,
+                rotation,
             } => {
                 let pointer = match sequence {
                     Some(sequence) => {
@@ -410,6 +420,17 @@ impl WindowRegistry {
                     #[allow(clippy::cast_possible_truncation, reason = "a pressure in 0–1")]
                     let pressure = pressure as f32;
                     sample = sample.with_pressure(pressure);
+                }
+                #[allow(clippy::cast_possible_truncation, reason = "angles in degrees")]
+                let (tilt, rotation) = (
+                    tilt.map(|(x, y)| (x as f32, y as f32)),
+                    rotation.map(|degrees| degrees as f32),
+                );
+                if let Some((tilt_x, tilt_y)) = tilt {
+                    sample = sample.with_tilt_xy(tilt_x, tilt_y);
+                }
+                if let Some(rotation) = rotation {
+                    sample = sample.with_roll(rotation.to_radians());
                 }
                 self.deliver(window, target, phase, sample)?;
                 if let Some(runtime) = self.windows.get_mut(&window) {
@@ -628,4 +649,14 @@ mod tests {
             PointerButtons::none().with(PointerButton::Primary).with(PointerButton::Secondary)
         );
     }
+}
+
+/// A pen's tilt, in degrees from the surface normal along x and y: GDK
+/// reports each tilt axis normalized to `-1..=1` of a quarter turn.
+fn tilt_of(event: &gdk::Event) -> Option<(f64, f64)> {
+    let x = event.axis(gdk::AxisUse::Xtilt);
+    let y = event.axis(gdk::AxisUse::Ytilt);
+    (x.is_some() || y.is_some()).then(|| {
+        (x.unwrap_or(0.0).clamp(-1.0, 1.0) * 90.0, y.unwrap_or(0.0).clamp(-1.0, 1.0) * 90.0)
+    })
 }

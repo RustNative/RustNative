@@ -18,3 +18,38 @@ pub enum Lifecycle {
     /// decoded images, prefetched pages — and keeps what it cannot.
     LowMemory,
 }
+
+/// A transition in one window's life, apart from the process's (see
+/// [`crate::Event::WindowLifecycle`]).
+///
+/// A host that shows a window root at a time, or several the person
+/// arranges — an Android activity, an iPad scene — backgrounds and discards
+/// windows while the process keeps running, and re-creates a discarded one
+/// from its saved state later. These are that window's own transitions;
+/// the process's are [`Lifecycle`].
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[non_exhaustive]
+pub enum WindowLifecycle {
+    /// The window can no longer be seen (another window or application is
+    /// in front of it), though the process runs. Its persisted state is
+    /// flushed before this is delivered.
+    Backgrounded,
+    /// The window can be seen again after [`Self::Backgrounded`].
+    Foregrounded,
+    /// The host discarded the window — the person dismissed it, or the
+    /// host reclaimed it — and may restore it later from its saved state.
+    /// Its persisted state is flushed before this is delivered.
+    Disconnected,
+    /// The window was re-created from saved state rather than opened fresh:
+    /// what it shows is what the person left.
+    Restored,
+}
+
+impl WindowLifecycle {
+    /// Whether the window's persisted state is flushed before this is
+    /// delivered: it may not be seen again by this process.
+    #[must_use]
+    pub const fn flushes(self) -> bool {
+        matches!(self, Self::Backgrounded | Self::Disconnected)
+    }
+}

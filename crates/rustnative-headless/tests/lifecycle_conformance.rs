@@ -7,7 +7,10 @@
 //!    link's destination both hold;
 //! 3. a configuration change while work is in flight: the work lands;
 //! 4. low memory while suspended, then resume: state intact, caches gone;
-//! 5. kill-and-restore per navigation destination (`C14-1`).
+//! 5. kill-and-restore per navigation destination (`C14-1`);
+//! 6. a window backgrounded, then the process killed: the window's state was
+//!    flushed when it went to the background, while bringing it forward
+//!    flushes nothing (iPadOS Phase 0, per-window lifecycle).
 
 use std::time::Duration;
 
@@ -127,6 +130,26 @@ fn process_death_keeps_only_flushed_state() {
 
     let app = app.kill_and_restore();
     assert!(app.find(&Query::text("Count 1")).is_ok(), "{}", app.golden());
+}
+
+#[test]
+fn a_backgrounded_windows_state_survives_process_death() {
+    use rustnative_core::{WindowId, WindowLifecycle};
+    let mut app = launch();
+    increment(&mut app);
+    increment(&mut app); // count 2, buffered
+    app.window_lifecycle(WindowId::PRIMARY, WindowLifecycle::Backgrounded);
+    let mut app = app.kill_and_restore();
+    assert!(
+        app.find(&Query::text("Count 2")).is_ok(),
+        "flushed on backgrounding: {}",
+        app.golden()
+    );
+
+    increment(&mut app); // count 3, buffered
+    app.window_lifecycle(WindowId::PRIMARY, WindowLifecycle::Foregrounded);
+    let app = app.kill_and_restore();
+    assert!(app.find(&Query::text("Count 2")).is_ok(), "foregrounding flushes nothing");
 }
 
 #[test]
