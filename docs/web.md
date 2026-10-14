@@ -166,6 +166,14 @@ ServerApp::new()
 - A route loads only the modules its islands use.
 - A component can wait for its data. The render waits with it, up to the
   page's budget; past the budget, a `pending` boundary shows its fallback.
+- A virtual list renders its realized items between spacers as long as the
+  rest; scrolling it sends `VisibleRangeChanged` (in an island, and over a
+  server-interactive session), so a range-rendering component fills in
+  what scrolled into view.
+- A node's virtual elements — a chart's bars and cells — become a visually
+  hidden tree of ARIA elements inside it, and the node a `figure`, so a
+  screen reader reads a chart the way UI Automation, AT-SPI, and Android
+  expose it. Their actions are not yet delivered from the browser.
 
 The wire format between the server and the runtime is
 `docs/web/wire-format.md`.

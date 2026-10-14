@@ -977,7 +977,9 @@ export class Realizer {
         return spacer;
       };
       element.c.push(spacer(before), ...items, spacer(after));
-      setAttr(element, "data-vlist", `${style.axis === "Horizontal" ? "row" : "column"} ${style.item_count}`);
+      // Axis, item count, item extent, and overscan: what a scroll needs to
+      // compute the visible range (`visibleRange`).
+      setAttr(element, "data-vlist", `${style.axis === "Horizontal" ? "row" : "column"} ${style.item_count} ${style.extent.Fixed ?? style.extent.Estimated} ${style.overscan}`);
     } else {
       element.c.push(...items);
     }
@@ -1184,6 +1186,20 @@ function asListItem(item) {
   wrapper.k = item.k;
   delete item.k;
   return wrapper;
+}
+
+/// The items a scrolled virtual list should realize: those its viewport
+/// shows plus its overscan, as `VirtualRange::compute` computes them.
+export function visibleRange(list) {
+  const [axis, count, extent, overscan] = (list.getAttribute("data-vlist") || "").split(" ");
+  const items = Number(count), length = Number(extent), extra = Number(overscan) || 0;
+  if (!(items > 0) || !(length > 0)) return null;
+  const horizontal = axis === "row";
+  const offset = Math.max(0, horizontal ? list.scrollLeft : list.scrollTop);
+  const viewport = Math.max(1, horizontal ? list.clientWidth : list.clientHeight);
+  const firstVisible = Math.min(items - 1, Math.floor(offset / length));
+  const lastVisible = Math.min(items - 1, Math.floor((offset + viewport - 1) / length));
+  return { first: Math.max(0, firstVisible - extra), last_exclusive: Math.min(items, lastVisible + 1 + extra) };
 }
 
 function extentOffset(style, index) {
@@ -1697,6 +1713,20 @@ export class Island {
     on("copy", clipboard(() => "Copy"));
     on("cut", clipboard(() => "Cut"));
     on("paste", clipboard((event) => ({ Paste: { text: event.clipboardData ? event.clipboardData.getData("text/plain") : null } })));
+    // A virtual list asks for the items its viewport now shows. `scroll`
+    // does not bubble, so it is caught on the way down.
+    const ranges = new Map();
+    on("scroll", (event) => {
+      const list = event.target;
+      if (!list || list.nodeType !== 1 || !list.hasAttribute("data-vlist")) return;
+      const found = this.keyOf(list);
+      const range = found && visibleRange(list);
+      if (!range) return;
+      const last = ranges.get(found.key);
+      if (last && last.first === range.first && last.last_exclusive === range.last_exclusive) return;
+      ranges.set(found.key, range);
+      this.dispatch({ type: "VisibleRangeChanged", target: found.key, range });
+    }, { capture: true, passive: true });
   }
 }
 
@@ -2182,6 +2212,18 @@ export class LiveIsland {
       const found = this.keyOf(event.target);
       if (found && found.element.type === "checkbox") this.send({ event: "toggled", target: found.key, on: found.element.checked });
     });
+    const ranges = new Map();
+    document.addEventListener("scroll", (event) => {
+      const list = event.target;
+      if (!list || list.nodeType !== 1 || !this.root.contains(list) || !list.hasAttribute("data-vlist")) return;
+      const found = this.keyOf(list);
+      const range = found && visibleRange(list);
+      if (!range) return;
+      const last = ranges.get(found.key);
+      if (last && last.first === range.first && last.last_exclusive === range.last_exclusive) return;
+      ranges.set(found.key, range);
+      this.send({ event: "visible_range_changed", target: found.key, first: range.first, last_exclusive: range.last_exclusive });
+    }, { capture: true, passive: true, signal: this.listening.signal });
   }
 
   /// `Auto` mode: the client module takes over from the session's last

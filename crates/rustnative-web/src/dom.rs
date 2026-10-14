@@ -15,7 +15,7 @@
 //! | `TextInput` | `<input type="text">` |
 //! | `Column`, `Row` | `<div>` (a flex container); `<ul>` of `<li>` for a list of list items; `<dialog>` for a dialog |
 //! | grid | `<div>` (a grid container) |
-//! | virtual list | a scrolling `<div>` with spacers for the unrealized items |
+//! | virtual list | a scrolling `<div>` with spacers for the unrealized items; a scroll sends `VisibleRangeChanged` |
 //! | `TabBar` | `role="tablist"` of `role="tab"` buttons |
 //! | check box, switch, radio | `<label>` around `<input type="checkbox">` (`role="switch"`) or `radio` |
 //! | slider, spinner, date | `<input type="range">`, `number`, `date` |
@@ -23,6 +23,7 @@
 //! | select, list box | `<select>`, `<select size>` |
 //! | separator, link, multi-line text, image | `<hr>`, `<a>`, `<textarea>`, `<img>` |
 //! | canvas | an inline `<svg>` drawn from its draw list |
+//! | virtual elements (a chart's bars) | a visually hidden tree of ARIA elements inside the node, which becomes a `figure` |
 //! | native surface, foreign object | a `<div>` carrying its accessible name |
 
 use std::collections::HashMap;
@@ -31,7 +32,7 @@ use rustnative_core::accessibility::{CheckedState, LiveRegion};
 use rustnative_core::wire::key_of;
 use rustnative_core::{
     AccessibilityInfo, AccessibilityRole, AccessibleValue, Alignment, ComponentId, Control, Node,
-    NodeId, SurfaceContent,
+    NodeId, SurfaceContent, VirtualElement,
 };
 use serde::{Deserialize, Serialize};
 
@@ -592,7 +593,16 @@ impl<'a> Realizer<'a> {
                 rustnative_core::Axis::Vertical => "column",
                 rustnative_core::Axis::Horizontal => "row",
             };
-            element = element.attr("data-vlist", format!("{axis} {}", style.item_count));
+            let extent = match style.extent {
+                rustnative_core::ItemExtent::Fixed(length)
+                | rustnative_core::ItemExtent::Estimated(length) => length,
+            };
+            // Axis, item count, item extent, and overscan: what the browser
+            // runtime computes the visible range from on scroll.
+            element = element.attr(
+                "data-vlist",
+                format!("{axis} {} {extent} {}", style.item_count, style.overscan),
+            );
         } else {
             for item in items {
                 element = element.child(item);
@@ -882,7 +892,75 @@ impl<'a> Realizer<'a> {
             native
         };
         self.accessibility(&mut element, node, node.accessibility(), native, visible_text);
+        let elements = node.accessibility().elements();
+        if !elements.is_empty() {
+            // An image's children are presentational to assistive
+            // technology; a figure's are read.
+            if element.get("role") == Some("img") || element.tag == "img" {
+                element.set("role", "figure");
+            }
+            let owner = self.wire(node.id());
+            element = element.child(Self::virtual_elements(&owner, elements));
+        }
         element
+    }
+
+    /// A node's virtual elements (a chart's bars, a canvas's regions) as an
+    /// accessible tree the browser exposes and nobody sees: each element an
+    /// element with its role, name, value, and states, nested as declared —
+    /// what UI Automation fragments, AT-SPI children, and Android's virtual
+    /// view hierarchy expose on the native backends.
+    fn virtual_elements(owner: &str, elements: &[VirtualElement]) -> Element {
+        let mut list = Element::new("div").attr("class", "rn-virtual");
+        for element in elements {
+            list = list.child(Self::virtual_element(owner, element));
+        }
+        list
+    }
+
+    fn virtual_element(owner: &str, element: &VirtualElement) -> Element {
+        let info = element.info();
+        let key = element.id().local_key().unwrap_or_else(|| element.id().get().to_string());
+        let mut out = Element::new("div")
+            .attr("role", aria_role(info.role()).unwrap_or("group"))
+            .attr("data-element", format!("{owner}~{key}"));
+        if let AccessibilityRole::Heading { level } = info.role() {
+            out = out.attr("aria-level", level.to_string());
+        }
+        if let Some(name) = info.name_hint() {
+            out = out.attr("aria-label", name);
+        }
+        if let Some(description) = info.description_hint() {
+            out = out.attr("aria-description", description);
+        }
+        match info.value() {
+            Some(AccessibleValue::Range { min, max, current, .. }) => {
+                out = out
+                    .attr("aria-valuemin", css::fixed3(min.get()))
+                    .attr("aria-valuemax", css::fixed3(max.get()))
+                    .attr("aria-valuenow", css::fixed3(current.get()));
+            }
+            Some(AccessibleValue::Text(text)) => out = out.attr("aria-valuetext", text.clone()),
+            _ => {}
+        }
+        if let Some(checked) = info.checked_state() {
+            let state = match checked {
+                CheckedState::Checked => "true",
+                CheckedState::Unchecked => "false",
+                CheckedState::Mixed => "mixed",
+            };
+            out = out.attr("aria-checked", state);
+        }
+        if let Some(selected) = info.selected_state() {
+            out = out.attr("aria-selected", selected.to_string());
+        }
+        if let Some(expanded) = info.expanded_state() {
+            out = out.attr("aria-expanded", expanded.to_string());
+        }
+        for child in info.elements() {
+            out = out.child(Self::virtual_element(owner, child));
+        }
+        out
     }
 
     /// The node's classes, `hidden`, `dir`, and framework attributes.
@@ -1137,6 +1215,38 @@ mod tests {
             </Column>
         };
         assert_eq!(realize(&builder), realize(&markup));
+    }
+
+    #[test]
+    fn a_charts_virtual_elements_are_an_accessible_tree_inside_it() {
+        let bar = |key: &str, name: &str| {
+            VirtualElement::new(
+                key,
+                AccessibilityInfo::new(AccessibilityRole::Cell).name(name),
+                rustnative_core::Rect::new(0, 0, 10, 10),
+            )
+        };
+        let row = VirtualElement::new(
+            "row",
+            AccessibilityInfo::new(AccessibilityRole::Group)
+                .name("Q1")
+                .element(bar("sales", "Sales 1.2M"))
+                .element(bar("costs", "Costs 0.8M")),
+            rustnative_core::Rect::new(0, 0, 20, 10),
+        );
+        let chart = Node::column("chart", []).with_accessibility(
+            AccessibilityInfo::new(AccessibilityRole::Canvas).name("Sales").element(row),
+        );
+        let (element, _) = realize(&chart);
+        assert_eq!(element.get("role"), Some("figure"), "an img would hide its children");
+        let Some(Child::Element(tree)) = element.children.last() else { panic!("the tree") };
+        assert_eq!(tree.get("class"), Some("rn-virtual"));
+        let Child::Element(group) = &tree.children[0] else { panic!("the row") };
+        assert_eq!((group.get("role"), group.get("aria-label")), (Some("group"), Some("Q1")));
+        let Child::Element(cell) = &group.children[1] else { panic!("a bar") };
+        assert_eq!(cell.get("role"), Some("cell"));
+        assert_eq!(cell.get("aria-label"), Some("Costs 0.8M"));
+        assert_eq!(cell.get("data-element"), Some("chart~costs"));
     }
 
     #[test]
