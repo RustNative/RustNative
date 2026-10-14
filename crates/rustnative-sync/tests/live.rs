@@ -224,3 +224,38 @@ async fn auto_mode_moves_to_the_client_with_its_state() {
         "the client component took over the state"
     );
 }
+
+#[test]
+fn a_scrolled_virtual_list_reaches_the_server_as_its_range() {
+    use rustnative_sync::live::WireEvent;
+    let wire: WireEvent = serde_json::from_value(json!({
+        "event": "visible_range_changed", "target": "rows", "first": 40, "last_exclusive": 62,
+    }))
+    .unwrap();
+    let event = wire.clone().into_event();
+    assert_eq!(
+        event,
+        Event::VisibleRangeChanged {
+            target: NodeId::from_key("rows"),
+            range: rustnative_core::VirtualRange { first: 40, last_exclusive: 62 },
+        }
+    );
+    assert_eq!(WireEvent::from_event(&event), Some(wire), "and travels back the same");
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn sessions_stop_at_the_ceiling_and_a_reconnect_still_gets_in() {
+    let (server, url) = server().await;
+    server.set_max_sessions(1);
+    let first = LiveClient::connect(&url);
+    until("the first session", || label(&first, "count").as_deref() == Some("Count 0")).await;
+    let second = LiveClient::connect(&url);
+    tokio::time::sleep(Duration::from_millis(300)).await;
+    assert_eq!(second.session(), None, "a second session would pass the ceiling");
+    assert_eq!(server.sessions(), 1);
+
+    server.drop_connections();
+    until("the first reconnects", || first.is_connected() && label(&first, "count").is_some())
+        .await;
+    assert_eq!(server.sessions(), 1, "its own session, not a new one");
+}

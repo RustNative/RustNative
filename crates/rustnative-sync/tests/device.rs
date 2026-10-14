@@ -17,7 +17,7 @@ use rustnative_sync::device::{
     Actuate, DeviceAgent, DeviceModel, DevicePolicy, Twin, decode, encode,
 };
 use rustnative_sync::mqtt::{MqttClient, Packet, serve};
-use rustnative_sync::{Clock, Hlc};
+use rustnative_sync::{Hlc, HlcClock};
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
 
@@ -56,8 +56,8 @@ fn topic(message: &str) -> String {
 
 #[test]
 fn a_device_converges_after_a_period_offline() {
-    let cloud = Clock::new(1);
-    let device = Clock::new(2);
+    let cloud = HlcClock::new(1);
+    let device = HlcClock::new(2);
     let broker = Broker::new();
     let mut twin = Twin::new(Thermostat { target: 20 }, cloud.now());
     let mut agent = DeviceAgent::new(Thermostat { target: 16 }, device.now());
@@ -144,7 +144,7 @@ fn a_device_converges_after_a_period_offline() {
 
 #[test]
 fn a_local_change_is_settled_by_the_policy() {
-    let clock = Clock::new(7);
+    let clock = HlcClock::new(7);
     let mut heater = Heater { applied: Vec::new() };
     let mut agent = DeviceAgent::new(Thermostat { target: 20 }, clock.now());
     let desire = |version, stamp: Hlc| rustnative_sync::device::Versioned {

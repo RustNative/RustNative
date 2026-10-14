@@ -15,7 +15,7 @@ use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
-use crate::clock::{Clock, Hlc};
+use crate::clock::{Hlc, HlcClock};
 
 /// A replicated record.
 pub trait Record: Serialize + DeserializeOwned + Clone + PartialEq + Send + Sync + 'static {
@@ -377,7 +377,7 @@ struct Local {
 /// A local-first replicated collection of `T`.
 pub struct SyncedCollection<T: Record> {
     local: Local,
-    clock: Arc<Clock>,
+    clock: Arc<HlcClock>,
     filter: Option<Filter>,
     _record: std::marker::PhantomData<fn() -> T>,
 }
@@ -398,7 +398,7 @@ impl<T: Record> SyncedCollection<T> {
     /// conflict policy is the server's declaration for the collection
     /// ([`SyncServer::collection`]), so every replica settles alike.
     #[must_use]
-    pub fn new(clock: Arc<Clock>) -> Self {
+    pub fn new(clock: Arc<HlcClock>) -> Self {
         Self { local: Local::default(), clock, filter: None, _record: std::marker::PhantomData }
     }
 

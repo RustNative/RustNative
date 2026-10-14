@@ -12,7 +12,7 @@ use std::sync::Arc;
 
 use rustnative_core::{Component, ComponentContext, Event, Node, NodeId};
 use rustnative_sync::{
-    Clock, ConflictPolicy, Crdt, Record, Rga, SyncError, SyncReport, SyncTransport,
+    ConflictPolicy, Crdt, HlcClock, Record, Rga, SyncError, SyncReport, SyncTransport,
     SyncedCollection,
 };
 use serde::{Deserialize, Serialize};
@@ -52,7 +52,7 @@ pub fn merge_policy() -> ConflictPolicy {
 
 /// Applies an edit from `before` to `after` to `text`, as the fewest
 /// deletions and insertions between their common prefix and suffix.
-pub fn apply_edit(text: &mut Rga<char>, before: &str, after: &str, clock: &Clock) {
+pub fn apply_edit(text: &mut Rga<char>, before: &str, after: &str, clock: &HlcClock) {
     let old: Vec<char> = before.chars().collect();
     let new: Vec<char> = after.chars().collect();
     let prefix = old.iter().zip(&new).take_while(|(a, b)| a == b).count();
@@ -99,7 +99,7 @@ impl PartialEq for EditorProps {
 /// The collaborative editor.
 pub struct Editor {
     props: EditorProps,
-    clock: Arc<Clock>,
+    clock: Arc<HlcClock>,
     docs: Arc<tokio::sync::Mutex<SyncedCollection<Doc>>>,
     text: String,
     status: String,
@@ -121,7 +121,7 @@ impl Component for Editor {
     type Message = Done;
 
     fn new(props: EditorProps) -> Self {
-        let clock = Arc::new(Clock::new(props.replica));
+        let clock = Arc::new(HlcClock::new(props.replica));
         let docs = Arc::new(tokio::sync::Mutex::new(SyncedCollection::new(Arc::clone(&clock))));
         Self {
             props,

@@ -10,7 +10,7 @@
 use std::time::Duration;
 
 use device_desired::{Cloud, Config, Hardware, device_session};
-use rustnative_sync::Clock;
+use rustnative_sync::HlcClock;
 use rustnative_sync::bus::Broker;
 use rustnative_sync::device::DeviceAgent;
 
@@ -24,7 +24,7 @@ async fn the_device_converges_after_being_offline() {
     let address = listener.local_addr().unwrap().to_string();
     tokio::spawn(rustnative_sync::mqtt::serve(Broker::new(), listener));
 
-    let clock = Clock::new(1);
+    let clock = HlcClock::new(1);
     let mut agent = DeviceAgent::new(config(60, "stable"), clock.now());
     let mut hardware = Hardware::default();
     let mut cloud = Cloud::connect(&address, "sensor-7", config(30, "stable")).await.unwrap();

@@ -14,7 +14,7 @@ in three places:
 let server = Arc::new(Mutex::new(
     SyncServer::new().collection::<Note>(ConflictPolicy::LastWriterWins, 1),
 ));
-let mut notes = SyncedCollection::<Note>::new(Arc::new(Clock::new(replica)));
+let mut notes = SyncedCollection::<Note>::new(Arc::new(HlcClock::new(replica)));
 notes.put(&note);              // local first; works offline
 notes.sync(&transport).await?; // push what changed, pull what others changed
 ```
@@ -26,7 +26,9 @@ notes.sync(&transport).await?; // push what changed, pull what others changed
   - `ServerAuthority`: a write based on an outdated copy is refused, and
     the writer receives the server's copy.
   - `LastWriterWins`: every write carries a hybrid logical clock stamp, and
-    the later stamp wins.
+    the later stamp wins. `HlcClock::new` reads the system's wall time;
+    `HlcClock::with_clock(replica, clock, epoch)` reads a core `Clock`
+    instead (`Services::clock`, or a `ManualClock` a test advances).
   - `Merge(fn)`: the two values are combined. For collaborative text,
     merge the CRDTs inside them, as `examples/collab-notes` does.
 - **Partial replication.** A `Filter` (a field equal to a value) limits
@@ -65,7 +67,12 @@ Application::new(RemoteView::new(client), window)
 - **Session.** Each connection is a session. Its `ComponentTree` runs on
   its own thread on the server, and the tree travels as a
   `rustnative_core::wire::WireNode`. The client reconciles each arrival like
-  any tree.
+  any tree. A thread per session means a ceiling: `set_max_sessions`
+  (default 1,024) bounds how many a server holds, and a connection past it
+  is closed — the page keeps its server-rendered content — while a
+  reconnect to a held session always gets in. Clicks, text, toggles,
+  values, and a virtual list's scrolled range travel; other events stay in
+  the browser.
 - **Events.** Events travel back numbered, and each tree says the last
   event it reflects. An event not yet reflected is sent again after a
   reconnect, and the server applies each number once. Nothing is lost or

@@ -34,7 +34,7 @@ pub mod replica;
 
 #[cfg(feature = "net")]
 pub use channel::{Channel, LocalHub, Presence};
-pub use clock::{Clock, Hlc, ReplicaId};
+pub use clock::{Hlc, HlcClock, ReplicaId};
 pub use crdt::{Crdt, GCounter, LwwMap, LwwRegister, OrSet, PnCounter, Rga};
 #[cfg(feature = "net")]
 pub use replica::{

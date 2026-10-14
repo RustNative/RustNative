@@ -9,7 +9,7 @@
 
 use std::time::Duration;
 
-use rustnative_sync::Clock;
+use rustnative_sync::HlcClock;
 use rustnative_sync::bus::{BusMessage, Connect, QoS};
 use rustnative_sync::device::{
     Actuate, DeviceAgent, DevicePolicy, Twin, Versioned, decode, encode,
@@ -57,7 +57,7 @@ pub async fn device_session(
     id: &str,
     agent: &mut DeviceAgent<Config>,
     hardware: &mut Hardware,
-    clock: &Clock,
+    clock: &HlcClock,
     stay: Duration,
 ) -> Result<(), String> {
     let will = BusMessage {
@@ -118,7 +118,7 @@ pub async fn device_session(
 /// The cloud side: publishes desires and collects reports into the twin.
 pub struct Cloud {
     client: MqttClient,
-    clock: Clock,
+    clock: HlcClock,
     device: String,
     /// The twin.
     pub twin: Twin<Config>,
@@ -137,7 +137,7 @@ impl Cloud {
         )
         .await?;
         client.subscribe(&topic(device, "reported"), QoS::AtLeastOnce).await?;
-        let clock = Clock::new(100);
+        let clock = HlcClock::new(100);
         let twin = Twin::new(initial, clock.now());
         let mut cloud = Self { client, clock, device: device.into(), twin };
         cloud.publish().await?;

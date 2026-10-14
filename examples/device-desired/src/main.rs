@@ -5,7 +5,7 @@
 use std::time::Duration;
 
 use device_desired::{Cloud, Config, Hardware, device_session};
-use rustnative_sync::Clock;
+use rustnative_sync::HlcClock;
 use rustnative_sync::bus::Broker;
 use rustnative_sync::device::DeviceAgent;
 
@@ -16,7 +16,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     tokio::spawn(rustnative_sync::mqtt::serve(Broker::new(), listener));
     println!("broker on mqtt://{address}");
 
-    let clock = Clock::new(1);
+    let clock = HlcClock::new(1);
     let mut agent =
         DeviceAgent::new(Config { interval: 60, channel: "stable".into() }, clock.now());
     let mut hardware = Hardware::default();

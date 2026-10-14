@@ -4,12 +4,12 @@ version = "0.1.0"
 edition.workspace = true
 rust-version.workspace = true
 license.workspace = true
-description.workspace = true
+description = "Rust Native reconciliation beyond the screen: local-first sync and CRDTs, server-interactive screens, channels, and device desired state"
 repository.workspace = true
 homepage.workspace = true
 readme.workspace = true
-keywords.workspace = true
-categories.workspace = true
+keywords = ["sync", "crdt", "local-first", "websocket", "framework"]
+categories = ["web-programming", "data-structures"]
 
 [lints]
 workspace = true

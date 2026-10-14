@@ -61,6 +61,15 @@ pub enum WireEvent {
         /// Its new value.
         value: i64,
     },
+    /// A virtual list scrolled: the items its viewport now shows.
+    VisibleRangeChanged {
+        /// The list's wire key.
+        target: String,
+        /// The first item to realize.
+        first: usize,
+        /// One past the last.
+        last_exclusive: usize,
+    },
 }
 
 impl WireEvent {
@@ -77,6 +86,11 @@ impl WireEvent {
             Event::ValueChanged { target, value } => {
                 Self::ValueChanged { target: key(*target), value: *value }
             }
+            Event::VisibleRangeChanged { target, range } => Self::VisibleRangeChanged {
+                target: key(*target),
+                first: range.first,
+                last_exclusive: range.last_exclusive,
+            },
             _ => return None,
         })
     }
@@ -92,6 +106,12 @@ impl WireEvent {
             Self::Toggled { target, on } => Event::Toggled { target: node_id(&target), on },
             Self::ValueChanged { target, value } => {
                 Event::ValueChanged { target: node_id(&target), value }
+            }
+            Self::VisibleRangeChanged { target, first, last_exclusive } => {
+                Event::VisibleRangeChanged {
+                    target: node_id(&target),
+                    range: rustnative_core::VirtualRange { first, last_exclusive },
+                }
             }
         }
     }
@@ -280,7 +300,13 @@ pub struct LiveServer<A: LiveApp> {
     next: AtomicU64,
     instance: u64,
     encoding: Mutex<Option<BrowserEncoding>>,
+    /// The most sessions held at once: each owns a thread, so this is the
+    /// thread ceiling too ([`Self::set_max_sessions`]).
+    max_sessions: std::sync::atomic::AtomicUsize,
 }
+
+/// How many sessions a [`LiveServer`] holds at once unless told otherwise.
+pub const DEFAULT_MAX_SESSIONS: usize = 1024;
 
 fn root_snapshot(tree: &ComponentTree) -> Option<Value> {
     tree.inspect_components()
@@ -381,6 +407,7 @@ impl<A: LiveApp> LiveServer<A> {
             drain_to: Mutex::new(String::new()),
             next: AtomicU64::new(1),
             encoding: Mutex::new(None),
+            max_sessions: std::sync::atomic::AtomicUsize::new(DEFAULT_MAX_SESSIONS),
             // A per-instance random part, so two instances (even in one
             // process) never mint the same session id.
             instance: {
@@ -394,7 +421,12 @@ impl<A: LiveApp> LiveServer<A> {
         let id = format!("s{:x}-{}", self.instance, self.next.fetch_add(1, Ordering::SeqCst));
         let (sender, receiver) = mpsc::channel();
         let app = Arc::clone(&self.app);
-        std::thread::spawn(move || run_session(&*app, snapshot, &receiver));
+        // One thread per session, named for a profiler; `accept` keeps their
+        // number at or under `max_sessions`.
+        let spawned = std::thread::Builder::new()
+            .name("rustnative-live".to_owned())
+            .spawn(move || run_session(&*app, snapshot, &receiver));
+        drop(spawned);
         self.sessions
             .lock()
             .unwrap_or_else(PoisonError::into_inner)
@@ -419,6 +451,13 @@ impl<A: LiveApp> LiveServer<A> {
     pub fn sessions(&self) -> usize {
         self.reap();
         self.sessions.lock().unwrap_or_else(PoisonError::into_inner).len()
+    }
+
+    /// Sets the most sessions held at once (default [`DEFAULT_MAX_SESSIONS`]).
+    /// A connection that would start one more is closed without a session;
+    /// a reconnect to a session the server still holds is always accepted.
+    pub fn set_max_sessions(&self, max: usize) {
+        self.max_sessions.store(max, Ordering::SeqCst);
     }
 
     /// How browsers get the tree ([`ServerFrame::Dom`]): the web
@@ -478,7 +517,18 @@ impl<A: LiveApp> LiveServer<A> {
             let sessions = self.sessions.lock().unwrap_or_else(PoisonError::into_inner);
             sessions.get(id).map(|handle| (id.clone(), handle.commands.clone()))
         });
-        let (id, commands) = existing.unwrap_or_else(|| self.start_session(hello.1));
+        let (id, commands) = if let Some(existing) = existing {
+            existing
+        } else {
+            let held = self.sessions.lock().unwrap_or_else(PoisonError::into_inner).len();
+            if held >= self.max_sessions.load(Ordering::SeqCst) {
+                // At the ceiling: no new thread. The page keeps its
+                // server-rendered content and retries later.
+                let _ = sink.send(Message::Close(None)).await;
+                return;
+            }
+            self.start_session(hello.1)
+        };
         let (outbound, mut frames) = async_mpsc::unbounded_channel();
         if let Some(handle) =
             self.sessions.lock().unwrap_or_else(PoisonError::into_inner).get_mut(&id)

@@ -12,7 +12,7 @@ use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
 use rustnative_sync::{
-    Channel, Clock, ConflictPolicy, Filter, InMemory, LocalHub, Presence, Record, SyncError,
+    Channel, ConflictPolicy, Filter, HlcClock, InMemory, LocalHub, Presence, Record, SyncError,
     SyncServer, SyncedCollection,
 };
 use serde::{Deserialize, Serialize};
@@ -44,8 +44,8 @@ fn server(policy: ConflictPolicy) -> Arc<Mutex<SyncServer>> {
 async fn two_offline_devices_converge_last_writer_wins() {
     let server = server(ConflictPolicy::LastWriterWins);
     let (laptop, phone) = (InMemory::new(Arc::clone(&server)), InMemory::new(Arc::clone(&server)));
-    let mut on_laptop = SyncedCollection::<Note>::new(Arc::new(Clock::new(1)));
-    let mut on_phone = SyncedCollection::<Note>::new(Arc::new(Clock::new(2)));
+    let mut on_laptop = SyncedCollection::<Note>::new(Arc::new(HlcClock::new(1)));
+    let mut on_phone = SyncedCollection::<Note>::new(Arc::new(HlcClock::new(2)));
     on_laptop.put(&note("n1", "ada", "Buy milk")).unwrap();
     on_laptop.sync(&laptop).await.unwrap();
     on_phone.sync(&phone).await.unwrap();
@@ -74,8 +74,8 @@ async fn two_offline_devices_converge_last_writer_wins() {
 async fn server_authority_refuses_an_outdated_write() {
     let server = server(ConflictPolicy::ServerAuthority);
     let transport = InMemory::new(Arc::clone(&server));
-    let mut first = SyncedCollection::<Note>::new(Arc::new(Clock::new(1)));
-    let mut second = SyncedCollection::<Note>::new(Arc::new(Clock::new(2)));
+    let mut first = SyncedCollection::<Note>::new(Arc::new(HlcClock::new(1)));
+    let mut second = SyncedCollection::<Note>::new(Arc::new(HlcClock::new(2)));
     first.put(&note("n1", "ada", "v1")).unwrap();
     first.sync(&transport).await.unwrap();
     second.sync(&transport).await.unwrap();
@@ -102,8 +102,8 @@ async fn a_merge_policy_combines_both_writes() {
         }));
     let server = server(merge);
     let transport = InMemory::new(Arc::clone(&server));
-    let mut first = SyncedCollection::<Note>::new(Arc::new(Clock::new(1)));
-    let mut second = SyncedCollection::<Note>::new(Arc::new(Clock::new(2)));
+    let mut first = SyncedCollection::<Note>::new(Arc::new(HlcClock::new(1)));
+    let mut second = SyncedCollection::<Note>::new(Arc::new(HlcClock::new(2)));
     first.put(&note("n1", "ada", "eggs")).unwrap();
     second.put(&note("n1", "ada", "flour")).unwrap();
     first.sync(&transport).await.unwrap();
@@ -117,11 +117,11 @@ async fn a_merge_policy_combines_both_writes() {
 async fn a_replica_holds_only_what_its_filter_selects() {
     let server = server(ConflictPolicy::LastWriterWins);
     let transport = InMemory::new(Arc::clone(&server));
-    let mut everyone = SyncedCollection::<Note>::new(Arc::new(Clock::new(1)));
+    let mut everyone = SyncedCollection::<Note>::new(Arc::new(HlcClock::new(1)));
     everyone.put(&note("n1", "ada", "Ada's")).unwrap();
     everyone.put(&note("n2", "grace", "Grace's")).unwrap();
     everyone.sync(&transport).await.unwrap();
-    let mut grace = SyncedCollection::<Note>::new(Arc::new(Clock::new(2)))
+    let mut grace = SyncedCollection::<Note>::new(Arc::new(HlcClock::new(2)))
         .filtered(Filter { field: "owner".into(), value: json!("grace") });
     grace.sync(&transport).await.unwrap();
     assert_eq!(grace.list(), vec![note("n2", "grace", "Grace's")]);
@@ -159,10 +159,10 @@ async fn clients_at_different_schema_versions_share_data() {
         SyncServer::new().collection::<NoteV2>(ConflictPolicy::LastWriterWins, 1),
     ));
     let transport = InMemory::new(Arc::clone(&server));
-    let mut old_client = SyncedCollection::<Note>::new(Arc::new(Clock::new(1)));
+    let mut old_client = SyncedCollection::<Note>::new(Arc::new(HlcClock::new(1)));
     old_client.put(&note("n1", "ada", "From the old app")).unwrap();
     old_client.sync(&transport).await.unwrap();
-    let mut new_client = SyncedCollection::<NoteV2>::new(Arc::new(Clock::new(2)));
+    let mut new_client = SyncedCollection::<NoteV2>::new(Arc::new(HlcClock::new(2)));
     new_client.sync(&transport).await.unwrap();
     assert_eq!(new_client.get("n1").unwrap().title, "From the old app", "upgraded on the way in");
 
@@ -170,8 +170,9 @@ async fn clients_at_different_schema_versions_share_data() {
     let strict = Arc::new(Mutex::new(
         SyncServer::new().collection::<NoteV2>(ConflictPolicy::LastWriterWins, 2),
     ));
-    let result =
-        SyncedCollection::<Note>::new(Arc::new(Clock::new(3))).sync(&InMemory::new(strict)).await;
+    let result = SyncedCollection::<Note>::new(Arc::new(HlcClock::new(3)))
+        .sync(&InMemory::new(strict))
+        .await;
     assert_eq!(result, Err(SyncError::NeedsUpgrade(2)));
 }
 
@@ -180,7 +181,7 @@ async fn the_server_pushes_a_signal_when_something_changes() {
     let server = server(ConflictPolicy::LastWriterWins);
     let mut changed = server.lock().unwrap().subscribe();
     let transport = InMemory::new(Arc::clone(&server));
-    let mut writer = SyncedCollection::<Note>::new(Arc::new(Clock::new(1)));
+    let mut writer = SyncedCollection::<Note>::new(Arc::new(HlcClock::new(1)));
     writer.put(&note("n1", "ada", "hi")).unwrap();
     writer.sync(&transport).await.unwrap();
     assert_eq!(changed.recv().await.unwrap(), 1, "a waiting replica wakes and syncs");

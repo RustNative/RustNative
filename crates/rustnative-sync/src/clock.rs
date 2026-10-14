@@ -1,9 +1,15 @@
 //! Hybrid logical clocks: timestamps that follow wall time, never go
 //! backwards, and order every event across replicas — the basis of
 //! last-writer-wins.
+//!
+//! Wall time is the system's by default; [`HlcClock::with_clock`] reads it
+//! from a `rustnative_core::Clock` instead (`Services::clock`, or a
+//! `ManualClock` in a test), so a replica's stamps are as controllable as
+//! every other time the framework reads.
 
+use std::sync::Arc;
 use std::sync::atomic::{AtomicU64, Ordering};
-use std::time::{SystemTime, UNIX_EPOCH};
+use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 use serde::{Deserialize, Serialize};
 
@@ -24,15 +30,29 @@ pub struct Hlc {
     pub replica: ReplicaId,
 }
 
-/// A replica's clock.
-#[derive(Debug)]
-pub struct Clock {
+/// A replica's hybrid logical clock (named apart from
+/// `rustnative_core::Clock`, the monotonic source it can read from).
+pub struct HlcClock {
     replica: ReplicaId,
     last: std::sync::Mutex<Hlc>,
     offset: AtomicU64,
+    /// A core clock and the Unix time its zero stands for; `None` reads the
+    /// system's wall clock.
+    source: Option<(Arc<dyn rustnative_core::Clock>, Duration)>,
 }
 
-impl Clock {
+impl std::fmt::Debug for HlcClock {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        formatter
+            .debug_struct("HlcClock")
+            .field("replica", &self.replica)
+            .field("last", &self.last)
+            .field("from_core_clock", &self.source.is_some())
+            .finish_non_exhaustive()
+    }
+}
+
+impl HlcClock {
     /// A clock for `replica`.
     #[must_use]
     pub fn new(replica: ReplicaId) -> Self {
@@ -40,7 +60,20 @@ impl Clock {
             replica,
             last: std::sync::Mutex::new(Hlc { wall: 0, counter: 0, replica }),
             offset: AtomicU64::new(0),
+            source: None,
         }
+    }
+
+    /// A clock for `replica` reading `clock`, whose zero is Unix time
+    /// `epoch` — `Services::clock` with the wall time read once at start,
+    /// or a `ManualClock` that a test advances.
+    #[must_use]
+    pub fn with_clock(
+        replica: ReplicaId,
+        clock: Arc<dyn rustnative_core::Clock>,
+        epoch: Duration,
+    ) -> Self {
+        Self { source: Some((clock, epoch)), ..Self::new(replica) }
     }
 
     /// This clock's replica.
@@ -56,9 +89,11 @@ impl Clock {
     }
 
     fn physical(&self) -> u64 {
-        let now = SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .map_or(0, |since| u64::try_from(since.as_millis()).unwrap_or(u64::MAX));
+        let since = match &self.source {
+            Some((clock, epoch)) => epoch.saturating_add(clock.now()),
+            None => SystemTime::now().duration_since(UNIX_EPOCH).unwrap_or_default(),
+        };
+        let now = u64::try_from(since.as_millis()).unwrap_or(u64::MAX);
         now.saturating_add(self.offset.load(Ordering::SeqCst))
     }
 
@@ -81,5 +116,22 @@ impl Clock {
         if remote.wall > last.wall || (remote.wall == last.wall && remote.counter > last.counter) {
             *last = Hlc { wall: remote.wall, counter: remote.counter, replica: self.replica };
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn a_core_clock_drives_the_wall_time() {
+        let manual = rustnative_core::ManualClock::new();
+        let clock = HlcClock::with_clock(3, Arc::new(manual.clone()), Duration::from_secs(1_000));
+        assert_eq!(clock.now(), Hlc { wall: 1_000_000, counter: 0, replica: 3 });
+        assert_eq!(clock.now().counter, 1, "the same millisecond counts up");
+        manual.advance(Duration::from_millis(5));
+        assert_eq!(clock.now(), Hlc { wall: 1_000_005, counter: 0, replica: 3 });
+        manual.set(Duration::ZERO);
+        assert!(clock.now().wall >= 1_000_005, "a clock set back never goes backwards");
     }
 }
