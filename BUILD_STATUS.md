@@ -69,6 +69,7 @@ backend's own entry records what it paid.
 |---|---|---|
 | Windows 10 Pro 19045, a real conhost window | `examples/tui-demo/tests/conhost.rs` (input records in, the screen buffer read back) | drawn, typed into, Tab and arrows as virtual keys, Space, Ctrl+C; the shell's screen and cursor back |
 | Windows 10, ConPTY | `tests/real_terminal.rs` (8 tests) | restoration after Ctrl+C, a component panic, and a panic outside every boundary (console modes equal before and after); the terminal taken a second time; resize; every key; closing the console |
+| Windows Server 2022 (CI), its newer ConPTY and a real console window | `tests/real_terminal.rs` and `examples/tui-demo/tests/conhost.rs` in the Windows job | all passed (the ConPTY turns focus reports on for itself; the check tells its modes from a session's) |
 | Ubuntu 24.04 (WSL), the kernel's pty | `tools/tui-session.sh tests` (10 tests) | the above plus SIGTERM, a second SIGTERM on a stuck component (exit 143, restored), SIGTSTP/SIGCONT, SIGWINCH |
 | Arch Linux (WSL), the kernel's pty | `tools/tui-session.sh tests` | 10 passed |
 | Ubuntu 24.04, tmux 3.4 | `tools/tui-session.sh tmux` (12 checks) | all passed |
@@ -83,9 +84,9 @@ backend's own entry records what it paid.
   Mac is available (`PLAN.md` 2.13); macOS terminals are not called
   supported until then. The Homebrew formula waits on Milestone 33's
   toolchain.
-- **Windows Terminal itself** (its own, newer ConPTY) and its mouse
-  forwarding were not run here: the ConPTY tests use Windows 10's inbox
-  ConPTY, which keeps mouse reporting to itself.
+- **Windows Terminal itself** and its mouse forwarding were not run: CI
+  runs the tests on Windows Server 2022's newer ConPTY, and here on
+  Windows 10's inbox ConPTY, which keeps mouse reporting to itself.
 - **A serial console**: the code path is the pty path (`/dev/tty`, the VT100
   size default when a serial line reports none); no serial line was attached.
 - **Screen readers** with the terminal (NVDA, Orca) were not run; the
