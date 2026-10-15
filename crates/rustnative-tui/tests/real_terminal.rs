@@ -119,6 +119,10 @@ fn terminal_state() -> String {
 fn child() {
     let Some(scenario) = pty::scenario() else { return };
     println!("BEFORE {}", terminal_state());
+    println!(
+        "SESSION {}",
+        if std::env::var_os("SSH_CONNECTION").is_some() { "ssh" } else { "local" }
+    );
     if scenario == "raw-panic" {
         // A panic outside every boundary, with the terminal held: only the
         // panic hook stands between it and a ruined terminal.
@@ -172,9 +176,14 @@ fn assert_cooked(terminal: &pty::Pty) {
 
 /// The BEFORE and AFTER lines the child printed agree.
 fn assert_same_mode(terminal: &pty::Pty) {
-    let text = terminal.screen.text();
+    // From everything written, not the screen: the line may have scrolled
+    // away by the time the application is done.
+    let text = String::from_utf8_lossy(&terminal.screen.output).into_owned();
     let after_marker = |marker: &str| {
-        text.split(marker).nth(1).and_then(|rest| rest.lines().next()).map(str::trim)
+        text.split(marker)
+            .nth(1)
+            .and_then(|rest| rest.split(['\r', '\n', '\u{1b}']).next())
+            .map(str::trim)
     };
     let (before, after) = (after_marker("BEFORE "), after_marker("AFTER "));
     assert!(
@@ -391,4 +400,40 @@ fn closing_the_console_ends_the_run() {
     let mut terminal = start(60, 16);
     terminal.close_console();
     assert!(terminal.wait_exit(WAIT).is_some(), "closing the console ended the application");
+}
+
+/// The same application on a terminal reached over SSH
+/// (`tools/tui-session.sh ssh`, which starts a private `sshd` and names it
+/// in `RUSTNATIVE_TUI_SSH`): the child runs on the pty `sshd` allocates, its
+/// questions and input cross the SSH channel, and a resize here reaches it
+/// as the SSH window-change it becomes.
+#[cfg(unix)]
+#[test]
+#[ignore = "needs an SSH server: tools/tui-session.sh ssh"]
+fn over_ssh() {
+    let Ok(target) = std::env::var("RUSTNATIVE_TUI_SSH") else {
+        panic!("RUSTNATIVE_TUI_SSH names the server: run tools/tui-session.sh ssh");
+    };
+    let mut terminal = pty::Pty::spawn_over_ssh(&target, "probe", 70, 16);
+    assert!(terminal.wait_for("hello pty", WAIT), "{}", terminal.screen.text());
+    assert!(terminal.screen.text().contains("SESSION ssh"), "the far side knows it is remote");
+    assert!(terminal.screen.emulator.on_alternate_screen());
+    for (bytes, shown) in [
+        (b"\x1b[1;5C".as_slice(), "key [ArrowRight ctrl]"),
+        (b"\x1bOP".as_slice(), "key [Function(1)]"),
+        (b"\x1b[3~".as_slice(), "key [Delete]"),
+    ] {
+        terminal.send(bytes);
+        assert!(terminal.wait_for(shown, WAIT), "{shown}:\n{}", terminal.screen.text());
+    }
+    terminal.send("é日".as_bytes());
+    terminal.send(b"\x1b[200~over ssh\x1b[201~");
+    assert!(terminal.wait_for("text [é日over ssh]", WAIT), "{}", terminal.screen.text());
+    terminal.resize(72, 20);
+    assert!(terminal.wait_for("size 72x20", WAIT), "{}", terminal.screen.text());
+    terminal.send(&[0x03]);
+    assert!(terminal.wait_exit(WAIT).is_some());
+    assert!(terminal.wait_for("RESULT ok", WAIT), "{}", terminal.screen.text());
+    assert_restored(&terminal);
+    assert_same_mode(&terminal);
 }

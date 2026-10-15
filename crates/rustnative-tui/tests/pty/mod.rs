@@ -84,6 +84,47 @@ mod unix {
     impl Pty {
         /// Starts scenario `name` on a `columns` × `rows` pty.
         pub fn spawn(name: &str, columns: u16, rows: u16) -> Self {
+            let exe = std::env::current_exe().expect("this test binary");
+            Self::spawn_command(exe.as_os_str(), &super::child_arguments(name), columns, rows)
+        }
+
+        /// Starts scenario `name` over SSH: `target` is
+        /// `user@host:port:identity-file` (`tools/tui-session.sh ssh`), and
+        /// the far side runs this same binary, with a pty `sshd` allocates.
+        pub fn spawn_over_ssh(target: &str, name: &str, columns: u16, rows: u16) -> Self {
+            let mut parts = target.rsplitn(3, ':');
+            let identity = parts.next().expect("an identity file");
+            let port = parts.next().expect("a port");
+            let destination = parts.next().expect("user@host");
+            let exe = std::env::current_exe().expect("this test binary");
+            let mut arguments: Vec<String> = [
+                "-tt",
+                "-p",
+                port,
+                "-i",
+                identity,
+                "-o",
+                "StrictHostKeyChecking=no",
+                "-o",
+                "UserKnownHostsFile=/dev/null",
+                "-o",
+                "LogLevel=ERROR",
+                destination,
+            ]
+            .iter()
+            .map(|argument| (*argument).to_owned())
+            .collect();
+            arguments.push(exe.display().to_string());
+            arguments.extend(super::child_arguments(name));
+            Self::spawn_command(std::ffi::OsStr::new("ssh"), &arguments, columns, rows)
+        }
+
+        fn spawn_command(
+            program: &std::ffi::OsStr,
+            arguments: &[String],
+            columns: u16,
+            rows: u16,
+        ) -> Self {
             // SAFETY: plain libc calls on descriptors this function owns.
             unsafe {
                 let master = libc::posix_openpt(libc::O_RDWR | libc::O_NOCTTY);
@@ -103,9 +144,9 @@ mod unix {
                 let master = OwnedFd::from_raw_fd(master);
                 let slave = OwnedFd::from_raw_fd(slave);
                 let io = |fd: &OwnedFd| Stdio::from(fd.try_clone().expect("dup the slave"));
-                let mut command = Command::new(std::env::current_exe().expect("this test binary"));
+                let mut command = Command::new(program);
                 command
-                    .args(super::child_arguments(name))
+                    .args(arguments)
                     .env("TERM", "xterm-256color")
                     .env_remove("COLORTERM")
                     .env("RUSTNATIVE_TUI_PROBE_MS", "1500")
