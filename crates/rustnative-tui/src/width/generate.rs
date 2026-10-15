@@ -40,9 +40,12 @@ fn put(class: &mut BTreeMap<u32, Class>, first: u32, last: u32, value: Class) {
 #[test]
 #[ignore = "regenerates the vendored table from the UCD files named by RUSTNATIVE_UCD_DIR"]
 fn regenerate() {
-    let dir = std::path::PathBuf::from(
-        std::env::var("RUSTNATIVE_UCD_DIR").expect("RUSTNATIVE_UCD_DIR names the UCD folder"),
-    );
+    // CI runs the ignored tests too; without the UCD files there is nothing
+    // to regenerate from.
+    let Some(dir) = std::env::var_os("RUSTNATIVE_UCD_DIR").map(std::path::PathBuf::from) else {
+        println!("skipped: RUSTNATIVE_UCD_DIR is not set");
+        return;
+    };
     let read = |name: &str| std::fs::read_to_string(dir.join(name)).expect(name);
     let east_asian = read("EastAsianWidth.txt");
     let emoji = read("emoji-data.txt");
