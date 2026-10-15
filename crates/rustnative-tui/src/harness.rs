@@ -121,6 +121,7 @@ impl SyntheticTerminal {
     }
 
     /// Takes the bytes written since the last call.
+    #[must_use]
     pub fn take_written(&self) -> Vec<u8> {
         std::mem::take(&mut self.state.lock().written)
     }
@@ -539,6 +540,8 @@ impl TuiHarness {
     /// underlined (`U`), or faint (`F`).
     #[must_use]
     pub fn golden(&self) -> String {
+        use std::fmt::Write as _;
+
         use crate::grid::Attrs;
         let screen = self.screen();
         let mut out = String::new();
@@ -564,18 +567,16 @@ impl TuiHarness {
                 })
                 .collect();
             let marks = marks.trim_end();
-            out.push_str(&format!("{text}\n"));
+            let _ = writeln!(out, "{text}");
             if !marks.is_empty() {
-                out.push_str(&format!("{:>width$}\n", "", width = 0));
-                out.pop();
-                out.push_str(&format!("~{marks}\n"));
+                let _ = writeln!(out, "~{marks}");
             }
         }
         while out.ends_with("\n\n") {
             out.pop();
         }
         let ((x, y), shown) = self.cursor();
-        out.push_str(&format!("cursor {x},{y}{}\n", if shown { " shown" } else { "" }));
+        let _ = writeln!(out, "cursor {x},{y}{}", if shown { " shown" } else { "" });
         out
     }
 }

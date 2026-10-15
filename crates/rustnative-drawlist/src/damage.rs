@@ -89,6 +89,7 @@ impl Region {
     }
 
     /// Takes the damage, leaving none.
+    #[must_use = "the damage taken is what must be written"]
     pub fn take(&mut self) -> Self {
         std::mem::take(self)
     }

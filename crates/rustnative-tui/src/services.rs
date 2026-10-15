@@ -35,6 +35,10 @@ use crate::term::Waker;
 pub const CLIPBOARD_READ_TIMEOUT: Duration = Duration::from_millis(500);
 
 #[derive(Debug, Default)]
+#[allow(
+    clippy::option_option,
+    reason = "outer: whether the read has ended; inner: what the clipboard held"
+)]
 struct ReadSlot {
     result: Option<Option<String>>,
     waker: Option<TaskWaker>,
@@ -161,12 +165,11 @@ impl Future for ClipboardRead {
 
     fn poll(self: Pin<&mut Self>, context: &mut Context<'_>) -> Poll<Self::Output> {
         let mut slot = self.0.lock();
-        match slot.result.take() {
-            Some(result) => Poll::Ready(result),
-            None => {
-                slot.waker = Some(context.waker().clone());
-                Poll::Pending
-            }
+        if let Some(result) = slot.result.take() {
+            Poll::Ready(result)
+        } else {
+            slot.waker = Some(context.waker().clone());
+            Poll::Pending
         }
     }
 }
@@ -443,7 +446,7 @@ mod tests {
         assert_eq!(supported.take_outbox(), b"\x1b]52;c;aGk=\x07");
         let unsupported = channel(ClipboardSupport::None, None);
         assert!(!unsupported.copy("hi"));
-        assert!(unsupported.take_outbox().is_empty());
+        assert_eq!(unsupported.take_outbox(), b"");
         assert_eq!(unsupported.local_clipboard().as_deref(), Some("hi"), "still pasteable inside");
     }
 

@@ -17,7 +17,7 @@
 //! | everything else | 1 |
 //!
 //! and a pair of regional indicators (a flag) is 2. The table is generated
-//! from Unicode 17.0.0 by [`generate`] (an ignored test).
+//! from Unicode 17.0.0 by `width::generate::regenerate` (an ignored test).
 //!
 //! ```
 //! use rustnative_tui::Width;
@@ -34,6 +34,7 @@
 
 #[cfg(test)]
 mod generate;
+#[allow(clippy::unreadable_literal, reason = "generated code points, in the UCD's own notation")]
 mod table;
 
 use unicode_segmentation::UnicodeSegmentation;
@@ -324,7 +325,7 @@ mod tests {
     #[test]
     fn the_table_is_sorted_and_disjoint() {
         for pair in table::RANGES.windows(2) {
-            assert!(pair[0].0 <= pair[0].1 && pair[0].1 < pair[1].0, "{:?}", pair);
+            assert!(pair[0].0 <= pair[0].1 && pair[0].1 < pair[1].0, "{pair:?}");
         }
     }
 }

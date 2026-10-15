@@ -317,7 +317,7 @@ mod tests {
         encoder.move_to(0, 2);
         assert_eq!(encoder.take(), b"\x1b[1G");
         encoder.move_to(0, 2);
-        assert!(encoder.take().is_empty());
+        assert_eq!(encoder.take(), b"");
     }
 
     #[test]
@@ -331,6 +331,6 @@ mod tests {
         let bytes = String::from_utf8(encoder.take()).unwrap();
         assert!(bytes.contains("new") && !bytes.contains("unchanged"), "{bytes:?}");
         assert_eq!(write_diff(&mut encoder, &after, &after, ColorDepth::TrueColor), 0);
-        assert!(encoder.take().is_empty());
+        assert_eq!(encoder.take(), b"");
     }
 }

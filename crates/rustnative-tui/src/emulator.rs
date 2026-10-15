@@ -233,13 +233,14 @@ impl Emulator {
         while at < data.len() {
             let byte = data[at];
             match byte {
-                0x1B => match self.escape(&data[at..]) {
-                    Some(length) => at += length,
-                    None => {
+                0x1B => {
+                    if let Some(length) = self.escape(&data[at..]) {
+                        at += length;
+                    } else {
                         self.pending = data[at..].to_vec();
                         return;
                     }
-                },
+                }
                 b'\r' => {
                     self.cursor.0 = 0;
                     self.pending_wrap = false;
@@ -474,7 +475,7 @@ impl Emulator {
             }
             (None, [], b'A') => self.cursor.1 = (self.cursor.1 - i32::from(param(0, 1))).max(0),
             (None, [], b'B') => {
-                self.cursor.1 = (self.cursor.1 + i32::from(param(0, 1))).min(rows - 1)
+                self.cursor.1 = (self.cursor.1 + i32::from(param(0, 1))).min(rows - 1);
             }
             (None, [], b'C') => {
                 self.cursor.0 = (self.cursor.0 + i32::from(param(0, 1))).min(columns - 1);
@@ -717,20 +718,21 @@ mod tests {
         assert_eq!(terminal.take_replies(), b"\x1b[?62;22;52c\x1b[?2004;2$y\x1b[?9999;0$y");
         let mut silent = Emulator::new(10, 2, Answers::silent());
         silent.feed(b"\x1b[c\x1b[?2004$p\x1b[?u");
-        assert!(silent.take_replies().is_empty());
+        assert_eq!(silent.take_replies(), b"");
     }
 
     /// The writer's grid and the emulator's screen agree, cell for cell,
     /// through every frame of a scripted sequence of changes.
     #[test]
     fn what_the_writer_means_is_what_the_terminal_shows() {
+        type Frame<'a> = Box<dyn Fn(&mut Grid) + 'a>;
         let width = Width::default();
         let mut terminal = Emulator::new(30, 6, Answers::silent());
         terminal.feed(seq::AUTOWRAP_OFF.as_bytes());
         let mut encoder = Encoder::new();
         let mut shown = Grid::new(30, 6);
         let red = CellStyle::DEFAULT.fg(Some(Color::rgb(200, 10, 10))).attrs(Attrs::BOLD);
-        let frames: Vec<Box<dyn Fn(&mut Grid)>> = vec![
+        let frames: Vec<Frame<'_>> = vec![
             Box::new(|grid| {
                 grid.print(0, 0, "hello 日本 world", CellStyle::DEFAULT, grid.bounds(), width);
             }),

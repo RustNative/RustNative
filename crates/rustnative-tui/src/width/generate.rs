@@ -31,6 +31,12 @@ fn ranges(text: &str) -> Vec<(u32, u32, String)> {
         .collect()
 }
 
+fn put(class: &mut BTreeMap<u32, Class>, first: u32, last: u32, value: Class) {
+    for code in first..=last {
+        class.insert(code, value);
+    }
+}
+
 #[test]
 #[ignore = "regenerates the vendored table from the UCD files named by RUSTNATIVE_UCD_DIR"]
 fn regenerate() {
@@ -44,11 +50,6 @@ fn regenerate() {
     assert!(east_asian.starts_with("# EastAsianWidth-17.0.0"), "the table is Unicode 17.0's");
 
     let mut class: BTreeMap<u32, Class> = BTreeMap::new();
-    fn put(class: &mut BTreeMap<u32, Class>, first: u32, last: u32, value: Class) {
-        for code in first..=last {
-            class.insert(code, value);
-        }
-    }
     // The file's stated defaults for unlisted code points in the ideograph
     // blocks and planes, beneath what it lists.
     for (first, last) in [

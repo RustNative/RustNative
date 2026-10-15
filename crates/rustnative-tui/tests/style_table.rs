@@ -4,6 +4,12 @@
 //! declared, and every property it answers as unavailable changes nothing —
 //! so the table can be neither optimistic nor stale.
 
+#![allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    reason = "helper functions in an integration test are test code too: a failed expectation is the test failing"
+)]
+
 mod common;
 
 use rustnative_core::{
@@ -45,7 +51,7 @@ fn view(property: Option<StyleProperty>) -> Node {
         Some(P::BorderRadius) => parent_visual = parent_visual.border_radius(6),
         Some(P::FontSize) => label_style = label_style.typography(typography("system-ui", 30, 400)),
         Some(P::FontWeight) => {
-            label_style = label_style.typography(typography("system-ui", 14, 700))
+            label_style = label_style.typography(typography("system-ui", 14, 700));
         }
         Some(P::FontFamily) => label_style = label_style.typography(typography("serif", 14, 400)),
         Some(P::Shadow) => {
@@ -69,13 +75,13 @@ fn view(property: Option<StyleProperty>) -> Node {
             parent_style.padding.end = 40;
         }
         Some(P::MarginTop) => {
-            a_layout = a_layout.margin(EdgeInsets { top: 32, ..EdgeInsets::all(0) })
+            a_layout = a_layout.margin(EdgeInsets { top: 32, ..EdgeInsets::all(0) });
         }
         Some(P::MarginBottom) => {
-            a_layout = a_layout.margin(EdgeInsets { bottom: 32, ..EdgeInsets::all(0) })
+            a_layout = a_layout.margin(EdgeInsets { bottom: 32, ..EdgeInsets::all(0) });
         }
         Some(P::MarginStart) => {
-            a_layout = a_layout.margin(EdgeInsets { start: 32, ..EdgeInsets::all(0) })
+            a_layout = a_layout.margin(EdgeInsets { start: 32, ..EdgeInsets::all(0) });
         }
         Some(P::MarginEnd) => {
             parent_style = parent_style.align_items(Alignment::End);
@@ -84,16 +90,19 @@ fn view(property: Option<StyleProperty>) -> Node {
         Some(P::Width) => a_layout = a_layout.width(SizeMode::Fixed(160)),
         Some(P::Height) => a_layout = a_layout.height(SizeMode::Fixed(48)),
         Some(P::MinWidth) => {
-            a_layout = a_layout.constraints(rustnative_core::Constraints::new().with_min_width(200))
+            a_layout =
+                a_layout.constraints(rustnative_core::Constraints::new().with_min_width(200));
         }
         Some(P::MinHeight) => {
-            a_layout = a_layout.constraints(rustnative_core::Constraints::new().with_min_height(64))
+            a_layout =
+                a_layout.constraints(rustnative_core::Constraints::new().with_min_height(64));
         }
         Some(P::MaxWidth) => {
-            a_layout = a_layout.constraints(rustnative_core::Constraints::new().with_max_width(40))
+            a_layout = a_layout.constraints(rustnative_core::Constraints::new().with_max_width(40));
         }
         Some(P::MaxHeight) => {
-            a_layout = a_layout.constraints(rustnative_core::Constraints::new().with_max_height(16))
+            a_layout =
+                a_layout.constraints(rustnative_core::Constraints::new().with_max_height(16));
         }
         Some(P::Gap) => parent_style = parent_style.gap(16),
         Some(P::AlignItems) => parent_style = parent_style.align_items(Alignment::Center),

@@ -5,6 +5,12 @@
 //! window stack; scrolling; canvases and images; virtual lists; and the
 //! inspection protocol's backend half.
 
+#![allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    reason = "helper functions in an integration test are test code too: a failed expectation is the test failing"
+)]
+
 mod common;
 
 use std::time::Duration;
@@ -444,4 +450,21 @@ fn transitions_declared_on_position_change_in_one_step() {
         rustnative_core::Transition::new(Duration::from_millis(300)),
     );
     let _ = node;
+}
+
+#[test]
+fn the_inspection_overlay_is_drawn_into_the_grid() {
+    let mut terminal = TuiHarness::launch(common::window("overlay"), 40, 6, || Colored);
+    let plain = terminal.screen();
+    let session = terminal.session_mut();
+    let models = session.models().clone();
+    let capabilities = session.capabilities().clone();
+    let mapping = session.mapping();
+    let inspect = rustnative_tui::TuiInspect::new(&models, &capabilities, mapping);
+    let request = rustnative_core::inspect::Request::Overlay {
+        mode: Some(rustnative_core::inspect::OverlayMode::Layout),
+    };
+    let _ = session.application_mut().inspect(&request, &inspect);
+    terminal.resize(40, 6);
+    assert_ne!(terminal.screen(), plain, "the overlay draws over the application");
 }

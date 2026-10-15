@@ -182,6 +182,10 @@ struct Press {
 }
 
 /// A running terminal application.
+#[allow(
+    clippy::struct_excessive_bools,
+    reason = "independent flags of one loop, each documented where it is set"
+)]
 pub struct Session<T: Terminal> {
     pub(crate) terminal: T,
     pub(crate) app: Application,
@@ -763,7 +767,7 @@ impl<T: Terminal> Session<T> {
                         self.pointer_capture = Some((node, pointer_id));
                     }
                     rustnative_core::InputRequest::ReleasePointer { .. } => {
-                        self.pointer_capture = None
+                        self.pointer_capture = None;
                     }
                     _ => {}
                 }
@@ -857,6 +861,7 @@ impl<T: Terminal> Session<T> {
         self.report_ranges_and_sizes();
     }
 
+    #[allow(clippy::similar_names, reason = "`sizes` and `sized` say what they are")]
     fn report_ranges_and_sizes(&mut self) {
         for _ in 0..4 {
             let mut changes = Vec::new();
@@ -986,6 +991,17 @@ impl<T: Terminal> Session<T> {
             if let Some(model) = self.models.get_mut(&id) {
                 cursor = paint::paint_window(model, &mut next, &context);
             }
+            // The inspector's overlay, when one turned it on, over the
+            // application (`PLAN.md` Milestone 44).
+            let rects = crate::inspect::TuiInspect::new(
+                &self.models,
+                &self.capabilities,
+                self.config.mapping,
+            )
+            .window_rects(id);
+            if let Some(overlay) = self.app.overlay_draw_list(id, &rects) {
+                paint::paint_overlay(&mut next, &overlay, &context);
+            }
         }
         let depth = self.profile.color_depth;
         let sync = self.profile.synchronized_output();
@@ -1049,8 +1065,8 @@ impl<T: Terminal> Session<T> {
 
     fn input(&mut self, event: InputEvent) {
         match event {
-            InputEvent::Reply(reply) => self.reply(reply),
-            InputEvent::Key(key) => self.key(key),
+            InputEvent::Reply(reply) => self.reply(&reply),
+            InputEvent::Key(key) => self.key(&key),
             InputEvent::Paste(text) => self.paste(&text),
             InputEvent::Mouse(mouse) => self.mouse(mouse),
             InputEvent::Focus(gained) => {
@@ -1060,14 +1076,14 @@ impl<T: Terminal> Session<T> {
         }
     }
 
-    fn reply(&mut self, reply: Reply) {
+    fn reply(&mut self, reply: &Reply) {
         if let Reply::Clipboard(text) = &reply {
             self.channel.clipboard_reply(text);
             if let Some((window, target)) = self.paste_pending.take() {
                 self.insert_into(window, target, text);
             }
         }
-        self.profile.accept(&reply);
+        self.profile.accept(reply);
         if matches!(reply, Reply::PrimaryAttributes(_)) && self.probe_until.is_some() {
             self.finish_probe();
         }
@@ -1100,7 +1116,7 @@ impl<T: Terminal> Session<T> {
         clippy::too_many_lines,
         reason = "the host's key handling, in the order hosts apply it"
     )]
-    fn key(&mut self, key: Key) {
+    fn key(&mut self, key: &Key) {
         if key.kind == KeyKind::Release {
             if let Some((window, focused)) = self.top() {
                 self.dispatch(
@@ -1114,7 +1130,7 @@ impl<T: Terminal> Session<T> {
         // An open select's list takes its keys first.
         if let Some(target) = focused {
             if self.models.get(&window).is_some_and(|model| model.widget(target).open)
-                && self.popup_key(window, target, &key)
+                && self.popup_key(window, target, key)
             {
                 return;
             }
@@ -1133,7 +1149,7 @@ impl<T: Terminal> Session<T> {
             return;
         }
         self.dispatch(window, Event::KeyDown { target: focused, key: key.code, modifiers });
-        let handled = focused.is_some_and(|target| self.widget_key(window, target, &key));
+        let handled = focused.is_some_and(|target| self.widget_key(window, target, key));
         if !handled {
             if let Some(text) = &key.text {
                 if !modifiers.ctrl && !modifiers.alt && !modifiers.meta && text != "\t" {
@@ -1378,7 +1394,7 @@ impl<T: Terminal> Session<T> {
                     KeyCode::ArrowUp | KeyCode::ArrowDown => {
                         let delta: i32 = if key.code == KeyCode::ArrowUp { 1 } else { -1 };
                         let (mut year, mut month, mut day) =
-                            (i32::from(date.year), i32::from(date.month), i32::from(date.day));
+                            (date.year, i32::from(date.month), i32::from(date.day));
                         match widget.segment {
                             0 => year += delta,
                             1 => month = (month - 1 + delta).rem_euclid(12) + 1,
@@ -1468,12 +1484,12 @@ impl<T: Terminal> Session<T> {
             self.models
                 .get(&window)
                 .and_then(|model| model.get(*target))
-                .is_some_and(|node| node.is_text_field())
+                .is_some_and(super::model::RealizedNode::is_text_field)
         });
         match field {
             Some(target) => self.insert_into(window, target, text),
             None => {
-                self.dispatch(window, Event::TextInput { target: focused, text: text.to_owned() })
+                self.dispatch(window, Event::TextInput { target: focused, text: text.to_owned() });
             }
         }
     }
@@ -1594,7 +1610,7 @@ impl<T: Terminal> Session<T> {
                     .models
                     .get(&window)
                     .and_then(|model| model.get(target))
-                    .is_some_and(|node| node.is_interactable());
+                    .is_some_and(super::model::RealizedNode::is_interactable);
                 if !interactable {
                     return;
                 }
@@ -1878,17 +1894,18 @@ impl<T: Terminal> Session<T> {
         };
         let target = node.id;
         match (&node.kind, &node.control) {
-            (NodeKind::Button, _) => self.dispatch(window, Event::Click { target }),
+            (NodeKind::Button, _) | (_, Some(Control::Link { .. })) => {
+                self.dispatch(window, Event::Click { target });
+            }
             (_, Some(Control::Checkbox { checked, .. })) => {
-                self.dispatch(window, Event::Toggled { target, on: !checked })
+                self.dispatch(window, Event::Toggled { target, on: !checked });
             }
             (_, Some(Control::Toggle { on, .. })) => {
-                self.dispatch(window, Event::Toggled { target, on: !on })
+                self.dispatch(window, Event::Toggled { target, on: !on });
             }
             (_, Some(Control::Radio { .. })) => {
-                self.dispatch(window, Event::Toggled { target, on: true })
+                self.dispatch(window, Event::Toggled { target, on: true });
             }
-            (_, Some(Control::Link { .. })) => self.dispatch(window, Event::Click { target }),
             (_, Some(Control::Select { selected, .. })) => {
                 if let Some(model) = self.models.get_mut(&window) {
                     let widget = model.widget_mut(target);

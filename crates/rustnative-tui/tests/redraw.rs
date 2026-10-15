@@ -3,6 +3,12 @@
 //! redraws once, frames coalesce under load, and animations run through the
 //! same `Timeline` — or not at all under reduced motion.
 
+#![allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    reason = "helper functions in an integration test are test code too: a failed expectation is the test failing"
+)]
+
 mod common;
 
 use std::time::Duration;

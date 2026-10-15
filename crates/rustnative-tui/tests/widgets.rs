@@ -5,6 +5,12 @@
 //! `RUSTNATIVE_BLESS=1 cargo test -p rustnative-tui --test widgets` rewrites
 //! the goldens in `tests/goldens/`.
 
+#![allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    reason = "helper functions in an integration test are test code too: a failed expectation is the test failing"
+)]
+
 mod common;
 
 use std::path::Path;

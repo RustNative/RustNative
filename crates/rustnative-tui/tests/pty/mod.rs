@@ -1,12 +1,12 @@
 //! A real pseudo-terminal for the tests: the test binary runs itself as a
 //! child (`--exact child rnscenario=<name>`) on the slave side of a pty
-//! (`posix_openpt` on Unix) or a ConPTY (Windows), and the parent plays the
+//! (`posix_openpt` on Unix) or a `ConPTY` (Windows), and the parent plays the
 //! terminal — its output runs through the crate's own VT emulator, which
 //! also answers the child's questions, and input goes in as bytes.
 //!
 //! So the bytes cross a real terminal driver: the kernel's line discipline
 //! (`termios`, `SIGWINCH`, job control) on Unix, and on Windows the console
-//! host behind ConPTY — which turns the parent's VT input into console
+//! host behind `ConPTY` — which turns the parent's VT input into console
 //! input records and back into VT for a child in virtual-terminal mode, as
 //! Windows Terminal does.
 
@@ -132,7 +132,7 @@ mod unix {
             let milliseconds = i32::try_from(wait.as_millis()).unwrap_or(i32::MAX);
             // SAFETY: one valid pollfd.
             unsafe { libc::poll(&raw mut descriptor, 1, milliseconds) };
-            let mut buffer = [0_u8; 65_536];
+            let mut buffer = vec![0_u8; 65_536];
             loop {
                 // SAFETY: reading into a local buffer.
                 let count = unsafe {
@@ -244,7 +244,7 @@ mod windows {
 
     use super::Screen;
 
-    /// A child on a ConPTY.
+    /// A child on a `ConPTY`.
     pub struct Pty {
         console: HPCON,
         input: HANDLE,
@@ -259,7 +259,7 @@ mod windows {
     unsafe impl Send for SendHandle {}
 
     impl Pty {
-        /// Starts scenario `name` on a `columns` × `rows` ConPTY.
+        /// Starts scenario `name` on a `columns` × `rows` `ConPTY`.
         #[allow(clippy::too_many_lines, reason = "the ConPTY recipe, step by step")]
         pub fn spawn(name: &str, columns: u16, rows: u16) -> Self {
             // SAFETY: the documented ConPTY recipe; every handle is owned here.

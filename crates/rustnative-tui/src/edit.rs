@@ -72,8 +72,7 @@ impl Edit {
                 .grapheme_indices(true)
                 .map(|(index, _)| index)
                 .chain(std::iter::once(value.len()))
-                .filter(|index| *index <= offset)
-                .last()
+                .rfind(|index| *index <= offset)
                 .unwrap_or(0)
         };
         self.caret = snap(self.caret);
@@ -107,7 +106,7 @@ fn previous_word(value: &str, offset: usize) -> usize {
         .split_word_bound_indices()
         .filter(|(index, word)| *index < offset && is_word(word))
         .map(|(index, _)| index)
-        .last()
+        .next_back()
         .unwrap_or(0)
 }
 
@@ -292,7 +291,7 @@ pub fn key(
             let goal = edit.goal.unwrap_or(column);
             let step = if matches!(key.code, KeyCode::PageUp | KeyCode::PageDown) { 5 } else { 1 };
             let target_row = if matches!(key.code, KeyCode::ArrowUp | KeyCode::PageUp) {
-                row.checked_sub(step).map_or(usize::MAX, |r| r)
+                row.checked_sub(step).unwrap_or(usize::MAX)
             } else {
                 row + step
             };

@@ -213,7 +213,7 @@ fn function_tilde(code: u16) -> Option<KeyCode> {
 fn unicode_key(code: u32) -> Option<KeyCode> {
     Some(match code {
         9 => KeyCode::Tab,
-        13 => KeyCode::Enter,
+        13 | 57_414 => KeyCode::Enter,
         27 => KeyCode::Escape,
         32 => KeyCode::Space,
         8 | 127 => KeyCode::Backspace,
@@ -229,7 +229,6 @@ fn unicode_key(code: u32) -> Option<KeyCode> {
         57_356 => KeyCode::Home,
         57_357 => KeyCode::End,
         57_364..=57_398 => KeyCode::Function(u8::try_from(code - 57_363).ok()?),
-        57_414 => KeyCode::Enter,
         57_441..=57_454 => return None, // a modifier key on its own
         _ => KeyCode::Character(char::from_u32(code)?),
     })
@@ -594,8 +593,7 @@ fn reply_of(kind: u8, body: &[u8]) -> Vec<InputEvent> {
             let value = parts.next().unwrap_or("");
             let channels: Option<Vec<u8>> = value
                 .strip_prefix("rgb:")
-                .map(|rgb| rgb.split('/').map(parse_hex_channel).collect::<Option<Vec<u8>>>())
-                .unwrap_or(None);
+                .and_then(|rgb| rgb.split('/').map(parse_hex_channel).collect::<Option<Vec<u8>>>());
             match channels.as_deref() {
                 Some([r, g, b]) => {
                     vec![InputEvent::Reply(Reply::Background(Color::rgb(*r, *g, *b)))]
@@ -670,7 +668,6 @@ fn csi_event(
         (Some(b'?'), b'u') => {
             vec![InputEvent::Reply(Reply::KittyKeyboard(first(params, 0).unwrap_or(0)))]
         }
-        (Some(_), _) => Vec::new(),
         (None, b'A') => key(KeyCode::ArrowUp),
         (None, b'B') => key(KeyCode::ArrowDown),
         (None, b'C') => key(KeyCode::ArrowRight),
@@ -788,7 +785,7 @@ mod tests {
     fn utf8_split_across_reads_waits_for_its_end() {
         let mut decoder = Decoder::new();
         let bytes = "日".as_bytes();
-        assert!(decoder.feed(&bytes[..1]).is_empty());
+        assert_eq!(decoder.feed(&bytes[..1]), Vec::new());
         assert!(decoder.has_pending());
         assert_eq!(decoder.feed(&bytes[1..]).len(), 1);
     }
@@ -807,7 +804,7 @@ mod tests {
     #[test]
     fn a_lone_escape_waits_for_the_timeout() {
         let mut decoder = Decoder::new();
-        assert!(decoder.feed(b"\x1b").is_empty());
+        assert_eq!(decoder.feed(b"\x1b"), Vec::new());
         assert!(decoder.has_pending());
         assert_eq!(decoder.flush(), vec![InputEvent::Key(Key::new(KeyCode::Escape))]);
         assert!(!decoder.has_pending());

@@ -86,7 +86,7 @@ impl Component for Form {
     fn view(&self) -> Node {
         dense(
             "form",
-            [
+            vec![
                 Node::label("status", format!("clicks {} links {}", self.clicks, self.links)),
                 Node::button("button", "Press"),
                 Node::text_input("text", self.text.clone()),

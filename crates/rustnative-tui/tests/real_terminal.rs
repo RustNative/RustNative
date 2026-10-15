@@ -4,7 +4,13 @@
 //! Each test starts this binary again as a child on a pseudo-terminal
 //! (`tests/pty`), running one scenario with [`TuiPlatform`], and plays the
 //! terminal in the parent. On Unix the bytes cross the kernel's terminal
-//! driver; on Windows, the console host behind ConPTY.
+//! driver; on Windows, the console host behind `ConPTY`.
+
+#![allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    reason = "helper functions in an integration test are test code too: a failed expectation is the test failing"
+)]
 
 mod pty;
 

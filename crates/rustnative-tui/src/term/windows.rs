@@ -3,7 +3,7 @@
 //! virtual-terminal mode").
 //!
 //! Input is read as console input records. With
-//! `ENABLE_VIRTUAL_TERMINAL_INPUT`, the console (conhost, or ConPTY under
+//! `ENABLE_VIRTUAL_TERMINAL_INPUT`, the console (conhost, or `ConPTY` under
 //! Windows Terminal) translates keys, mouse reports, and paste into the same
 //! VT sequences a Unix terminal sends, so one decoder serves both; window
 //! size records are resize notifications, and focus records become the

@@ -95,7 +95,7 @@ pub trait RasterTarget {
     /// half's centre and `lower` at the lower half's. By default the unit
     /// is filled with their average.
     fn image(&mut self, x: i32, y: i32, upper: Color, lower: Color) {
-        let mix = |a: u8, b: u8| u8::try_from((u16::from(a) + u16::from(b)) / 2).unwrap_or(a);
+        let mix = u8::midpoint;
         self.fill(
             x,
             y,
@@ -194,6 +194,7 @@ fn is_axis_aligned(transform: &Transform2D) -> bool {
 
 #[allow(
     clippy::cast_possible_truncation,
+    clippy::cast_precision_loss,
     reason = "unit coordinates are clamped to the i32 range before the cast"
 )]
 fn floor_unit(value: f32) -> i32 {
@@ -416,12 +417,13 @@ impl<T: RasterTarget> State<'_, T> {
         }
     }
 
+    #[allow(clippy::many_single_char_names, reason = "a Bézier curve's textbook names")]
     fn flatten(&mut self, path: &Path) -> Vec<Polygon> {
+        const STEPS: usize = 8;
         let mut polygons: Vec<Polygon> = Vec::new();
         let mut current: Option<Polygon> = None;
         let mut at = (0.0_f32, 0.0_f32);
         let mut start = at;
-        const STEPS: usize = 8;
         for segment in path.segments() {
             match segment {
                 PathSegment::MoveTo(point) => {
@@ -571,6 +573,7 @@ impl<T: RasterTarget> State<'_, T> {
     clippy::cast_possible_truncation,
     clippy::cast_sign_loss,
     clippy::cast_precision_loss,
+    clippy::many_single_char_names,
     reason = "u and v are clamped into 0..1, so the index is inside the image"
 )]
 fn pixel(image: &ImageData, u: f32, v: f32, opacity: f32) -> Color {

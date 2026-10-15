@@ -1,4 +1,4 @@
-//! The demo in a real console window: conhost itself, not ConPTY
+//! The demo in a real console window: `conhost` itself, not `ConPTY`
 //! (`docs/tui.md`, "Verified on").
 //!
 //! The test starts `cmd /k tui-demo` in a new console, attaches to that

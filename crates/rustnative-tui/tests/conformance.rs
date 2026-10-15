@@ -4,6 +4,12 @@
 //! pseudo-localized, mirrored, and in wide characters — at several
 //! terminal sizes.
 
+#![allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    reason = "helper functions in an integration test are test code too: a failed expectation is the test failing"
+)]
+
 mod common;
 
 use std::collections::BTreeSet;
@@ -175,7 +181,7 @@ fn wide_characters_wrap_within_their_cells() {
                 [
                     Node::label("cjk", "設定を保存すると、変更はすぐに反映されます。"),
                     Node::label("korean", "변경 사항은 저장할 때 적용됩니다"),
-                    Node::label("marks", "ạ̈ccệnts and e\u{301}moji 👩‍👩‍👧 🇯🇵 together"),
+                    Node::label("marks", "ạ̈ccệnts and e\u{301}moji 👩‍👩‍👧 🇯🇵 together"),
                     Node::row(
                         "actions",
                         [Node::button("save", "保存"), Node::button("cancel", "取消")],

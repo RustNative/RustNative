@@ -37,7 +37,7 @@ pub const PROBED_MODES: [u16; 5] = [1003, 1004, 1006, 2004, 2026];
 /// Which sequence posts a notification on this terminal.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum NotificationProtocol {
-    /// `OSC 9 ; text` (iTerm2, Ghostty, WezTerm).
+    /// `OSC 9 ; text` (iTerm2, Ghostty, `WezTerm`).
     Osc9,
     /// `OSC 99` (kitty).
     Osc99,

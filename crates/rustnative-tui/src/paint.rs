@@ -260,12 +260,8 @@ fn border_glyph(edges: Edges) -> &'static str {
         (true, false, true, true) => "┤",
         (false, true, true, true) => "┬",
         (true, true, false, true) => "┴",
-        (true, false, true, false) | (true, false, false, false) | (false, false, true, false) => {
-            "│"
-        }
-        (false, true, false, true) | (false, true, false, false) | (false, false, false, true) => {
-            "─"
-        }
+        (true | false, false, true, false) | (true, false, false, false) => "│",
+        (false, true | false, false, true) | (false, true, false, false) => "─",
         (false, false, false, false) => "·",
     }
 }
@@ -444,6 +440,18 @@ fn paint_popup(
     spot
 }
 
+/// Draws `list` (in window coordinates) over everything on `grid` — the
+/// inspection overlay.
+pub fn paint_overlay(
+    grid: &mut Grid,
+    list: &rustnative_core::DrawList,
+    context: &PaintContext<'_>,
+) {
+    let clip = grid.bounds();
+    let mut target = CellTarget { grid, clip, context };
+    let _ = rasterize(list, clip, context.mapping, &mut target);
+}
+
 struct CellTarget<'a, 'b> {
     grid: &'a mut Grid,
     clip: GridRect,
@@ -502,6 +510,7 @@ impl RasterTarget for CellTarget<'_, '_> {
 }
 
 #[allow(clippy::too_many_lines, reason = "one arm per node kind")]
+#[allow(clippy::similar_names, reason = "`used` and `user` are not confusable here")]
 fn paint_node(
     model: &mut TuiModel,
     grid: &mut Grid,
@@ -698,12 +707,10 @@ fn paint_control(
             let knob = i32::try_from((value.clamp(min, max) - min) * i64::from(length - 1) / span)
                 .unwrap_or(0);
             for column in 0..length {
-                let glyph = if column == knob {
-                    "●"
-                } else if column < knob {
-                    "━"
-                } else {
-                    "─"
+                let glyph = match column.cmp(&knob) {
+                    std::cmp::Ordering::Equal => "●",
+                    std::cmp::Ordering::Less => "━",
+                    std::cmp::Ordering::Greater => "─",
                 };
                 let look = if column == knob { focus(base) } else { base };
                 grid.print(rect.x + column, y, glyph, look, clip, context.width);
@@ -715,53 +722,50 @@ fn paint_control(
             let inner = (rect.width - 7).max(1);
             grid.print(rect.x, y, "[", base, clip, context.width);
             grid.print(rect.x + inner + 1, y, "]", base, clip, context.width);
-            match percent {
-                Some(percent) => {
-                    let filled = i32::from(*percent).min(100) * inner / 100;
-                    for column in 0..inner {
-                        grid.print(
-                            rect.x + 1 + column,
-                            y,
-                            if column < filled { "█" } else { "░" },
-                            base,
-                            clip,
-                            context.width,
-                        );
-                    }
+            if let Some(percent) = percent {
+                let filled = i32::from(*percent).min(100) * inner / 100;
+                for column in 0..inner {
                     grid.print(
-                        rect.x + inner + 2,
+                        rect.x + 1 + column,
                         y,
-                        &format!("{percent:>3}%"),
+                        if column < filled { "█" } else { "░" },
                         base,
                         clip,
                         context.width,
                     );
                 }
-                None => {
-                    let block = (inner / 4).max(1);
-                    let position = if context.reduced_motion {
-                        0
-                    } else {
-                        let step = i32::try_from(
-                            context.now.as_millis() / 100
-                                % u128::try_from((inner + block).max(1)).unwrap_or(1),
-                        )
-                        .unwrap_or(0);
-                        step - block
-                    };
-                    for column in 0..inner {
-                        let lit = column >= position && column < position + block;
-                        grid.print(
-                            rect.x + 1 + column,
-                            y,
-                            if lit { "█" } else { " " },
-                            base,
-                            clip,
-                            context.width,
-                        );
-                    }
-                    grid.print(rect.x + inner + 2, y, "  …", base, clip, context.width);
+                grid.print(
+                    rect.x + inner + 2,
+                    y,
+                    &format!("{percent:>3}%"),
+                    base,
+                    clip,
+                    context.width,
+                );
+            } else {
+                let block = (inner / 4).max(1);
+                let position = if context.reduced_motion {
+                    0
+                } else {
+                    let step = i32::try_from(
+                        context.now.as_millis() / 100
+                            % u128::try_from((inner + block).max(1)).unwrap_or(1),
+                    )
+                    .unwrap_or(0);
+                    step - block
+                };
+                for column in 0..inner {
+                    let lit = column >= position && column < position + block;
+                    grid.print(
+                        rect.x + 1 + column,
+                        y,
+                        if lit { "█" } else { " " },
+                        base,
+                        clip,
+                        context.width,
+                    );
                 }
+                grid.print(rect.x + inner + 2, y, "  …", base, clip, context.width);
             }
             None
         }

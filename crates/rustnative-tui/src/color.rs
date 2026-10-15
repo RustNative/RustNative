@@ -12,9 +12,9 @@
 //! 3. `TERM=dumb`: no colour.
 //! 4. `COLORTERM` = `truecolor` or `24bit`: true colour.
 //! 5. A terminal known to draw true colour from its own variables:
-//!    Windows Terminal (`WT_SESSION`), `TERM_PROGRAM` of iTerm2, WezTerm,
+//!    Windows Terminal (`WT_SESSION`), `TERM_PROGRAM` of iTerm2, `WezTerm`,
 //!    VS Code, Ghostty, or Hyper; a `TERM` naming kitty, Alacritty, foot,
-//!    WezTerm, Ghostty, or a `-direct` entry.
+//!    `WezTerm`, Ghostty, or a `-direct` entry.
 //! 6. The Windows console with virtual-terminal processing enabled (it
 //!    draws true colour since Windows 10 1703).
 //! 7. `TERM_PROGRAM=Apple_Terminal`, or a `TERM` ending in `256color`: 256.
@@ -176,7 +176,7 @@ fn distance(a: (u8, u8, u8), b: (u8, u8, u8)) -> i64 {
         i64::from(a.1) - i64::from(b.1),
         i64::from(a.2) - i64::from(b.2),
     );
-    ((512 + mean) * dr * dr >> 8) + 4 * dg * dg + ((767 - mean) * db * db >> 8)
+    (((512 + mean) * dr * dr) >> 8) + 4 * dg * dg + (((767 - mean) * db * db) >> 8)
 }
 
 fn nearest_level(value: u8) -> usize {
