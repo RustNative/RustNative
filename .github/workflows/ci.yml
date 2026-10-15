@@ -223,7 +223,7 @@ jobs:
     # Milestone 38: the terminal backend on real Unix terminals — its tests
     # (the real-terminal ones on the kernel's pty, under `script`), the demo
     # driven inside tmux, and the backend run over SSH to a private sshd.
-    name: terminal backend (ubuntu: pty, tmux, ssh)
+    name: "terminal backend (ubuntu: pty, tmux, ssh)"
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
