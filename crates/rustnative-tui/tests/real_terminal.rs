@@ -169,9 +169,24 @@ fn assert_restored(terminal: &pty::Pty) {
     assert!(emulator.mode(25), "the cursor is shown again");
     assert!(emulator.mode(7), "autowrap is back on");
     for mode in [1000, 1002, 1003, 1006, 1004, 2004, 2026] {
-        assert!(!emulator.mode(mode), "mode {mode} was turned off");
+        assert!(
+            !emulator.mode(mode) || set_by_host(terminal, mode),
+            "mode {mode} was turned off; the pty's output began {:?}",
+            String::from_utf8_lossy(
+                &terminal.screen.output[..terminal.screen.output.len().min(300)]
+            )
+        );
     }
     assert_eq!(emulator.kitty_flags(), 0);
+}
+
+/// Whether the pty itself turned `mode` on before the child's first line:
+/// newer `ConPTY` asks its own terminal for focus reports (`?1004h`) when it
+/// starts, and that mode is the host's, not one a session left behind.
+fn set_by_host(terminal: &pty::Pty, mode: u16) -> bool {
+    let output = String::from_utf8_lossy(&terminal.screen.output);
+    let before = output.find("BEFORE").unwrap_or(output.len());
+    cfg!(windows) && output[..before].contains(&format!("\x1b[?{mode}h"))
 }
 
 #[cfg(unix)]

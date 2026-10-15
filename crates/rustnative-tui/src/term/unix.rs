@@ -75,13 +75,25 @@ pub(crate) fn restore_now() {
     }
 }
 
-#[cfg(any(target_os = "linux", target_os = "android"))]
+#[cfg(target_os = "linux")]
 fn errno_location() -> *mut c_int {
     // SAFETY: always valid for the calling thread.
     unsafe { libc::__errno_location() }
 }
 
-#[cfg(not(any(target_os = "linux", target_os = "android")))]
+// Bionic and the BSDs that spell it `__errno`.
+#[cfg(any(target_os = "android", target_os = "openbsd", target_os = "netbsd"))]
+fn errno_location() -> *mut c_int {
+    // SAFETY: always valid for the calling thread.
+    unsafe { libc::__errno() }
+}
+
+#[cfg(not(any(
+    target_os = "linux",
+    target_os = "android",
+    target_os = "openbsd",
+    target_os = "netbsd"
+)))]
 fn errno_location() -> *mut c_int {
     // SAFETY: always valid for the calling thread.
     unsafe { libc::__error() }
