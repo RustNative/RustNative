@@ -348,9 +348,7 @@ fn a_second_signal_restores_a_stuck_application() {
     std::thread::sleep(Duration::from_millis(200));
     terminal.kill(libc::SIGTERM);
     let status = terminal.wait_exit(WAIT).expect("the second signal ended it");
-    use std::os::unix::process::ExitStatusExt;
     assert_eq!(status.code(), Some(128 + libc::SIGTERM), "{status:?}");
-    let _ = status.signal();
     assert_restored(&terminal);
     assert_cooked(&terminal);
 }

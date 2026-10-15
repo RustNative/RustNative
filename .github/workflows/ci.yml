@@ -219,6 +219,27 @@ jobs:
       - name: cargo test -p rustnative-headless (one core)
         run: taskset -c 0 cargo test -p rustnative-headless -- --test-threads=1
 
+  terminal:
+    # Milestone 38: the terminal backend on real Unix terminals — its tests
+    # (the real-terminal ones on the kernel's pty, under `script`), the demo
+    # driven inside tmux, and the backend run over SSH to a private sshd.
+    name: terminal backend (ubuntu: pty, tmux, ssh)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - name: tmux and an SSH server
+        run: sudo apt-get update && sudo apt-get install -y tmux openssh-server
+      - name: cargo test -p rustnative-tui -p rustnative-drawlist -p tui-demo
+        run: cargo test -p rustnative-tui -p rustnative-drawlist -p tui-demo
+      - name: the real-terminal tests under a pty of a known size
+        run: tools/tui-session.sh tests
+      - name: the demo inside tmux
+        run: tools/tui-session.sh tmux
+      - name: the backend over SSH
+        run: tools/tui-session.sh ssh
+
   budgets:
     # Milestone 42: each shipped target's budget file, enforced. A
     # measurement over its budget (beyond its declared noise) fails the
@@ -240,6 +261,12 @@ jobs:
           - target: linux
             os: ubuntu-latest
             bench: tools/linux-session.sh xvfb cargo run --release -p rustnative-cli -- bench --target linux --check --unpaced-display
+          - target: tui
+            os: ubuntu-latest
+            bench: taskset -c 0 cargo run --release -p rustnative-cli -- bench --target tui --check --low-end
+          - target: tui-windows
+            os: windows-latest
+            bench: cargo run --release -p rustnative-cli -- bench --target tui --check
           - target: web
             os: ubuntu-latest
             bench: cargo run --release -p rustnative-cli -- bench --target web --check
@@ -284,6 +311,8 @@ jobs:
       - uses: Swatinem/rust-cache@v2
       - name: cargo check (macOS)
         run: cargo check -p rustnative-core -p rustnative-host -p rustnative-headless -p rustnative-components -p rustnative-data -p rustnative-update -p rustnative-server -p rustnative-sync
+      - name: cargo check -p rustnative-tui (the Unix terminal on macOS; its tests are owed to a Mac, docs/tui.md)
+        run: cargo check -p rustnative-tui -p rustnative-drawlist -p tui-demo --all-targets
       - name: cargo check (iOS)
         run: cargo check --target aarch64-apple-ios -p rustnative-core -p rustnative-host -p rustnative-components -p rustnative-update
 

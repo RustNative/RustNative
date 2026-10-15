@@ -478,7 +478,7 @@ impl TuiHarness {
     }
 
     /// The application, mutably (then [`Self::settle`]).
-    pub const fn application_mut(&mut self) -> &mut Application {
+    pub fn application_mut(&mut self) -> &mut Application {
         self.session.application_mut()
     }
 

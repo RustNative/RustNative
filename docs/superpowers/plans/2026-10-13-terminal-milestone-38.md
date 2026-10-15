@@ -2,7 +2,7 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:executing-plans to implement this plan phase-by-phase. Steps use checkbox (`- [ ]`) syntax for tracking.
 >
-> **Status: in progress (2026-10-14); see "Design decisions" at the end.** Unlike the Apple targets, nothing here needs hardware this project lacks: Windows Terminal and conhost on Windows, and the terminals of the WSL distributions (and a serial console through WSL), are the hosts it is verified on.
+> **Status: built (2026-10-15); macOS terminals owed to a Mac. See "Design decisions" and "Progress" at the end.** Unlike the Apple targets, nothing here needs hardware this project lacks: Windows Terminal and conhost on Windows, and the terminals of the WSL distributions (and a serial console through WSL), are the hosts it is verified on.
 
 **Goal:** Build `rustnative-tui` — `PLAN.md` "Milestone 38 — Terminal (TUI) backend" — to `PLAN.md` §8's definition in the reduced form §8 and Milestone 38 allow a terminal: the terminal's cell grid as the host object, honest capabilities, and §11's gates where a terminal can carry them.
 
@@ -157,13 +157,21 @@ Linux backend (styles applied only where they differ from the default theme).
   advertised only where DECRQM answers that 1003 and 1006 are recognized.
 - **Select** opens as a list drawn over the content below it — the
   terminal's equivalent of a drop-down, not an imitation window.
+- **Opacity is approximated**, not unavailable as Phase 2 first said: zero
+  draws nothing and below one half is faint (SGR 2) — something a cell does
+  show, so answering it unavailable would refuse what the screen realizes
+  (`tests/style_table.rs` holds every answer against the screen).
+- **Lengths are quantized before layout** (`TreeSnapshot::map_lengths`), not
+  only rectangles after it: rounding positions alone made a 12-pixel gap
+  alternate between one row and none.
 
 ### Progress
 
-- [ ] Phase 0 — `Platform::Tui` (done 2026-10-12), `rustnative-drawlist` with damage tracking, the cell-quantized layout check
-- [ ] Phase 1 — host I/O, decoding, encoding, restoration
-- [ ] Phase 2 — the cell grid, drawn widgets, style table, harness goldens
-- [ ] Phase 3 — accessibility as the terminal's
-- [ ] Phase 4 — the loop, redraw, animation
-- [ ] Phase 5 — inspection, conformance column, budgets, developer loop
-- [ ] Phase 6 — toolchain, packaging, documentation
+- [x] Phase 0 — `Platform::Tui`, `rustnative-drawlist` with damage tracking, the cell-quantized layout check (`rustnative-drawlist/tests/cell_quantized_layout.rs`), and `TreeSnapshot::map_lengths`
+- [x] Phase 1 — host I/O, decoding, encoding, restoration (`tests/real_terminal.rs` on a pty, ConPTY, and over SSH)
+- [x] Phase 2 — the cell grid, drawn widgets, style table, harness goldens (`tests/widgets.rs`, `tests/style_table.rs`, `tests/conformance.rs`)
+- [x] Phase 3 — accessibility as the terminal's (`tests/portable.rs`)
+- [x] Phase 4 — the loop, redraw, animation (`tests/redraw.rs`)
+- [x] Phase 5 — inspection, conformance column, budgets, developer loop
+- [x] Phase 6 — toolchain, packaging, documentation
+- [ ] macOS: run `tests/real_terminal.rs` and `tools/tui-session.sh` on a Mac (Terminal.app, iTerm2) when one is available; add the Homebrew formula with Milestone 33

@@ -340,7 +340,9 @@ impl<T: Terminal> Session<T> {
     }
 
     /// The application, mutably.
-    pub const fn application_mut(&mut self) -> &mut Application {
+    pub fn application_mut(&mut self) -> &mut Application {
+        // Whatever the caller changes, the next frame draws.
+        self.dirty = true;
         &mut self.app
     }
 

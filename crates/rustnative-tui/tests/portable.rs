@@ -468,3 +468,22 @@ fn the_inspection_overlay_is_drawn_into_the_grid() {
     terminal.resize(40, 6);
     assert_ne!(terminal.screen(), plain, "the overlay draws over the application");
 }
+
+#[test]
+fn a_theme_change_restyles_the_screen_without_restarting() {
+    let (_, root) = common::form();
+    let mut terminal = TuiHarness::launch(common::window("theme"), 50, 36, root);
+    let before = terminal.screen();
+    let created = terminal.model().stats().created;
+    let label = rustnative_core::ComponentStyle {
+        normal: VisualStyle::new().foreground(Color::rgb(0, 160, 0)),
+        ..rustnative_core::ComponentStyle::default()
+    };
+    terminal.application_mut().set_theme(rustnative_core::Theme::default().with_label(label));
+    terminal.settle();
+    let status = terminal.node("status").unwrap();
+    let cell = terminal.screen().get(status.cells.x, status.cells.y).cloned().unwrap();
+    assert_eq!(cell.style.fg, Some(Color::rgb(0, 160, 0)), "the label took the theme's colour");
+    assert_ne!(terminal.screen(), before);
+    assert_eq!(terminal.model().stats().created, created, "restyled in place: nothing re-created");
+}

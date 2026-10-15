@@ -308,6 +308,7 @@ impl TreeSnapshot {
     /// ```
     /// use rustnative_core::{ColumnStyle, EdgeInsets, LayoutStyle, Node, TreeSnapshot};
     ///
+    /// // single-syntax: the example is about a snapshot's lengths, not about writing a tree.
     /// let view = Node::column_with_layout("root", [], LayoutStyle::new(), ColumnStyle::new().gap(12));
     /// let mut snapshot = TreeSnapshot::from_node(&view).unwrap();
     /// snapshot.map_lengths(|x| x, |y| (y + 8) / 16 * 16);

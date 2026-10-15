@@ -7,7 +7,8 @@ measure GTK on, so it is run on the reference machine), `headless.toml`,
 `web.toml` (measured by
 `examples/web-bench` in headless Edge on a throttled profile), and
 `serverless.toml` (measured by `rustnative bench` itself, running
-`examples/web-notes` under its emulators). `rustnative bench --target <target>`
+`examples/web-notes` under its emulators), and `tui.toml` (the terminal
+backend, measured by `examples/tui-bench` on its synthetic terminal). `rustnative bench --target <target>`
 measures the target and compares the results with its file. With `--check`,
 the command fails when a measurement is over budget, just as a failing test
 fails the build. CI runs it on every push (`.github/workflows/ci.yml`, job
@@ -82,6 +83,22 @@ labelled text fields, 125 native controls in all.
 | `input_latency_ms` | a click through hit-testing and the input path, to the settled change |
 | `filter_input_latency_ms` | a keystroke into `examples/filter-demo`'s filter over 200 000 rows: the event and the render it causes (median of 12) |
 | `resident_memory_mb` | the process's resident set with the bench screen and the 200 000-row filter both alive (working set on Windows, `VmRSS` on Linux) |
+
+### Terminal (`tui.toml`)
+
+Measured by `examples/tui-bench` (`rustnative bench --target tui`) on the
+synthetic terminal: the real session loop writing real escape sequences into
+the terminal backend's VT emulator, on a 120 × 40 terminal, so the numbers
+are the backend's and no terminal emulator's rendering is in them.
+
+| Key | Meaning |
+|---|---|
+| `launch_ms` | launching the bench screen (forty rows, a button, a field) to its first frame (median of 11) |
+| `input_latency_ms` | Enter on the focused button, to the frame showing its effect (median of 31) |
+| `bytes_per_keystroke` | the bytes written per character typed into the field: the damage, not a screen |
+| `frame_time_full_ms`, `frame_time_full_max_ms` | a frame in which every row of the screen changes (median and worst of 30) |
+| `resident_memory_mb` | the process's resident set with the screen alive (working set on Windows, `VmRSS` on Linux) |
+| `artifact_size_kb` | `tui-bench`, release |
 
 ### Shared core and compile steps (both targets)
 

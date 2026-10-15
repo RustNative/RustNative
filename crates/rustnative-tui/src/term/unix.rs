@@ -162,10 +162,11 @@ impl ProcessTerminal {
         // SAFETY: a valid C string and flags.
         let opened =
             unsafe { libc::open(path.as_ptr(), libc::O_RDWR | libc::O_NOCTTY | libc::O_CLOEXEC) };
+        // SAFETY: `isatty` only inspects the descriptor.
+        let stdin_is_a_terminal = unsafe { libc::isatty(0) } == 1;
         let (fd, owned) = if opened >= 0 {
             (opened, true)
-        } else if unsafe { libc::isatty(0) } == 1 {
-            // SAFETY (above): `isatty` only inspects the descriptor.
+        } else if stdin_is_a_terminal {
             (0, false)
         } else {
             return Err(io::Error::new(

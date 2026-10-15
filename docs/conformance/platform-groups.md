@@ -9,7 +9,7 @@ second member is written; the crate is created when that member is.
 |---|---|---|---|
 | Apple | macOS (33), iOS (36), iPadOS (70) | Objective-C runtime bindings and the retain/release convention, Core Text measurement, `NSAccessibility`/`UIAccessibility` role mapping, Foundation locale facilities, the Keychain, the Apple toolchain driver | `rustnative-apple` |
 | UIKit (inside Apple) | iOS (36), iPadOS (70) | UIKit realization of node kinds, the scene bridge and the idiom launcher of a universal bundle, `UITextInput`, the touch, gesture, and drag bridge, `UIAccessibility` elements, `CADisplayLink` pacing, the UIKit services both realize identically | `rustnative-uikit` |
-| Draw-list | terminal (38), embedded displays (37), the in-application overlay (44) | rasterizing `DrawList`, cell/pixel geometry conversion, a focus-ring and hit-test model for hosts with no native controls | `rustnative-drawlist` |
+| Draw-list | terminal (38), embedded displays (37), the in-application overlay (44) | rasterizing `DrawList`, cell/pixel geometry conversion (`GridMapping`, and lengths quantized to whole units before layout), a focus and hit-test model for hosts with no native controls, damage coalescing | `rustnative-drawlist` — created with the terminal, its first host member (2026-10-15), so the embedded backend arrives as the second member rather than with a copy; the terminal also draws the inspection overlay through it |
 | Android | Android (35) only | nothing to share: no other host runs the Android framework | none |
 | Desktop shell | Windows, macOS, Linux | tray/menu-bar extras, jump lists and dock menus, document windows (Milestones 48, 57) | `rustnative-desktop-shell` |
 

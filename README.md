@@ -29,8 +29,8 @@ picks the native backend for the target being compiled and builds its
 services, and components ask for *capabilities*
 (`ComponentContext::capabilities`), never for a platform (see
 [Running on every host](#running-on-every-host)). The framework core is
-platform-independent, so macOS, iOS, iPadOS, terminal, and embedded targets
-are added as separate adapters, each planned to the same depth: native host
+platform-independent, so macOS, iOS, iPadOS, and embedded targets are
+added as separate adapters, each planned to the same depth: native host
 objects, native measurement, native input, native accessibility, its own
 toolchain and packaging.
 
@@ -733,12 +733,15 @@ rendering with client attachment and typed server functions, service workers
 and PWAs, serverless and edge deployment, and the browser development,
 testing, and bundling tooling.
 
-**Terminal** (Milestone 38) — a `rustnative-tui` adapter realizing the same
-tree onto a terminal's cell grid: the Windows console in virtual-terminal
-mode, `termios` and VT sequences elsewhere, Unicode-width text measurement,
-key and mouse protocols, damage-tracked redraw, and terminal state restored
-even on panic. Desktop terminals and embedded Linux consoles, local or over
-SSH — not Android, iOS, iPadOS, or the browser.
+**Terminal** (Milestone 38, **built**: [`docs/tui.md`](docs/tui.md)) — the
+terminal's cell grid as the host: the Windows console in virtual-terminal
+mode and `termios` with VT sequences elsewhere, Unicode 17 display-width
+measurement, every node kind as a drawn widget with the portable semantics,
+the terminal's colour depth and key and mouse protocols detected rather than
+assumed, damage-only redraw, and the terminal restored on exit, signal, and
+panic. Verified in conhost, through ConPTY, on Linux ptys, in tmux, and over
+SSH; macOS terminals are owed to a Mac. Not Android, iOS, iPadOS, or the
+browser.
 
 **Embedded** (Milestone 37) — embedded Linux, RTOS, and selected bare-metal
 profiles, realized through the draw-list path rather than native controls,
@@ -1288,8 +1291,8 @@ that `inspect to-test` turns into a headless regression test.
 A project is a folder with a `rustnative.toml`: the application's identity (the
 same id its saved state and single-instance mutex use), its display name,
 version, publisher, and URL schemes. Every platform on the roadmap is
-recognized — `windows`, `linux`, `android`, `web`, `macos`, `ios`, `ipados`,
-`tui`, `embedded-linux`, and `embedded` (RTOS and bare metal); the ones whose backend does not exist yet say so, with the
+recognized — `windows`, `linux`, `android`, `web`, `tui`, `macos`, `ios`,
+`ipados`, `embedded-linux`, and `embedded` (RTOS and bare metal); the ones whose backend does not exist yet say so, with the
 milestone that brings them, and exit with a distinct code rather than
 quietly building for Windows.
 
@@ -1458,9 +1461,9 @@ cargo test --workspace -- --ignored
 
 The complete master roadmap—including completed milestones, architectural invariants, and all planned future stages—is maintained in [`PLAN.md`](PLAN.md).
 
-Milestones 25–32, 34, and 35 are complete, and so is the Web track (Web milestones A–K).
+Milestones 25–32, 34, 35, and 38 are complete, and so is the Web track (Web milestones A–K).
 What remains is the rest of the platform matrix — macOS, iOS,
-iPadOS, embedded, and terminal — plus the
+iPadOS, and embedded — plus the
 core work those targets share: a `no_std`-capable core subset, an executor
 seam for single-threaded hosts, and time from the host clock rather than
 `std::time::Instant`. The markup syntax and the style spellings are core work of

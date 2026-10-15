@@ -1,16 +1,18 @@
 # Build Status — RustNative
 
-## Current state (2026-10-14)
+## Current state (2026-10-15)
 
 The shipped backends are **Windows**, **Linux** (GTK 4; Ubuntu, Fedora, Arch),
-**Android**, the **Web**, and the **headless** reference backend; the server
+**Android**, the **terminal** (Milestone 38), the **Web**, and the **headless**
+reference backend; the server
 runs long-lived, serverless, and at the edge. Every milestone through 58, the
-Web milestones A–K, Milestones 34 and 35, and the first part of Milestone 69
+Web milestones A–K, Milestones 34, 35, and 38, and the first part of Milestone 69
 (Windows per-monitor DPI scaling) are built. The backends not yet built —
-macOS (33), iOS (36), embedded (37), the terminal (38), and iPadOS (70) — owe
+macOS (33), iOS (36), embedded (37), and iPadOS (70) — owe
 the standard in `PLAN.md` section 8 and
 `docs/conformance/new-backend-checklist.md`, row by row. The 2026-10-12
-whole-framework review and the fixes it led to are the first entry below.
+whole-framework review and the fixes it led to are the second entry below; the
+terminal backend is the first.
 
 History: Milestones 39–58 were scoped on 2026-09-23
 (`docs/superpowers/plans/2026-09-23-milestones-39-58.md`) as Windows-first,
@@ -18,6 +20,79 @@ with each item that only another backend could realize built as a portable
 contract and a test double and recorded as **owed** by that backend; the
 entries below keep that wording where it was true when written, and each
 backend's own entry records what it paid.
+
+**The terminal backend (Milestone 38, 2026-10-14 to 2026-10-15).** Built to
+`PLAN.md` §8 in the reduced form Milestone 38 allows a terminal
+(`docs/superpowers/plans/2026-10-13-terminal-milestone-38.md`; guide:
+`docs/tui.md`):
+
+- **`rustnative-drawlist`**, the draw-list group's crate, with the terminal as
+  its first member: `GridMapping` (logical pixels ↔ a host grid, one rounding
+  rule), damage coalescing, a focus and hit-test model, and a `DrawList`
+  rasterizer onto any grid. The core gains `TreeSnapshot::map_lengths`, so a
+  grid host rounds declared lengths to whole units before layout
+  (`tests/cell_quantized_layout.rs`).
+- **`rustnative-tui`**: Unicode 17 display width (a table generated from the
+  UCD), colour-depth detection and downsampling, the VT input decoder, the
+  damage-only writer and the VT emulator it is checked through, raw mode and
+  signals on Unix (libc) and the console API on Windows, restoration on exit,
+  panic, signal, and console close, the terminal probe, the realized model,
+  every node kind as a drawn widget, grapheme-aware editing, the session
+  loop, the services (OSC 52, OSC 9/99/777, URL launch through ShellExecute
+  or one-argument openers, state files), and inspection with the overlay in
+  the grid. `rustnative_style::TUI` and `TUI_UNITS`; `[style] targets =
+  ["tui"]` is checked by the macros.
+- **Tooling**: `rustnative run|build|check|dev|package tui`, a doctor row,
+  `rustnative_host::terminal`/`terminal_services`/`wants_terminal`, the
+  template's terminal path, packaging in the host's formats (Linux packages
+  now take an application kind: `Terminal=true`, a console-application
+  AppStream entry, libc only), `budgets/tui.toml` with `examples/tui-bench`,
+  `examples/tui-demo`, `tools/tui-session.sh`, and CI's `terminal` job and
+  `tui` budgets on Linux and Windows.
+- **Tests**: 45 unit tests; widget goldens and behaviour for every node kind;
+  the TUI style table held against the screen; the guarantee suites and
+  layout conformance (plain, pseudo-localized, mirrored, wide text) on the
+  synthetic terminal; redraw (one cell written for a one-cell change, one
+  frame for a resize, fifty keystrokes in one frame, transitions, reduced
+  motion); accessibility order and colour independence; and the
+  real-terminal tests (`tests/real_terminal.rs`).
+- **Fixed on the way**: typed text with nothing focused is delivered; the
+  window beneath a closed one is redrawn; scroll bars draw over their
+  content; a subtree's own direction aligns its text; a tiny image shows
+  both halves; a list box's cursor follows the application's choice (found
+  by the conhost run); URLs never pass through `cmd` (a security review
+  finding: `&` in a URL could have run a command).
+
+**Verified on**, each run on 2026-10-15:
+
+| Host | What ran | Result |
+|---|---|---|
+| Windows 10 Pro 19045, a real conhost window | `examples/tui-demo/tests/conhost.rs` (input records in, the screen buffer read back) | drawn, typed into, Tab and arrows as virtual keys, Space, Ctrl+C; the shell's screen and cursor back |
+| Windows 10, ConPTY | `tests/real_terminal.rs` (7 tests) | restoration after Ctrl+C, a component panic, and a panic outside every boundary (console modes equal before and after); resize; every key; closing the console |
+| Ubuntu 24.04 (WSL), the kernel's pty | `tools/tui-session.sh tests` (9 tests) | the above plus SIGTERM, a second SIGTERM on a stuck component (exit 143, restored), SIGTSTP/SIGCONT, SIGWINCH |
+| Arch Linux (WSL), the kernel's pty | `tools/tui-session.sh tests` | 9 passed |
+| Ubuntu 24.04, tmux 3.4 | `tools/tui-session.sh tmux` (12 checks) | all passed |
+| Arch Linux and Kali (WSL), OpenSSH's `sshd` | `tools/tui-session.sh ssh` | over SSH as root (Arch) and as a regular user (Kali): remote detection, keys, UTF-8, paste, window-change resize, restoration |
+| both | `rustnative bench --target tui --check` | Windows: launch 11.5 ms, input 5.7 ms, 23.7 bytes/key, full frame 5.8 ms, 7.8 MB, 3.0 MB binary; Linux: 5.9 ms, 3.8 ms, 23.7, 3.7 ms, 7.2 MB, 4.2 MB |
+| both | clippy (stable 1.98 and 1.99, `-D warnings`), `cargo +1.85 check`, `cargo doc -D warnings` | clean |
+
+**Not verified / owed.**
+- **macOS**: the Unix terminal code is written for macOS too (`libc`'s
+  `__error`, `posix_openpt`) and CI compiles it there, but it has not run on
+  a Mac. Terminal.app, iTerm2, and the real-terminal tests are owed when a
+  Mac is available (`PLAN.md` 2.13); macOS terminals are not called
+  supported until then. The Homebrew formula waits on Milestone 33's
+  toolchain.
+- **Windows Terminal itself** (its own, newer ConPTY) and its mouse
+  forwarding were not run here: the ConPTY tests use Windows 10's inbox
+  ConPTY, which keeps mouse reporting to itself.
+- **A serial console**: the code path is the pty path (`/dev/tty`, the VT100
+  size default when a serial line reports none); no serial line was attached.
+- **Screen readers** with the terminal (NVDA, Orca) were not run; the
+  obligation the backend can meet — reading order, the cursor on focus,
+  nothing by colour alone — is tested.
+- **Checklist rows 23 and 24** (the extended style range and guards) are owed
+  by every backend until Milestone 67.
 
 **The whole-framework review and its fixes (2026-10-12 to 2026-10-14).** A
 review of every crate, backend, document, and plan against the definition of a
