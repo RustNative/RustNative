@@ -68,9 +68,9 @@ backend's own entry records what it paid.
 | Host | What ran | Result |
 |---|---|---|
 | Windows 10 Pro 19045, a real conhost window | `examples/tui-demo/tests/conhost.rs` (input records in, the screen buffer read back) | drawn, typed into, Tab and arrows as virtual keys, Space, Ctrl+C; the shell's screen and cursor back |
-| Windows 10, ConPTY | `tests/real_terminal.rs` (7 tests) | restoration after Ctrl+C, a component panic, and a panic outside every boundary (console modes equal before and after); resize; every key; closing the console |
-| Ubuntu 24.04 (WSL), the kernel's pty | `tools/tui-session.sh tests` (9 tests) | the above plus SIGTERM, a second SIGTERM on a stuck component (exit 143, restored), SIGTSTP/SIGCONT, SIGWINCH |
-| Arch Linux (WSL), the kernel's pty | `tools/tui-session.sh tests` | 9 passed |
+| Windows 10, ConPTY | `tests/real_terminal.rs` (8 tests) | restoration after Ctrl+C, a component panic, and a panic outside every boundary (console modes equal before and after); the terminal taken a second time; resize; every key; closing the console |
+| Ubuntu 24.04 (WSL), the kernel's pty | `tools/tui-session.sh tests` (10 tests) | the above plus SIGTERM, a second SIGTERM on a stuck component (exit 143, restored), SIGTSTP/SIGCONT, SIGWINCH |
+| Arch Linux (WSL), the kernel's pty | `tools/tui-session.sh tests` | 10 passed |
 | Ubuntu 24.04, tmux 3.4 | `tools/tui-session.sh tmux` (12 checks) | all passed |
 | Arch Linux and Kali (WSL), OpenSSH's `sshd` | `tools/tui-session.sh ssh` | over SSH as root (Arch) and as a regular user (Kali): remote detection, keys, UTF-8, paste, window-change resize, restoration |
 | both | `rustnative bench --target tui --check` | Windows: launch 11.5 ms, input 5.7 ms, 23.7 bytes/key, full frame 5.8 ms, 7.8 MB, 3.0 MB binary; Linux: 5.9 ms, 3.8 ms, 23.7, 3.7 ms, 7.2 MB, 4.2 MB |

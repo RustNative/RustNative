@@ -135,8 +135,17 @@ fn child() {
         std::thread::sleep(Duration::from_millis(300));
         panic!("raw panic with the terminal held");
     }
+    let mut first = Ok(());
+    if scenario == "twice" {
+        // A program that hands the terminal to a screen, takes it back,
+        // and hands it over again. The first outcome joins the last line:
+        // ConPTY repaints over anything printed between the two.
+        let mut application =
+            Application::new(Probe::new(()), Window::new("Probe", Size::new(0, 0)));
+        first = TuiPlatform::new().run(&mut application);
+    }
     let mut application = Application::new(Probe::new(()), Window::new("Probe", Size::new(0, 0)));
-    let outcome = TuiPlatform::new().run(&mut application);
+    let outcome = first.and(TuiPlatform::new().run(&mut application));
     println!("AFTER {}", terminal_state());
     match outcome {
         Ok(()) => println!("RESULT ok"),
@@ -434,4 +443,23 @@ fn over_ssh() {
     assert!(terminal.wait_for("RESULT ok", WAIT), "{}", terminal.screen.text());
     assert_restored(&terminal);
     assert_same_mode(&terminal);
+}
+
+#[test]
+fn the_terminal_can_be_taken_again_after_it_was_given_back() {
+    let mut terminal = pty::Pty::spawn("twice", 60, 16);
+    assert!(terminal.wait_for("hello pty", WAIT), "{}", terminal.screen.text());
+    let mark = terminal.screen.output.len();
+    terminal.send(&[0x03]);
+    let started = std::time::Instant::now();
+    while !String::from_utf8_lossy(&terminal.screen.output[mark..]).contains("hello")
+        && started.elapsed() < WAIT
+    {
+        terminal.pump(Duration::from_millis(20));
+    }
+    assert!(terminal.screen.emulator.screen().text().contains("hello pty"), "the second run drew");
+    terminal.send(&[0x03]);
+    assert!(terminal.wait_exit(WAIT).is_some());
+    assert!(terminal.wait_for("RESULT ok", WAIT), "{}", terminal.screen.text());
+    assert_restored(&terminal);
 }

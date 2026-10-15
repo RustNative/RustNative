@@ -317,6 +317,17 @@ that has them. Nothing that opens a window is offered.
 Everything a service writes to the terminal goes through the loop, between
 frames.
 
+## Embedding (Milestone 40)
+
+A terminal has no host objects to embed in either direction: there is no
+foreign widget a terminal application could host, and no other program's
+widget tree it could live inside — a terminal multiplexer (tmux, screen) is
+another terminal, and the application runs in it unchanged (verified in
+tmux). Both directions are answered as the host permitting neither.
+Incremental adoption works at the process level instead: a terminal program
+can hand the terminal to a Rust Native screen and take it back
+(`rustnative_tui::guard::restore`, then a new `TuiPlatform::run`).
+
 ## Inspection and the development loop
 
 The inspection protocol is already a side channel — line-delimited JSON over
