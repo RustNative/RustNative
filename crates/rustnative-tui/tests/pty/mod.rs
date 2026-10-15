@@ -156,7 +156,7 @@ mod unix {
                 command.pre_exec(|| {
                     // A session of its own, with the pty as its controlling
                     // terminal, so `/dev/tty` is the pty and SIGWINCH reaches it.
-                    if libc::setsid() < 0 || libc::ioctl(0, libc::TIOCSCTTY, 0) < 0 {
+                    if libc::setsid() < 0 || libc::ioctl(0, libc::TIOCSCTTY as _, 0) < 0 {
                         return Err(std::io::Error::last_os_error());
                     }
                     Ok(())
