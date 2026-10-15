@@ -52,6 +52,34 @@ const START_TIMEOUT: Duration = Duration::from_secs(60);
 /// How often the project is looked at.
 const POLL: Duration = Duration::from_millis(250);
 
+/// Whether the application shares this terminal (`rustnative dev tui`):
+/// then the loop writes nothing to it while the application runs, and its
+/// messages and the build's output go to `target/rustnative-dev/dev.log`.
+static TERMINAL: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
+
+fn terminal_mode() -> bool {
+    TERMINAL.load(std::sync::atomic::Ordering::Relaxed)
+}
+
+/// Where the loop writes while a terminal application owns the terminal.
+fn log_path(project: &Project) -> PathBuf {
+    project.root.join("target").join("rustnative-dev").join("dev.log")
+}
+
+/// Reports `message`: on the terminal, or to the log while a terminal
+/// application owns it.
+fn say(project: &Project, message: &str) {
+    if terminal_mode() {
+        let path = log_path(project);
+        let _ = std::fs::create_dir_all(path.parent().unwrap_or(Path::new(".")));
+        if let Ok(mut file) = std::fs::OpenOptions::new().create(true).append(true).open(&path) {
+            let _ = writeln!(file, "{message}");
+        }
+    } else {
+        println!("{message}");
+    }
+}
+
 /// Where the application runs.
 #[derive(Debug, Clone)]
 pub struct Remote {
@@ -422,6 +450,14 @@ impl Host {
         }
     }
 
+    /// Whether a local application has exited by itself.
+    fn exited(&mut self) -> bool {
+        match self {
+            Self::Local { child: Some(child), .. } => child.try_wait().ok().flatten().is_some(),
+            _ => false,
+        }
+    }
+
     /// Asks the application to close; a local one that does not is ended.
     fn stop(&mut self, endpoint: &Endpoint) {
         let _ = ask(endpoint, &Request::Quit);
@@ -474,6 +510,35 @@ fn millis(duration: Duration) -> f64 {
 
 fn build(project: &Project) -> Result<Duration> {
     let started = Instant::now();
+    if terminal_mode() {
+        // The build's output would draw over the application: it goes to
+        // the log, and only its outcome is reported.
+        let path = log_path(project);
+        let _ = std::fs::create_dir_all(path.parent().unwrap_or(Path::new(".")));
+        let log = std::fs::OpenOptions::new()
+            .create(true)
+            .append(true)
+            .open(&path)
+            .map_err(|cause| Error::Io { what: format!("open {}", path.display()), cause })?;
+        let error_log =
+            log.try_clone().map_err(|cause| Error::Io { what: "share the log".into(), cause })?;
+        let status = Command::new(std::env::var_os("CARGO").unwrap_or_else(|| "cargo".into()))
+            .current_dir(&project.root)
+            .args(["build", "--color", "never"])
+            .stdin(std::process::Stdio::null())
+            .stdout(log)
+            .stderr(error_log)
+            .status()
+            .map_err(|cause| Error::ToolMissing {
+                tool: "cargo",
+                hint: "install Rust from https://rustup.rs".to_owned(),
+                cause: Some(cause.to_string()),
+            })?;
+        if !status.success() {
+            return Err(Error::ToolFailed { tool: "cargo", code: status.code() });
+        }
+        return Ok(started.elapsed());
+    }
     crate::diagnostics::run_cargo(&project.root, &["build".to_owned()])?;
     Ok(started.elapsed())
 }
@@ -509,7 +574,13 @@ fn restart(
 /// restart after start-up — the application's main file saved again —
 /// prints how it went as JSON, closes the application, and returns: what
 /// the budget harness measures.
-pub fn run(here: &Path, remote: Option<Remote>, android: bool, once: bool) -> Result<()> {
+pub fn run(
+    here: &Path,
+    remote: Option<Remote>,
+    android: bool,
+    terminal: bool,
+    once: bool,
+) -> Result<()> {
     let project = Project::find(here)?;
     let mut host = match remote {
         _ if android => Host::Android { apk: PathBuf::new() },
@@ -518,12 +589,26 @@ pub fn run(here: &Path, remote: Option<Remote>, android: bool, once: bool) -> Re
     };
     println!("dev: building {}", project.config.app.display_name);
     host.build(&project)?;
+    if terminal && !once {
+        println!(
+            "dev: the application takes this terminal; messages go to {} until it exits",
+            log_path(&project).display()
+        );
+    }
+    TERMINAL.store(terminal, std::sync::atomic::Ordering::Relaxed);
     let mut endpoint = host.start(&executable(&project))?;
-    println!("dev: running; watching for changes (Ctrl+C to stop)");
+    say(&project, "dev: running; watching for changes (Ctrl+C to stop)");
 
     let outcome = watch(&project, &mut host, &mut endpoint, once);
     if outcome.is_err() || once {
         host.stop(&endpoint);
+    }
+    if terminal {
+        TERMINAL.store(false, std::sync::atomic::Ordering::Relaxed);
+        println!(
+            "dev: the application exited; the loop's messages are in {}",
+            log_path(&project).display()
+        );
     }
     outcome
 }
@@ -549,6 +634,11 @@ fn watch(project: &Project, host: &mut Host, endpoint: &mut Endpoint, once: bool
     let mut files = scan(&project.root);
     loop {
         std::thread::sleep(POLL);
+        // A terminal application the person quit ends the loop: the
+        // terminal is theirs again.
+        if terminal_mode() && host.exited() {
+            return Ok(());
+        }
         let now = scan(&project.root);
         let paths = changed(&files, &now);
         if paths.is_empty() {
@@ -566,11 +656,16 @@ fn watch(project: &Project, host: &mut Host, endpoint: &mut Endpoint, once: bool
                     &Request::SetStyleFile { css: new_css.clone().unwrap_or_default() },
                 );
                 match applied {
-                    Ok(_) => println!(
-                        "dev: app.css changed token values only — applied live in {:.0} ms, no rebuild",
-                        millis(seen.elapsed())
+                    Ok(_) => say(
+                        project,
+                        &format!(
+                            "dev: app.css changed token values only — applied live in {:.0} ms, no rebuild",
+                            millis(seen.elapsed())
+                        ),
                     ),
-                    Err(error) => println!("dev: the theme could not be applied: {error}"),
+                    Err(error) => {
+                        say(project, &format!("dev: the theme could not be applied: {error}"));
+                    }
                 }
             }
             Change::Catalogues => {
@@ -580,11 +675,14 @@ fn watch(project: &Project, host: &mut Host, endpoint: &mut Endpoint, once: bool
                         continue;
                     };
                     match ask(endpoint, &Request::SetCatalogue { locale: locale.clone(), ftl }) {
-                        Ok(_) => println!(
-                            "dev: locales/{locale}.ftl changed — applied live in {:.0} ms, no rebuild",
-                            millis(seen.elapsed())
+                        Ok(_) => say(
+                            project,
+                            &format!(
+                                "dev: locales/{locale}.ftl changed — applied live in {:.0} ms, no rebuild",
+                                millis(seen.elapsed())
+                            ),
                         ),
-                        Err(error) => println!("dev: locales/{locale}.ftl: {error}"),
+                        Err(error) => say(project, &format!("dev: locales/{locale}.ftl: {error}")),
                     }
                 }
             }
@@ -595,14 +693,20 @@ fn watch(project: &Project, host: &mut Host, endpoint: &mut Endpoint, once: bool
                         path.strip_prefix(&project.root).unwrap_or(path).display().to_string()
                     })
                     .collect();
-                println!("dev: {} changed — rebuilding", names.join(", "));
+                say(project, &format!("dev: {} changed — rebuilding", names.join(", ")));
                 match restart(project, host, endpoint, seen) {
-                    Ok(done) => println!(
-                        "dev: restarted in {:.0} ms (build {:.0} ms); state: {} restored, {} not editable",
-                        done.total_ms, done.build_ms, done.restored, done.refused
+                    Ok(done) => say(
+                        project,
+                        &format!(
+                            "dev: restarted in {:.0} ms (build {:.0} ms); state: {} restored, {} not editable",
+                            done.total_ms, done.build_ms, done.restored, done.refused
+                        ),
                     ),
                     Err(error) => {
-                        println!("dev: {error} — the running application is unchanged");
+                        say(
+                            project,
+                            &format!("dev: {error} — the running application is unchanged"),
+                        );
                     }
                 }
             }

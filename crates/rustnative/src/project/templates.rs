@@ -74,8 +74,21 @@ pub fn previews() -> Vec<Preview> {
 ///
 /// The backend could not start the application.
 pub fn run() -> Result<(), Box<dyn std::error::Error>> {
-    use rustnative_core::{Application, Size, Window};
+    use rustnative_core::{Application, Platform as _, Size, Window};
     let identity = rustnative_host::AppIdentity::new(APP_ID, APP_NAME);
+    // `rustnative run tui` (or `--tui`): the same application in the
+    // terminal it was started from, on the terminal backend.
+    if rustnative_host::wants_terminal() {
+        let mut platform = rustnative_host::terminal(&identity);
+        let mut application = Application::with_services(
+            App::new(()),
+            Window::new(APP_NAME, Size::new(0, 0)),
+            rustnative_host::terminal_services(&identity, &platform)?,
+        );
+        application.set_theme(rustnative_core::app_theme!());
+        platform.run(&mut application)?;
+        return Ok(());
+    }
     let mut application = Application::with_services(
         App::new(()),
         Window::new(APP_NAME, Size::new(480, 320)),
@@ -216,8 +229,21 @@ pub fn previews() -> Vec<Preview> {
 ///
 /// The backend could not start the application.
 pub fn run() -> Result<(), Box<dyn std::error::Error>> {
-    use rustnative_core::{Application, Component, Size, Window};
+    use rustnative_core::{Application, Component, Platform as _, Size, Window};
     let identity = rustnative_host::AppIdentity::new(APP_ID, APP_NAME);
+    // `rustnative run tui` (or `--tui`): the same application in the
+    // terminal it was started from, on the terminal backend.
+    if rustnative_host::wants_terminal() {
+        let mut platform = rustnative_host::terminal(&identity);
+        let mut application = Application::with_services(
+            App::new(()),
+            Window::new(APP_NAME, Size::new(0, 0)),
+            rustnative_host::terminal_services(&identity, &platform)?,
+        );
+        application.set_theme(rustnative_core::app_theme!());
+        platform.run(&mut application)?;
+        return Ok(());
+    }
     let mut application = Application::with_services(
         App::new(()),
         Window::new(APP_NAME, Size::new(480, 320)),

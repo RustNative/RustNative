@@ -2446,6 +2446,7 @@ dependencies = [
  "rustnative-core",
  "rustnative-data",
  "rustnative-linux",
+ "rustnative-tui",
  "rustnative-windows",
 ]
 
@@ -3214,6 +3215,25 @@ dependencies = [
  "target-triple",
  "termcolor",
  "toml",
+]
+
+[[package]]
+name = "tui-bench"
+version = "0.1.0"
+dependencies = [
+ "rustnative-core",
+ "rustnative-tui",
+ "serde_json",
+ "windows-sys 0.61.2",
+]
+
+[[package]]
+name = "tui-demo"
+version = "0.1.0"
+dependencies = [
+ "rustnative-core",
+ "rustnative-tui",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]

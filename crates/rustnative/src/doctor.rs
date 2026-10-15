@@ -118,6 +118,13 @@ impl Report {
                     }
                     _ if platform == Platform::Linux => linux_readiness(),
                     _ if platform == Platform::Android => android_readiness(),
+                    // Cargo alone builds it, and it runs in the terminal it is
+                    // started from: nothing more to have.
+                    _ if platform == Platform::Tui => (
+                        true,
+                        "ready — built with Cargo alone; runs in the terminal it is started in"
+                            .to_owned(),
+                    ),
                     Some(milestone) => (false, format!("no backend yet — Milestone {milestone}")),
                     None => (false, "no backend yet — see PLAN.md's web roadmap".to_owned()),
                 };
@@ -331,7 +338,7 @@ mod tests {
         for platform in report
             .platforms
             .iter()
-            .filter(|p| !["windows", "linux", "android"].contains(&p.platform.as_str()))
+            .filter(|p| !["windows", "linux", "android", "tui"].contains(&p.platform.as_str()))
         {
             assert!(!platform.ready, "{} has no backend yet", platform.platform);
             assert!(platform.detail.contains("no backend yet"));

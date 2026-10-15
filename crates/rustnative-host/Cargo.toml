@@ -16,6 +16,9 @@ workspace = true
 
 [dependencies]
 rustnative-core.workspace = true
+# The terminal backend: chosen explicitly (`terminal`), never by target, so
+# one binary can be a GUI and a terminal application.
+rustnative-tui.workspace = true
 # The constrained-work conditions and image decoding contracts the
 # backends' services implement.
 rustnative-data.workspace = true

@@ -155,6 +155,7 @@ pub struct TuiModel {
     rendered_values: HashMap<NodeId, String>,
     widgets: HashMap<NodeId, WidgetState>,
     scroll: HashMap<NodeId, Point>,
+    rendered_selections: HashMap<NodeId, Option<usize>>,
     focused: Option<NodeId>,
     hovered: Option<NodeId>,
     pressed: Option<NodeId>,
@@ -223,6 +224,7 @@ impl TuiModel {
                     self.native_values.remove(&node.id);
                     self.rendered_values.remove(&node.id);
                     self.widgets.remove(&node.id);
+                    self.rendered_selections.remove(&node.id);
                     self.scroll.remove(&node.id);
                 }
                 _ => {}
@@ -375,12 +377,15 @@ impl TuiModel {
                 },
             );
         }
-        // A list box's cursor follows its selection when the person has not
-        // moved it.
+        // A list box's cursor follows its selection whenever a render changes
+        // the selection (the application chose an item), and where it has
+        // none or points past the items.
         for node in nodes.values() {
             if let Some(Control::ListBox { selected, items }) = &node.control {
+                let changed =
+                    self.rendered_selections.insert(node.id, *selected) != Some(*selected);
                 let widget = self.widgets.entry(node.id).or_default();
-                if widget.cursor.is_none_or(|cursor| cursor >= items.len()) {
+                if changed || widget.cursor.is_none_or(|cursor| cursor >= items.len()) {
                     widget.cursor = selected.filter(|index| *index < items.len());
                 }
             }

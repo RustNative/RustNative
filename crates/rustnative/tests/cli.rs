@@ -107,7 +107,6 @@ fn every_platform_without_a_backend_is_refused_by_name() {
         ("ipados", "Milestone 70"),
         ("embedded-linux", "Milestone 37"),
         ("embedded", "Milestone 37"),
-        ("tui", "Milestone 38"),
     ];
     for (platform, mention) in expected {
         let output = rustnative()

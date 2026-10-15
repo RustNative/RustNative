@@ -1,0 +1,27 @@
+[package]
+name = "tui-bench"
+version = "0.1.0"
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+description.workspace = true
+repository.workspace = true
+homepage.workspace = true
+readme.workspace = true
+keywords.workspace = true
+categories.workspace = true
+publish = false
+
+[lints]
+workspace = true
+
+# The terminal backend's budget scenarios (`budgets/tui.toml`), measured by
+# `rustnative bench --target tui`. A crate of its own so the process holds
+# the terminal backend and nothing else: its memory is the terminal's.
+[dependencies]
+rustnative-core.workspace = true
+rustnative-tui.workspace = true
+serde_json = "1"
+
+[target.'cfg(windows)'.dependencies]
+windows-sys = { workspace = true, features = ["Win32_System_ProcessStatus", "Win32_System_Threading"] }

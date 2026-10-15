@@ -30,7 +30,9 @@ pub enum Platform {
     EmbeddedLinux,
     /// Embedded RTOS and bare-metal targets (Milestone 37).
     Embedded,
-    /// Terminal applications (Milestone 38).
+    /// Terminal applications: the terminal's cell grid as the host, on
+    /// Windows, Linux, and macOS terminals, locally, over SSH, or on a serial
+    /// line (Milestone 38).
     Tui,
     /// The browser: Rust on the server, HTML/CSS and compile-time generated
     /// JavaScript in the browser, with WebAssembly for subtrees that opt in
@@ -46,6 +48,7 @@ impl Platform {
             Self::Windows => Some("rustnative-windows"),
             Self::Linux => Some("rustnative-linux"),
             Self::Android => Some("rustnative-android"),
+            Self::Tui => Some("rustnative-tui"),
             Self::Web => Some("rustnative-web"),
             _ => None,
         }
@@ -58,11 +61,10 @@ impl Platform {
         match self {
             // The web target has a roadmap section rather than a numbered
             // milestone, so it names none either.
-            Self::Windows | Self::Linux | Self::Android | Self::Web => None,
+            Self::Windows | Self::Linux | Self::Android | Self::Tui | Self::Web => None,
             Self::Macos => Some(33),
             Self::Ios => Some(36),
             Self::EmbeddedLinux | Self::Embedded => Some(37),
-            Self::Tui => Some(38),
             Self::Ipados => Some(70),
         }
     }
@@ -91,8 +93,10 @@ mod tests {
     use super::*;
 
     #[test]
-    fn windows_linux_android_and_web_have_backends_and_every_other_names_its_milestone() {
+    fn the_built_platforms_have_backends_and_every_other_names_its_milestone() {
         assert_eq!(Platform::Windows.backend(), Some("rustnative-windows"));
+        assert_eq!(Platform::Tui.backend(), Some("rustnative-tui"));
+        assert_eq!(Platform::Tui.planned_milestone(), None);
         assert_eq!(Platform::Linux.backend(), Some("rustnative-linux"));
         assert_eq!(Platform::Android.backend(), Some("rustnative-android"));
         assert_eq!(Platform::Android.planned_milestone(), None);
@@ -102,7 +106,6 @@ mod tests {
             Platform::Ipados,
             Platform::EmbeddedLinux,
             Platform::Embedded,
-            Platform::Tui,
         ] {
             assert!(platform.backend().is_none(), "{platform} has no backend yet");
             assert!(platform.planned_milestone().is_some(), "{platform} names its milestone");

@@ -29,12 +29,13 @@ use windows_sys::Win32::Storage::FileSystem::{
     CreateFileW, FILE_SHARE_READ, FILE_SHARE_WRITE, OPEN_EXISTING, WriteFile,
 };
 use windows_sys::Win32::System::Console::{
-    CONSOLE_MODE, CONSOLE_SCREEN_BUFFER_INFO, CTRL_BREAK_EVENT, CTRL_C_EVENT, CTRL_CLOSE_EVENT,
-    DISABLE_NEWLINE_AUTO_RETURN, ENABLE_EXTENDED_FLAGS, ENABLE_PROCESSED_OUTPUT,
-    ENABLE_VIRTUAL_TERMINAL_INPUT, ENABLE_VIRTUAL_TERMINAL_PROCESSING, ENABLE_WINDOW_INPUT,
-    FOCUS_EVENT, GetConsoleCP, GetConsoleMode, GetConsoleOutputCP, GetConsoleScreenBufferInfo,
-    GetNumberOfConsoleInputEvents, INPUT_RECORD, KEY_EVENT, ReadConsoleInputW, SetConsoleCP,
-    SetConsoleCtrlHandler, SetConsoleMode, SetConsoleOutputCP, WINDOW_BUFFER_SIZE_EVENT,
+    ATTACH_PARENT_PROCESS, AttachConsole, CONSOLE_MODE, CONSOLE_SCREEN_BUFFER_INFO,
+    CTRL_BREAK_EVENT, CTRL_C_EVENT, CTRL_CLOSE_EVENT, DISABLE_NEWLINE_AUTO_RETURN,
+    ENABLE_EXTENDED_FLAGS, ENABLE_PROCESSED_OUTPUT, ENABLE_VIRTUAL_TERMINAL_INPUT,
+    ENABLE_VIRTUAL_TERMINAL_PROCESSING, ENABLE_WINDOW_INPUT, FOCUS_EVENT, GetConsoleCP,
+    GetConsoleMode, GetConsoleOutputCP, GetConsoleScreenBufferInfo, GetNumberOfConsoleInputEvents,
+    INPUT_RECORD, KEY_EVENT, ReadConsoleInputW, SetConsoleCP, SetConsoleCtrlHandler,
+    SetConsoleMode, SetConsoleOutputCP, WINDOW_BUFFER_SIZE_EVENT,
 };
 use windows_sys::Win32::System::Threading::{CreateEventW, SetEvent, WaitForMultipleObjects};
 
@@ -162,7 +163,20 @@ impl ProcessTerminal {
                 "the console is already in use by a session",
             ));
         }
-        let input = open_console("CONIN$")?;
+        let input = match open_console("CONIN$") {
+            Ok(input) => input,
+            // A GUI-subsystem binary (one that is also a desktop
+            // application) has no console of its own: it uses the console
+            // of the process that started it, as a console program would.
+            Err(first) => {
+                // SAFETY: attaching to the parent's console has no
+                // preconditions; failure is reported by its result.
+                if unsafe { AttachConsole(ATTACH_PARENT_PROCESS) } == 0 {
+                    return Err(first);
+                }
+                open_console("CONIN$")?
+            }
+        };
         let output = open_console("CONOUT$")?;
         let (mut input_mode, mut output_mode): (CONSOLE_MODE, CONSOLE_MODE) = (0, 0);
         // SAFETY: valid console handles; the modes are written.

@@ -26,6 +26,47 @@ use crate::config::Config;
 use crate::error::{Error, Result};
 use crate::toolchain::{cargo, windows_sdk::WindowsToolchain};
 
+/// What kind of application a Linux package installs: a desktop one (the
+/// GTK backend, its window, its libraries) or a terminal one (the terminal
+/// backend, opened in the desktop's terminal, needing nothing but the C
+/// library).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum AppKind {
+    /// A desktop application (`rustnative package linux`).
+    Desktop,
+    /// A terminal application (`rustnative package tui`).
+    Terminal,
+}
+
+impl AppKind {
+    /// The `.deb`'s `Depends:` line.
+    #[must_use]
+    pub const fn deb_depends(self) -> &'static str {
+        match self {
+            Self::Desktop => "libgtk-4-1 (>= 4.14), libsoup-3.0-0, libc6",
+            Self::Terminal => "libc6",
+        }
+    }
+
+    /// The RPM's requirements, in Fedora's package names.
+    #[must_use]
+    pub const fn rpm_requires(self) -> &'static [(&'static str, Option<&'static str>)] {
+        match self {
+            Self::Desktop => &[("gtk4", Some("4.14")), ("libsoup3", None)],
+            Self::Terminal => &[("glibc", None)],
+        }
+    }
+
+    /// The pacman package's dependencies, in Arch's package names.
+    #[must_use]
+    pub const fn pacman_depends(self) -> &'static [(&'static str, Option<&'static str>)] {
+        match self {
+            Self::Desktop => &[("gtk4", Some("4.14")), ("libsoup3", None), ("glibc", None)],
+            Self::Terminal => &[("glibc", None)],
+        }
+    }
+}
+
 /// Which packages to produce.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, clap::ValueEnum)]
 #[value(rename_all = "lower")]
@@ -93,7 +134,12 @@ impl Format {
 ///
 /// The build's error, a missing `appimagetool` for an AppImage asked for
 /// by name, or anything that could not be written.
-pub fn package_linux(root: &Path, config: &Config, format: Format) -> Result<Vec<PathBuf>> {
+pub fn package_linux(
+    root: &Path,
+    config: &Config,
+    format: Format,
+    kind: AppKind,
+) -> Result<Vec<PathBuf>> {
     cargo::run(root, ["build", "--release"])?;
     let target =
         std::env::var_os("CARGO_TARGET_DIR").map_or_else(|| root.join("target"), PathBuf::from);
@@ -111,21 +157,21 @@ pub fn package_linux(root: &Path, config: &Config, format: Format) -> Result<Vec
     let icon = icon.as_deref();
     let mut produced = Vec::new();
     if matches!(format, Format::Deb | Format::All) {
-        produced.push(linux::build_deb(&output, &executable, icon, config)?);
+        produced.push(linux::build_deb(&output, &executable, icon, config, kind)?);
     }
     if matches!(format, Format::Rpm | Format::All) {
-        produced.push(linux::build_rpm(&output, &executable, icon, config)?);
+        produced.push(linux::build_rpm(&output, &executable, icon, config, kind)?);
     }
     if matches!(format, Format::Pacman | Format::All) {
-        produced.push(linux::build_pacman(&output, &executable, icon, config)?);
+        produced.push(linux::build_pacman(&output, &executable, icon, config, kind)?);
     }
     if matches!(format, Format::Tar | Format::All) {
-        produced.push(linux::build_tar(&output, &executable, icon, config)?);
+        produced.push(linux::build_tar(&output, &executable, icon, config, kind)?);
     }
     let appimage = format == Format::AppImage
         || (format == Format::All && linux::which("appimagetool").is_some());
     if appimage {
-        produced.push(linux::build_appimage(&output, &executable, icon, config)?);
+        produced.push(linux::build_appimage(&output, &executable, icon, config, kind)?);
     }
     Ok(produced)
 }

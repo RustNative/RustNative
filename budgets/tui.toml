@@ -1,0 +1,25 @@
+# The terminal backend's budgets (`PLAN.md` Milestones 38 and 42). See
+# SCHEMA.md. Measured by `examples/tui-bench` on the synthetic terminal:
+# the real session loop writing real escape sequences into the crate's VT
+# emulator, so the bytes and the frame work are the terminal's own, with no
+# terminal emulator's rendering in the numbers.
+#
+# Reference machine: the development desktop, Windows 10 (19045) and WSL
+# Ubuntu 24.04 on the same x86-64. Measured values at the time are in the
+# comments (Windows / Linux).
+target = "tui"
+
+[budget]
+# Launch to the first frame on a 120 × 40 terminal (median of 11).
+launch_ms = { max = 25, tolerance = 1.0 }                 # 11.8 / 5.9
+# Enter on a focused button to the frame showing its effect (median of 31).
+input_latency_ms = { max = 12, tolerance = 1.0 }          # 5.7 / 3.8
+# Bytes written per keystroke typed into a field: the damage, not a screen.
+bytes_per_keystroke = { max = 32, tolerance = 0.25 }      # 23.7 / 23.7
+# A frame in which every row of the screen changes (median and worst of 30).
+frame_time_full_ms = { max = 12, tolerance = 1.0 }        # 5.8 / 3.7
+frame_time_full_max_ms = { max = 30, tolerance = 1.5 }    # 7.0 / 4.7
+# The resident set with the screen alive.
+resident_memory_mb = { max = 16, tolerance = 0.5 }        # 8.4 / 7.2
+# The release binary (`tui-bench`): the terminal backend and the core.
+artifact_size_kb = { max = 5000, tolerance = 0.2 }        # 3004 / 4154

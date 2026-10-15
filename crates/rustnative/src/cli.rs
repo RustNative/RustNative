@@ -568,7 +568,13 @@ impl Cli {
                 }
                 let remote =
                     remote.zip(token).map(|(addr, token)| crate::dev::Remote { addr, token });
-                crate::dev::run(&here, remote, platform == Platform::Android, once)
+                crate::dev::run(
+                    &here,
+                    remote,
+                    platform == Platform::Android,
+                    platform == Platform::Tui,
+                    once,
+                )
             }
             Command::DevAgent { listen, max_deployments } => {
                 crate::dev::agent(listen, max_deployments)
@@ -723,7 +729,52 @@ impl Cli {
                 }
                 linux_host(Platform::Linux)?;
                 let project = Project::find(&here)?;
-                for path in crate::package::package_linux(&project.root, &project.config, format)? {
+                for path in crate::package::package_linux(
+                    &project.root,
+                    &project.config,
+                    format,
+                    crate::package::AppKind::Desktop,
+                )? {
+                    println!("Packaged {}", path.display());
+                }
+                Ok(())
+            }
+            Command::Package { platform: Platform::Tui, format, .. } => {
+                // A terminal application is packaged in the host operating
+                // system's own formats (`PLAN.md` Milestone 38).
+                let project = Project::find(&here)?;
+                let produced = if cfg!(target_os = "linux") {
+                    if !format.is_linux() {
+                        return Err(Error::Usage(
+                            "terminal packages on Linux are deb, rpm, pacman, tar, appimage, or all".to_owned(),
+                        ));
+                    }
+                    crate::package::package_linux(
+                        &project.root,
+                        &project.config,
+                        format,
+                        crate::package::AppKind::Terminal,
+                    )?
+                } else if cfg!(windows) {
+                    if !matches!(format, crate::package::Format::Zip | crate::package::Format::All)
+                    {
+                        return Err(Error::Usage(
+                            "terminal packages on Windows are zip (with SHA256SUMS)".to_owned(),
+                        ));
+                    }
+                    crate::package::package(
+                        &project.root,
+                        &project.config,
+                        crate::package::Format::Zip,
+                        None,
+                    )?
+                } else {
+                    return Err(Error::Usage(
+                        "on macOS a terminal application is packaged as a Homebrew formula, which arrives with \n                         Milestone 33's toolchain; until then `rustnative build tui --release` builds it"
+                            .to_owned(),
+                    ));
+                };
+                for path in produced {
                     println!("Packaged {}", path.display());
                 }
                 Ok(())
@@ -830,6 +881,12 @@ fn cargo_for(
     linux_host(platform)?;
     let project = Project::find(here)?;
     println!("{subcommand}: {} for {platform}", project.config.app.display_name);
+    if platform == Platform::Tui {
+        // A binary that is both a GUI and a terminal application starts in
+        // the terminal when asked (`rustnative_host::wants_terminal`).
+        // SAFETY: set before this process starts any thread.
+        unsafe { std::env::set_var("RUSTNATIVE_TARGET", "tui") };
+    }
     let mut arguments = vec![subcommand.to_owned()];
     if release {
         arguments.push("--release".to_owned());

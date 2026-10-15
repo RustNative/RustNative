@@ -216,7 +216,7 @@ impl Style {
     /// Every name `targets` may hold: the shipped backends, then the
     /// planned ones (accepted, and checked once their tables exist).
     pub const TARGETS: &'static [&'static str] = &[
-        "windows", "linux", "android", "web", "headless", "macos", "ios", "ipados", "tui",
+        "windows", "linux", "android", "web", "headless", "tui", "macos", "ios", "ipados",
         "embedded",
     ];
 }

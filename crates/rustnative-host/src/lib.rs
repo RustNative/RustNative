@@ -8,7 +8,7 @@
 //!
 //! - [`HostPlatform`] is the backend for this target: `WindowsPlatform`,
 //!   `LinuxPlatform`, or `AndroidPlatform`. On a target whose backend is
-//!   planned but not built (macOS, iOS, iPadOS, terminals, embedded) it is
+//!   planned but not built (macOS, iOS, iPadOS, embedded) it is
 //!   [`NoBackend`], which compiles and fails at [`Platform::run`] naming the
 //!   milestone that brings it — never a different platform's backend.
 //! - [`services`] is that backend's full set of services: HTTP, clipboard,
@@ -18,6 +18,9 @@
 //!   push, and store billing (answered "unavailable, because…" where the
 //!   host or build has none).
 //! - [`run`] does both and runs the application.
+//! - [`terminal`] and [`terminal_services`] are the terminal backend
+//!   (Milestone 38), for a binary that is also a terminal application:
+//!   chosen by the application ([`wants_terminal`]), never by target.
 //!
 //! ```no_run
 //! use rustnative_core::{Application, Component, Event, Node, Size, Window};
@@ -122,7 +125,7 @@ impl NoBackend {
         } else if cfg!(target_family = "wasm") {
             "the browser: a web application is served by rustnative-server, not run as a native host"
         } else {
-            "this target: terminals are Milestone 38 and embedded targets Milestone 37"
+            "this target: embedded targets are Milestone 37 (a terminal application runs anywhere through `terminal`)"
         }
     }
 }
@@ -193,6 +196,46 @@ pub fn services(app: &AppIdentity) -> Result<Services, ServiceError> {
     host::services(app)
 }
 
+/// The terminal backend (`PLAN.md` Milestone 38), for the same application
+/// run in the terminal it was started from — chosen explicitly, never by
+/// target, so one binary can be both a GUI and a terminal application (the
+/// CLI's `rustnative run tui` sets `RUSTNATIVE_TARGET=tui`, which
+/// [`wants_terminal`] reads).
+///
+/// A program that is only a terminal application depends on
+/// `rustnative-tui` directly instead: this crate links the operating
+/// system's GUI backend, which a server or a console without a desktop does
+/// not have.
+#[must_use]
+pub fn terminal(app: &AppIdentity) -> rustnative_tui::TuiPlatform {
+    rustnative_tui::TuiPlatform::new().with_app_id(app.id.clone())
+}
+
+/// Whether this run was asked to be a terminal application: `--tui` on
+/// the command line, or `RUSTNATIVE_TARGET=tui` in the environment.
+#[must_use]
+pub fn wants_terminal() -> bool {
+    std::env::args().any(|argument| argument == "--tui")
+        || std::env::var("RUSTNATIVE_TARGET").is_ok_and(|target| target.eq_ignore_ascii_case("tui"))
+}
+
+/// The terminal's services for `app` over `platform`'s channel — the OSC 52
+/// clipboard, the terminal's notifications, state files — with what the
+/// operating system offers without a window (HTTP, secure storage, locale
+/// formatting) from this target's backend. Nothing that opens a window (a
+/// file dialog, printing) is offered: a terminal application has none.
+///
+/// # Errors
+///
+/// The state store's folder could not be created.
+pub fn terminal_services(
+    app: &AppIdentity,
+    platform: &rustnative_tui::TuiPlatform,
+) -> Result<Services, ServiceError> {
+    let services = rustnative_tui::services(&app.id, &app.display_name, platform.channel())?;
+    Ok(host::windowless(app, services))
+}
+
 /// The host's answers about the device — network reachability and external
 /// power — for constrained background work (`rustnative_data::BackgroundWork`).
 #[must_use]
@@ -220,6 +263,13 @@ mod host {
 
     use rustnative_core::{ServiceError, Services};
     use rustnative_windows as backend;
+
+    pub(super) fn windowless(app: &super::AppIdentity, services: Services) -> Services {
+        services
+            .with_http(Arc::new(backend::WinHttp::new()))
+            .with_secure_storage(Arc::new(backend::WindowsSecureStorage::new(&app.id)))
+            .with_locale_service(Arc::new(backend::WindowsLocale))
+    }
 
     pub(super) fn services(app: &super::AppIdentity) -> Result<Services, ServiceError> {
         Ok(Services::default()
@@ -265,6 +315,13 @@ mod host {
     use rustnative_core::{ServiceError, Services};
     use rustnative_linux as backend;
 
+    pub(super) fn windowless(app: &super::AppIdentity, services: Services) -> Services {
+        services
+            .with_http(Arc::new(backend::SoupHttp::new()))
+            .with_secure_storage(Arc::new(backend::LinuxSecureStorage::new(&app.id)))
+            .with_locale_service(Arc::new(backend::LinuxLocale))
+    }
+
     pub(super) fn services(app: &super::AppIdentity) -> Result<Services, ServiceError> {
         Ok(Services::default()
             .with_http(Arc::new(backend::SoupHttp::new()))
@@ -309,6 +366,12 @@ mod host {
 
     use rustnative_android as backend;
     use rustnative_core::{ServiceError, Services};
+
+    pub(super) fn windowless(_app: &super::AppIdentity, services: Services) -> Services {
+        // A terminal emulator on Android is its own application, not a
+        // target (`PLAN.md` Milestone 38): nothing is added.
+        services
+    }
 
     pub(super) fn services(_app: &super::AppIdentity) -> Result<Services, ServiceError> {
         // The package is the identity on Android: its state folder, its
@@ -358,6 +421,10 @@ mod host {
     use std::sync::Arc;
 
     use rustnative_core::{ServiceError, Services};
+
+    pub(super) fn windowless(_app: &super::AppIdentity, services: Services) -> Services {
+        services
+    }
 
     pub(super) fn services(_app: &super::AppIdentity) -> Result<Services, ServiceError> {
         // No backend: the portable services that need no host.

@@ -42,6 +42,8 @@ pub enum BenchTarget {
     Serverless,
     /// The Android backend, on the attached device (`examples/hello-label`).
     Android,
+    /// The terminal backend, on the synthetic terminal (`examples/tui-bench`).
+    Tui,
 }
 
 impl BenchTarget {
@@ -53,6 +55,7 @@ impl BenchTarget {
             Self::Web => "web",
             Self::Serverless => "serverless",
             Self::Android => "android",
+            Self::Tui => "tui",
         }
     }
 
@@ -63,6 +66,7 @@ impl BenchTarget {
             Self::Web => "web-bench",
             Self::Serverless => "web-notes",
             Self::Android => "hello-label",
+            Self::Tui => "tui-bench",
         }
     }
 
@@ -79,6 +83,7 @@ impl BenchTarget {
             ],
             Self::Headless => &[("headless", 3), ("core", 1), ("compile", 1)],
             Self::Web => &[("web", 3)],
+            Self::Tui => &[("tui", 3)],
             // Measured in this process, under the emulators; on the device.
             Self::Serverless | Self::Android => &[],
         }
@@ -412,7 +417,7 @@ pub fn run(here: &Path, target: BenchTarget, options: Options) -> Result<()> {
         measured.extend(medians(&results));
     }
     measured.remove("frames");
-    if matches!(target, BenchTarget::Windows | BenchTarget::Linux) {
+    if matches!(target, BenchTarget::Windows | BenchTarget::Linux | BenchTarget::Tui) {
         let size = std::fs::metadata(&exe).map_err(io("read bench-app's size"))?.len();
         #[allow(clippy::cast_precision_loss, reason = "kilobytes")]
         measured.insert("artifact_size_kb".to_owned(), size as f64 / 1024.0);

@@ -1,0 +1,12 @@
+# The example terminal application's project description, read by
+# `rustnative` (`rustnative run tui`, `rustnative package tui`).
+[app]
+name = "tui-demo"
+id = "dev.rustnative.tui-demo"
+display-name = "Rust Native terminal demo"
+version = "0.1.0"
+publisher = "CN=Rust Native"
+description = "A to-do list in the terminal, on the Rust Native terminal backend"
+
+[style]
+targets = ["tui"]

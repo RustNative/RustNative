@@ -32,6 +32,7 @@ pub mod rpm;
 use std::fmt::Write as _;
 use std::path::{Path, PathBuf};
 
+use super::AppKind;
 use crate::config::Config;
 use crate::error::{Error, Result};
 
@@ -208,12 +209,20 @@ pub fn pacman_architecture() -> &'static str {
 
 /// The desktop entry (`<id>.desktop`).
 #[must_use]
-pub fn desktop_entry(config: &Config) -> String {
+pub fn desktop_entry(config: &Config, kind: AppKind) -> String {
     let app = &config.app;
-    let mut entry = format!(
-        "[Desktop Entry]\nType=Application\nVersion=1.5\nName={}\nExec={} %u\nIcon={}\nTerminal=false\nStartupNotify=true\nStartupWMClass={}\nCategories=Utility;\n",
-        app.display_name, app.name, app.id, app.id
-    );
+    let mut entry = match kind {
+        AppKind::Desktop => format!(
+            "[Desktop Entry]\nType=Application\nVersion=1.5\nName={}\nExec={} %u\nIcon={}\nTerminal=false\nStartupNotify=true\nStartupWMClass={}\nCategories=Utility;\n",
+            app.display_name, app.name, app.id, app.id
+        ),
+        // A terminal application opens in the desktop's terminal: it has no
+        // window of its own to announce or to match.
+        AppKind::Terminal => format!(
+            "[Desktop Entry]\nType=Application\nVersion=1.5\nName={}\nExec={} %u\nIcon={}\nTerminal=true\nCategories=Utility;ConsoleOnly;\n",
+            app.display_name, app.name, app.id
+        ),
+    };
     if let Some(description) = &app.description {
         let _ = writeln!(entry, "Comment={description}");
     }
@@ -238,11 +247,23 @@ fn xml_escape(text: &str) -> String {
 /// own timestamp, so the file stays reproducible) — because GNOME Software
 /// and Discover leave out a component that fails validation.
 #[must_use]
-pub fn metainfo(config: &Config) -> String {
+pub fn metainfo(config: &Config, kind: AppKind) -> String {
     let app = &config.app;
     let summary = app.description.as_deref().unwrap_or(&app.display_name);
+    // A terminal application is a console application to AppStream, found
+    // by the command it provides.
+    let (component, provides) = match kind {
+        AppKind::Desktop => ("desktop-application", String::new()),
+        AppKind::Terminal => (
+            "console-application",
+            format!(
+                "  <provides>\n    <binary>{}</binary>\n  </provides>\n",
+                xml_escape(&app.name)
+            ),
+        ),
+    };
     format!(
-        "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<component type=\"desktop-application\">\n  <id>{id}</id>\n  <name>{name}</name>\n  <summary>{summary}</summary>\n  <description>\n    <p>{summary}</p>\n  </description>\n  <metadata_license>CC0-1.0</metadata_license>\n  <launchable type=\"desktop-id\">{id}.desktop</launchable>\n  <releases>\n    <release version=\"{version}\" date=\"{date}\"/>\n  </releases>\n</component>\n",
+        "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<component type=\"{component}\">\n  <id>{id}</id>\n  <name>{name}</name>\n  <summary>{summary}</summary>\n  <description>\n    <p>{summary}</p>\n  </description>\n  <metadata_license>CC0-1.0</metadata_license>\n  <launchable type=\"desktop-id\">{id}.desktop</launchable>\n{provides}  <releases>\n    <release version=\"{version}\" date=\"{date}\"/>\n  </releases>\n</component>\n",
         id = xml_escape(&app.id),
         name = xml_escape(&app.display_name),
         summary = xml_escape(summary),
@@ -277,11 +298,12 @@ fn package_name(name: &str) -> String {
 
 /// The `control` file.
 #[must_use]
-pub fn control(config: &Config, installed_kib: u64) -> String {
+pub fn control(config: &Config, installed_kib: u64, kind: AppKind) -> String {
     let app = &config.app;
     let summary = app.description.as_deref().unwrap_or(&app.display_name);
+    let depends = kind.deb_depends();
     format!(
-        "Package: {}\nVersion: {}\nArchitecture: {}\nMaintainer: {}\nInstalled-Size: {installed_kib}\nDepends: libgtk-4-1 (>= 4.14), libsoup-3.0-0, libc6\nSection: misc\nPriority: optional\nDescription: {summary}\n",
+        "Package: {}\nVersion: {}\nArchitecture: {}\nMaintainer: {}\nInstalled-Size: {installed_kib}\nDepends: {depends}\nSection: misc\nPriority: optional\nDescription: {summary}\n",
         package_name(&app.name),
         app.version,
         debian_architecture(),
@@ -293,6 +315,7 @@ pub fn control(config: &Config, installed_kib: u64) -> String {
 /// `.deb`, nothing in a tarball), with the icon if it has one.
 fn installed_files(
     config: &Config,
+    kind: AppKind,
     executable: &[u8],
     icon: Option<&[u8]>,
     prefix: &str,
@@ -306,12 +329,12 @@ fn installed_files(
         },
         File {
             path: format!("{prefix}share/applications/{}.desktop", app.id),
-            data: desktop_entry(config).into_bytes(),
+            data: desktop_entry(config, kind).into_bytes(),
             executable: false,
         },
         File {
             path: format!("{prefix}share/metainfo/{}.metainfo.xml", app.id),
-            data: metainfo(config).into_bytes(),
+            data: metainfo(config, kind).into_bytes(),
             executable: false,
         },
     ];
@@ -357,14 +380,15 @@ pub fn build_deb(
     executable: &Path,
     icon: Option<&Path>,
     config: &Config,
+    kind: AppKind,
 ) -> Result<PathBuf> {
     let binary = read(executable, "the built executable")?;
     let icon = icon.map(|icon| read(icon, "the icon")).transpose()?;
-    let data = installed_files(config, &binary, icon.as_deref(), "./usr/");
+    let data = installed_files(config, kind, &binary, icon.as_deref(), "./usr/");
     let installed: u64 = data.iter().map(|file| file.data.len() as u64).sum::<u64>().div_ceil(1024);
     let control_files = [File {
         path: "./control".to_owned(),
-        data: control(config, installed).into_bytes(),
+        data: control(config, installed, kind).into_bytes(),
         executable: false,
     }];
     let path = output.join(format!(
@@ -377,12 +401,6 @@ pub fn build_deb(
     Ok(path)
 }
 
-/// What the RPM and pacman packages need from the host: the libraries the
-/// `.deb` names, in those distributions' package names.
-const RPM_REQUIRES: &[(&str, Option<&str>)] = &[("gtk4", Some("4.14")), ("libsoup3", None)];
-const PACMAN_DEPENDS: &[(&str, Option<&str>)] =
-    &[("gtk4", Some("4.14")), ("libsoup3", None), ("glibc", None)];
-
 /// Builds the `.rpm` and returns its path.
 ///
 /// # Errors
@@ -393,10 +411,11 @@ pub fn build_rpm(
     executable: &Path,
     icon: Option<&Path>,
     config: &Config,
+    kind: AppKind,
 ) -> Result<PathBuf> {
     let binary = read(executable, "the built executable")?;
     let icon = icon.map(|icon| read(icon, "the icon")).transpose()?;
-    let files = installed_files(config, &binary, icon.as_deref(), "usr/");
+    let files = installed_files(config, kind, &binary, icon.as_deref(), "usr/");
     let name = package_name(&config.app.name);
     let package = rpm::rpm(
         &rpm::Metadata {
@@ -406,7 +425,7 @@ pub fn build_rpm(
             summary: config.app.description.as_deref().unwrap_or(&config.app.display_name),
             packager: config.app.publisher.as_deref().unwrap_or("unknown"),
             arch: rpm_architecture(),
-            requires: RPM_REQUIRES,
+            requires: kind.rpm_requires(),
         },
         &files,
         timestamp(),
@@ -426,10 +445,11 @@ pub fn build_pacman(
     executable: &Path,
     icon: Option<&Path>,
     config: &Config,
+    kind: AppKind,
 ) -> Result<PathBuf> {
     let binary = read(executable, "the built executable")?;
     let icon = icon.map(|icon| read(icon, "the icon")).transpose()?;
-    let files = installed_files(config, &binary, icon.as_deref(), "usr/");
+    let files = installed_files(config, kind, &binary, icon.as_deref(), "usr/");
     let name = package_name(&config.app.name);
     let package = pacman::package(
         &pacman::Metadata {
@@ -439,7 +459,7 @@ pub fn build_pacman(
             description: config.app.description.as_deref().unwrap_or(&config.app.display_name),
             packager: config.app.publisher.as_deref().unwrap_or("Unknown Packager"),
             arch: pacman_architecture(),
-            depends: PACMAN_DEPENDS,
+            depends: kind.pacman_depends(),
         },
         &files,
         timestamp(),
@@ -460,11 +480,12 @@ pub fn build_tar(
     executable: &Path,
     icon: Option<&Path>,
     config: &Config,
+    kind: AppKind,
 ) -> Result<PathBuf> {
     let binary = read(executable, "the built executable")?;
     let icon = icon.map(|icon| read(icon, "the icon")).transpose()?;
     let root = format!("{}-{}/", config.app.name, config.app.version);
-    let files = installed_files(config, &binary, icon.as_deref(), &root);
+    let files = installed_files(config, kind, &binary, icon.as_deref(), &root);
     let path = output.join(format!(
         "{}-{}-linux-{}.tar",
         config.app.name,
@@ -487,6 +508,7 @@ pub fn build_appimage(
     executable: &Path,
     icon: Option<&Path>,
     config: &Config,
+    kind: AppKind,
 ) -> Result<PathBuf> {
     let tool = which("appimagetool").ok_or_else(|| Error::ToolMissing {
         tool: "appimagetool",
@@ -499,11 +521,11 @@ pub fn build_appimage(
     let icon = icon.map(|icon| read(icon, "the icon")).transpose()?;
     let appdir = output.join(format!("{}.AppDir", config.app.name));
     let _ = std::fs::remove_dir_all(&appdir);
-    let mut files = installed_files(config, &binary, icon.as_deref(), "usr/");
+    let mut files = installed_files(config, kind, &binary, icon.as_deref(), "usr/");
     // The AppDir's root holds the desktop entry, the icon, and `AppRun`.
     files.push(File {
         path: format!("{}.desktop", config.app.id),
-        data: desktop_entry(config).into_bytes(),
+        data: desktop_entry(config, kind).into_bytes(),
         executable: false,
     });
     if let Some(icon) = &icon {
@@ -583,8 +605,22 @@ mod tests {
     }
 
     #[test]
+    fn a_terminal_application_opens_in_a_terminal_and_needs_only_the_c_library() {
+        let entry = desktop_entry(&config(), AppKind::Terminal);
+        assert!(entry.contains("Terminal=true\n") && entry.contains("ConsoleOnly;"), "{entry}");
+        assert!(!entry.contains("StartupWMClass"), "it has no window to match");
+        let info = metainfo(&config(), AppKind::Terminal);
+        assert!(info.contains("<component type=\"console-application\">"));
+        assert!(info.contains("<binary>notes</binary>"), "{info}");
+        let control = control(&config(), 12, AppKind::Terminal);
+        assert!(control.contains("Depends: libc6\n") && !control.contains("gtk"), "{control}");
+        assert_eq!(AppKind::Terminal.rpm_requires(), &[("glibc", None)]);
+        assert!(!AppKind::Terminal.pacman_depends().iter().any(|(name, _)| name.contains("gtk")));
+    }
+
+    #[test]
     fn the_desktop_entry_hands_urls_to_the_application_and_names_its_windows() {
-        let entry = desktop_entry(&config());
+        let entry = desktop_entry(&config(), AppKind::Desktop);
         assert!(entry.starts_with("[Desktop Entry]\n"));
         for line in [
             "Exec=notes %u",
@@ -594,7 +630,7 @@ mod tests {
         ] {
             assert!(entry.lines().any(|candidate| candidate == line), "{line} in\n{entry}");
         }
-        let info = metainfo(&config());
+        let info = metainfo(&config(), AppKind::Desktop);
         assert!(info.contains("<summary>Take notes &amp; keep them</summary>"));
         assert!(info.contains("<description>\n    <p>Take notes &amp; keep them</p>"));
         assert!(info.contains(&format!("date=\"{}\"", iso_date(timestamp()))), "{info}");
@@ -618,7 +654,7 @@ mod tests {
         };
         let (directory, _) = scratch("desktop");
         let path = directory.join("com.example.Notes.desktop");
-        std::fs::write(&path, desktop_entry(&config())).expect("written");
+        std::fs::write(&path, desktop_entry(&config(), AppKind::Desktop)).expect("written");
         let output = std::process::Command::new(tool).arg(&path).output().expect("runs");
         assert!(output.status.success(), "{}", String::from_utf8_lossy(&output.stdout));
         let _ = std::fs::remove_dir_all(&directory);
@@ -634,7 +670,7 @@ mod tests {
         };
         let (directory, _) = scratch("metainfo");
         let path = directory.join("com.example.Notes.metainfo.xml");
-        std::fs::write(&path, metainfo(&config())).expect("written");
+        std::fs::write(&path, metainfo(&config(), AppKind::Desktop)).expect("written");
         let output = std::process::Command::new(tool)
             .args(["validate", "--no-net"])
             .arg(&path)
@@ -692,7 +728,7 @@ mod tests {
         let order = ["debian-binary", "control.tar", "data.tar"]
             .map(|member| text.find(member).expect(member));
         assert!(order[0] < order[1] && order[1] < order[2], "dpkg reads the members in this order");
-        assert!(control(&config(), 12).contains("Package: notes\nVersion: "));
+        assert!(control(&config(), 12, AppKind::Desktop).contains("Package: notes\nVersion: "));
     }
 
     #[test]
@@ -757,7 +793,8 @@ mod tests {
             return;
         };
         let (directory, executable) = scratch("deb");
-        let path = build_deb(&directory, &executable, None, &config()).expect("built");
+        let path =
+            build_deb(&directory, &executable, None, &config(), AppKind::Desktop).expect("built");
         let run = |flag: &str| {
             let output =
                 std::process::Command::new(&tool).arg(flag).arg(&path).output().expect("runs");
@@ -773,10 +810,12 @@ mod tests {
     fn the_rpm_and_pacman_packages_are_named_as_their_distributions_name_them() {
         let (directory, executable) = scratch("native");
         let config = config();
-        let rpm = build_rpm(&directory, &executable, None, &config).expect("built");
+        let rpm =
+            build_rpm(&directory, &executable, None, &config, AppKind::Desktop).expect("built");
         let expected = format!("notes-{}-1.{}.rpm", config.app.version, rpm_architecture());
         assert_eq!(rpm.file_name().and_then(|name| name.to_str()), Some(expected.as_str()));
-        let pacman = build_pacman(&directory, &executable, None, &config).expect("built");
+        let pacman =
+            build_pacman(&directory, &executable, None, &config, AppKind::Desktop).expect("built");
         let expected = format!("notes-{}-1-{}.pkg.tar", config.app.version, pacman_architecture());
         assert_eq!(pacman.file_name().and_then(|name| name.to_str()), Some(expected.as_str()));
         let _ = std::fs::remove_dir_all(&directory);
