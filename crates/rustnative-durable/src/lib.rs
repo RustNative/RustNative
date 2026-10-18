@@ -19,6 +19,8 @@
 //! Everything but the actor contract and its edge adapter needs the
 //! `local` feature (the default): SQLite, and a multi-threaded runtime.
 
+#![deny(missing_docs)]
+
 pub mod actor;
 pub mod edge;
 #[cfg(feature = "local")]

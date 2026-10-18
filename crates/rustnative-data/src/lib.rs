@@ -23,6 +23,8 @@
 //! [`rustnative_core::scheduler`]), because every component can use them.
 //! The guide is `docs/data.md`.
 
+#![deny(missing_docs)]
+
 pub mod batch;
 pub mod document;
 pub mod forms;

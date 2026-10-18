@@ -124,7 +124,9 @@ process. A member whose heartbeats stop is dropped after the timeout.
   - `Broker` holds these semantics.
   - `LocalBus` is an in-process client.
   - `mqtt` carries the same broker over MQTT 3.1.1: a packet codec, a TCP
-    broker, and a client with acknowledgement and redelivery.
+    broker, and a client with acknowledgement and redelivery. The broker
+    holds each client to `mqtt::MqttLimits`: a largest packet (refused before
+    its body is allocated), a connection cap, and a deadline for CONNECT.
 - **Data models.** `DeviceModel` maps typed state to a standard data
   model's resource paths (LwM2M/IPSO `object/instance/resource`).
 - **Commissioning.** Joining a network and provisioning credentials are

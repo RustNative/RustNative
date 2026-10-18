@@ -15,6 +15,8 @@
 //!
 //! The guide is `docs/components.md`; the tokens are `docs/tokens.md`.
 
+#![deny(missing_docs)]
+
 pub mod behaviour;
 pub mod chart;
 pub mod idioms;

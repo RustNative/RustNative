@@ -21,6 +21,8 @@
 //! starts off, remembers the person's choice, and an OTLP exporter sends
 //! nothing without it (`docs/telemetry-policy.md`).
 
+#![deny(missing_docs)]
+
 pub mod conventions;
 pub mod export;
 pub mod memory;
