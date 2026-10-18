@@ -97,7 +97,7 @@ commit messages, waivers, and `#[allow]` reasons, for example
 `reason = "MEM-3: …"`. An ID is never reused. A retired standard keeps its
 number and is marked *retired*.
 
-Findings are cited by their register number, such as `F-10`. The register
+Findings are cited by their register number, such as `F-21`. The register
 in section 37 records each open defect the scan found, where it is, and
 whether it was reproduced by running it. A standard that a finding breaks cites the
 finding, so a contributor can see the rule's cost in this codebase.
@@ -2410,9 +2410,10 @@ protected.** Revisions are immutable, traffic moves by percentage, rollback
 is one command, and health and readiness are real. The control surface
 that moves traffic is authenticated (NET-1), and previewing an unpromoted
 revision (`x-revision`) is restricted to authorized callers.
-- *Enforcement:* E3, `rustnative-server/tests/deploy.rs` **[Partial]**: the
-  mechanics are tested and the control surface is authenticated (NET-1),
-  but any client can preview a revision with `x-revision` (F-10).
+- *Enforcement:* E3, `rustnative-server/tests/deploy.rs` **[Enforced]**: the
+  mechanics are tested, the control surface is authenticated (NET-1), and
+  a preview needs the run's preview token (`x-preview-token`), which a
+  splitter without one never accepts.
 
 **RLS-6 — Published crates are complete.** Each published crate has its
 `description`, `license`, `repository`, `readme`, `keywords`, and
@@ -2698,7 +2699,6 @@ A fixed finding leaves the register and its ID is not reused;
 | ID | Severity | Where | Defect | Evidence | Breaks |
 |---|---|---|---|---|---|
 | F-06 | Medium | `rustnative-server/src/security.rs` `RateLimiter` | IPv6 keyed per address; a full table clears every bucket | Read | NET-6 |
-| F-10 | Medium | `rustnative-server/src/deploy.rs` `TrafficSplitter::forward` | Any client previews any revision with `x-revision` | Read | RLS-5 |
 | F-15 | Medium | `rustnative-server/src/auth/oauth.rs` | `id_token` returned unverified, no nonce | Read | SEC-16 |
 | F-16 | Low | `crates/rustnative/templates/kits/auth.rs`, `examples/web-notes`, `examples/server-demo` | Sign-in without `session.renew()`, which the docs require | Read | API-10, SEC-15 |
 | F-17 | Medium | `rustnative-android/src/update.rs` `from_play`, `RnServices.installer` | Play-install check fails open | Read | REL-9, RLS-4, LEG-4 |

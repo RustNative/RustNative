@@ -116,10 +116,11 @@ fn io(what: String) -> impl FnOnce(std::io::Error) -> Error {
     move |cause| Error::Io { what, cause }
 }
 
-/// Where the control API's token for `port` is kept: a directory only this
-/// user can read (`$XDG_RUNTIME_DIR/rustnative`, else
-/// `~/.rustnative/run`).
-fn token_path(port: u16) -> Result<PathBuf> {
+/// Where the deployment controlled on `port` keeps its token of `kind`
+/// (`deploy-<port>.token` for the control API, `deploy-<port>-preview.token`
+/// for previews): a directory only this user can read
+/// (`$XDG_RUNTIME_DIR/rustnative`, else `~/.rustnative/run`).
+fn token_path(port: u16, kind: TokenKind) -> Result<PathBuf> {
     let folder = std::env::var_os("XDG_RUNTIME_DIR")
         .filter(|dir| !dir.is_empty())
         .map(|dir| PathBuf::from(dir).join("rustnative"))
@@ -129,13 +130,25 @@ fn token_path(port: u16) -> Result<PathBuf> {
                 .map(|home| PathBuf::from(home).join(".rustnative").join("run"))
         })
         .ok_or_else(|| usage("no per-user directory (set HOME) to keep the control token in"))?;
-    Ok(folder.join(format!("deploy-{port}.token")))
+    Ok(folder.join(match kind {
+        TokenKind::Control => format!("deploy-{port}.token"),
+        TokenKind::Preview => format!("deploy-{port}-preview.token"),
+    }))
 }
 
-/// Makes a fresh token for this run of the control API on `port` and
-/// writes it where only this user can read it.
-fn issue_token(port: u16) -> Result<(String, PathBuf)> {
-    let path = token_path(port)?;
+/// The two tokens a local deployment issues.
+#[derive(Clone, Copy)]
+enum TokenKind {
+    /// Drives the control API: moves all traffic.
+    Control,
+    /// Previews an unpromoted revision through the public proxy.
+    Preview,
+}
+
+/// Makes a fresh token of `kind` for this run of the deployment controlled
+/// on `port` and writes it where only this user can read it.
+fn issue_token(port: u16, kind: TokenKind) -> Result<(String, PathBuf)> {
+    let path = token_path(port, kind)?;
     let folder = path.parent().unwrap_or(Path::new("."));
     std::fs::create_dir_all(folder).map_err(io(format!("create {}", folder.display())))?;
     let token = rustnative_server::random_token(32);
@@ -161,7 +174,7 @@ fn issue_token(port: u16) -> Result<(String, PathBuf)> {
 /// A plain HTTP/1.1 request to the loopback control API, with this run's
 /// token.
 fn control(port: u16, method: &str, path: &str, body: &str) -> Result<String> {
-    let file = token_path(port)?;
+    let file = token_path(port, TokenKind::Control)?;
     let token = std::fs::read_to_string(&file).map_err(io(format!(
         "read the control token in {} (is `rustnative deploy local start` running?)",
         file.display()
@@ -278,19 +291,25 @@ pub fn run(here: &Path, command: DeployCommand) -> Result<()> {
                 let runtime =
                     tokio::runtime::Runtime::new().map_err(io("start the runtime".into()))?;
                 runtime.block_on(async {
+                    let (preview, preview_file) = issue_token(control_port, TokenKind::Preview)?;
                     let adapter =
-                        rustnative_server::deploy::LocalAdapter::for_target(target.into());
+                        rustnative_server::deploy::LocalAdapter::for_target(target.into())
+                            .with_preview_token(preview);
                     let proxy = tokio::net::TcpListener::bind(("0.0.0.0", port))
                         .await
                         .map_err(io(format!("listen on {port}")))?;
                     let controller = tokio::net::TcpListener::bind(("127.0.0.1", control_port))
                         .await
                         .map_err(io(format!("listen on {control_port}")))?;
-                    let (token, file) = issue_token(control_port)?;
+                    let (token, file) = issue_token(control_port, TokenKind::Control)?;
                     println!(
                         "deploy: a {} on port {port}; control on 127.0.0.1:{control_port}, its token in {}",
                         adapter.target().name(),
                         file.display()
+                    );
+                    println!(
+                        "deploy: a preview (x-revision) needs x-preview-token, its value in {}",
+                        preview_file.display()
                     );
                     tokio::spawn(adapter.splitter().serve(proxy));
                     adapter

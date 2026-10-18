@@ -37,10 +37,12 @@ fn client(n: u8) -> SocketAddr {
     SocketAddr::from(([10, 0, 0, n], 5000))
 }
 
+const PREVIEW_TOKEN: &str = "this-run-s-preview-token";
+
 async fn served_by(adapter: &LocalAdapter, from: SocketAddr, preview: Option<&str>) -> String {
     let mut request = Request::builder().uri("/");
     if let Some(name) = preview {
-        request = request.header("x-revision", name);
+        request = request.header("x-revision", name).header("x-preview-token", PREVIEW_TOKEN);
     }
     let response = adapter.splitter().forward(request.body(Bytes::new()).unwrap(), from).await;
     assert!(response.status().is_success(), "{:?}", response.status());
@@ -51,7 +53,7 @@ async fn served_by(adapter: &LocalAdapter, from: SocketAddr, preview: Option<&st
 
 #[tokio::test]
 async fn revisions_are_previewed_promoted_by_percentage_and_rolled_back() {
-    let adapter = LocalAdapter::default();
+    let adapter = LocalAdapter::default().with_preview_token(PREVIEW_TOKEN);
     adapter.deploy(revision("r1").await).await.unwrap();
     adapter.deploy(revision("r2").await).await.unwrap();
     assert!(adapter.deploy(revision("r1").await).await.is_err(), "revisions are immutable");
@@ -83,6 +85,53 @@ async fn revisions_are_previewed_promoted_by_percentage_and_rolled_back() {
         assert_eq!(served_by(&adapter, client(n), None).await, "r1", "rolled back");
     }
     assert_eq!(adapter.status().weights.get("r1"), Some(&100));
+}
+
+/// Any client of the public proxy could otherwise reach a revision nobody
+/// promoted: an unreviewed build, or one kept for a rollback.
+#[tokio::test]
+async fn a_preview_needs_the_preview_token_and_the_revision_never_sees_it() {
+    let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let address = listener.local_addr().unwrap();
+    let echo =
+        ServerApp::new().security(Security { rate_limit: None, ..Security::default() }).route(
+            "/",
+            get(|headers: http::HeaderMap| async move {
+                let seen = ["x-revision", "x-preview-token"]
+                    .into_iter()
+                    .filter(|name| headers.contains_key(*name))
+                    .collect::<Vec<_>>()
+                    .join(",");
+                format!("r2 saw [{seen}]")
+            })
+            .public(),
+        );
+    tokio::spawn(echo.into_service().serve(listener, std::future::pending()));
+    let preview = |adapter: LocalAdapter, token: Option<&'static str>| async move {
+        let mut request = Request::builder().uri("/").header("x-revision", "r2");
+        if let Some(token) = token {
+            request = request.header("x-preview-token", token);
+        }
+        adapter.splitter().forward(request.body(Bytes::new()).unwrap(), client(1)).await
+    };
+
+    let open = LocalAdapter::default();
+    open.deploy(revision("r1").await).await.unwrap();
+    open.deploy(Revision { name: "r2".into(), address }).await.unwrap();
+    let refused = preview(open.clone(), Some(PREVIEW_TOKEN)).await;
+    assert_eq!(refused.status(), http::StatusCode::FORBIDDEN, "no token, no previews");
+    assert_eq!(served_by(&open, client(1), None).await, "r1", "ordinary traffic still flows");
+
+    let guarded = LocalAdapter::default().with_preview_token(PREVIEW_TOKEN);
+    guarded.deploy(revision("r1").await).await.unwrap();
+    guarded.deploy(Revision { name: "r2".into(), address }).await.unwrap();
+    for token in [None, Some(""), Some("this-run-s-preview-tokeX")] {
+        let refused = preview(guarded.clone(), token).await;
+        assert_eq!(refused.status(), http::StatusCode::FORBIDDEN, "{token:?}");
+    }
+    let admitted = preview(guarded, Some(PREVIEW_TOKEN)).await;
+    assert!(admitted.status().is_success(), "{:?}", admitted.status());
+    assert_eq!(admitted.body().as_ref(), b"r2 saw []");
 }
 
 const CONTROL_PORT: u16 = 8081;

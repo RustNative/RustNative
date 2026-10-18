@@ -170,8 +170,11 @@ fn the_local_control_api_answers_only_this_user_s_cli() {
     #[cfg(unix)]
     {
         use std::os::unix::fs::PermissionsExt;
-        let mode = std::fs::metadata(&token_file).unwrap().permissions().mode();
-        assert_eq!(mode & 0o777, 0o600, "only this user reads the token");
+        let preview = runtime.join("rustnative").join(format!("deploy-{control}-preview.token"));
+        for file in [&token_file, &preview] {
+            let mode = std::fs::metadata(file).unwrap().permissions().mode();
+            assert_eq!(mode & 0o777, 0o600, "only this user reads {}", file.display());
+        }
     }
     let cli = |arguments: &[&str]| {
         Command::new(env!("CARGO_BIN_EXE_rustnative"))

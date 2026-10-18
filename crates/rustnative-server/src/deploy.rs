@@ -6,7 +6,8 @@
 //! its own address. The [`TrafficSplitter`] is a small reverse proxy in
 //! front of the revisions: it sends each client to a revision by weight
 //! (the same client to the same revision, by a hash of its address), lets
-//! a named revision be previewed with `x-revision`, and moves traffic —
+//! a named revision be previewed with `x-revision` by whoever holds the
+//! deployment's preview token, and moves traffic —
 //! promote, roll back — without restarting anything. [`LocalAdapter`]
 //! drives it for a [`Target`] — a long-lived server, a static host, a
 //! function runtime, or an edge host (Web milestone K), each revision being
@@ -153,15 +154,25 @@ pub trait DeploymentAdapter: Send + Sync {
 /// same resource limits as an application's own: the body limit, the
 /// connection ceiling, and the header and body timeouts of a
 /// [`crate::Security`] ([`Self::with_limits`]; the defaults otherwise).
+///
+/// A preview (`x-revision: <name>`) reaches a revision that takes no
+/// traffic yet, so it is refused unless the request also presents the
+/// preview token ([`Self::with_preview_token`]) as `x-preview-token`. A
+/// splitter without one serves no previews.
 #[derive(Clone)]
 pub struct TrafficSplitter {
     status: Arc<Mutex<DeploymentStatus>>,
     limits: Arc<crate::Security>,
+    preview_token: Option<Arc<str>>,
 }
 
 impl Default for TrafficSplitter {
     fn default() -> Self {
-        Self { status: Arc::default(), limits: Arc::new(crate::Security::default()) }
+        Self {
+            status: Arc::default(),
+            limits: Arc::new(crate::Security::default()),
+            preview_token: None,
+        }
     }
 }
 
@@ -190,6 +201,22 @@ impl TrafficSplitter {
         self
     }
 
+    /// Serves previews to requests that present `token` as
+    /// `x-preview-token`.
+    #[must_use]
+    pub fn with_preview_token(mut self, token: impl Into<String>) -> Self {
+        self.preview_token = Some(token.into().into());
+        self
+    }
+
+    /// Whether `presented` is this splitter's preview token.
+    fn admits_preview(&self, presented: Option<&[u8]>) -> bool {
+        match (&self.preview_token, presented) {
+            (Some(token), Some(presented)) => crate::constant_time_eq(presented, token.as_bytes()),
+            _ => false,
+        }
+    }
+
     /// Where traffic goes.
     #[must_use]
     pub fn status(&self) -> DeploymentStatus {
@@ -204,7 +231,8 @@ impl TrafficSplitter {
     }
 
     /// The revision a request goes to: the previewed one if it names one
-    /// (`x-revision`), else by the client's bucket and the weights.
+    /// (`x-revision`), else by the client's bucket and the weights. It does
+    /// not check the preview token; [`Self::forward`] does.
     #[must_use]
     pub fn choose(&self, client: &str, preview: Option<&str>) -> Option<Revision> {
         let status = self.status.lock().unwrap_or_else(PoisonError::into_inner);
@@ -223,16 +251,29 @@ impl TrafficSplitter {
     }
 
     /// Forwards `request` to the chosen revision, telling it the client's
-    /// address in `x-forwarded-for` (replacing any the client sent).
+    /// address in `x-forwarded-for` (replacing any the client sent). A
+    /// request naming a revision in `x-revision` without the preview token
+    /// is `403`. Neither header reaches the revision.
     pub async fn forward(&self, mut request: http::Request<Bytes>, client: SocketAddr) -> Response {
         if let Ok(value) = http::HeaderValue::from_str(&client.ip().to_string()) {
             request.headers_mut().insert("x-forwarded-for", value);
         }
-        let preview = request
-            .headers()
-            .get("x-revision")
-            .and_then(|value| value.to_str().ok())
-            .map(str::to_owned);
+        let headers = request.headers_mut();
+        let presented = headers.remove("x-preview-token");
+        let preview = headers.remove("x-revision");
+        let preview = match preview {
+            None => None,
+            Some(_)
+                if !self.admits_preview(presented.as_ref().map(http::HeaderValue::as_bytes)) =>
+            {
+                return ServerError::new(
+                    http::StatusCode::FORBIDDEN,
+                    "Previewing a revision needs this deployment's preview token",
+                )
+                .into_response();
+            }
+            Some(name) => Some(name.to_str().unwrap_or_default().to_owned()),
+        };
         let Some(revision) = self.choose(&client.ip().to_string(), preview.as_deref()) else {
             return ServerError::new(
                 http::StatusCode::SERVICE_UNAVAILABLE,
@@ -346,6 +387,14 @@ impl LocalAdapter {
     #[must_use]
     pub fn for_target(target: Target) -> Self {
         Self { splitter: TrafficSplitter::new(), target }
+    }
+
+    /// This adapter, its splitter serving previews to requests that
+    /// present `token` ([`TrafficSplitter::with_preview_token`]).
+    #[must_use]
+    pub fn with_preview_token(mut self, token: impl Into<String>) -> Self {
+        self.splitter = self.splitter.with_preview_token(token);
+        self
     }
 
     /// Its target.

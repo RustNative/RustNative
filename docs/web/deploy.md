@@ -152,7 +152,8 @@ per-object alarm calls the same path.
 `rustnative deploy local start --target static|function|edge|server` puts
 the traffic splitter (`docs/deploy.md`) in front of revisions. Each revision
 is `serve static`, `serve lambda`, or `serve wagi` (or a server) on its own
-port. A revision is previewed by name (`x-revision`), promoted by
+port. A revision is previewed by name (`x-revision`, with the run's
+preview token in `x-preview-token`), promoted by
 percentage, and rolled back without a restart. `GET /target` on the control
 port states the target's limits
 (`tests/serverless.rs::a_function_deployment_previews_promotes_and_rolls_back`).

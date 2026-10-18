@@ -572,6 +572,7 @@ fn a_function_deployment_previews_promotes_and_rolls_back() {
     wait_for(proxy);
     wait_for(control);
     let token_file = runtime.join("rustnative").join(format!("deploy-{control}.token"));
+    let preview_file = runtime.join("rustnative").join(format!("deploy-{control}-preview.token"));
     let started = Instant::now();
     while !token_file.is_file() {
         assert!(started.elapsed() < Duration::from_secs(60), "no control token");
@@ -590,9 +591,11 @@ fn a_function_deployment_previews_promotes_and_rolls_back() {
     };
     deploy(&["add", "r1", &format!("127.0.0.1:{first}")]);
     deploy(&["add", "r2", &format!("127.0.0.1:{second}")]);
+    let preview_token = std::fs::read_to_string(&preview_file).unwrap();
     let served_by = |preview: Option<&str>| {
-        let headers: Vec<(&str, &str)> =
-            preview.map(|name| vec![("x-revision", name)]).unwrap_or_default();
+        let headers: Vec<(&str, &str)> = preview
+            .map(|name| vec![("x-revision", name), ("x-preview-token", preview_token.as_str())])
+            .unwrap_or_default();
         let reply = send(proxy, "GET", "/", &headers, "");
         assert_eq!(reply.status, 200, "{}", reply.body);
         assert!(reply.body.contains("Sign in"), "{}", reply.body);
@@ -606,6 +609,7 @@ fn a_function_deployment_previews_promotes_and_rolls_back() {
     assert_eq!(send(control, "GET", "/target", &[("host", &host)], "").status, 401);
     assert_eq!(served_by(None), "r1", "the first revision takes the traffic");
     assert_eq!(served_by(Some("r2")), "r2", "a preview, by name");
+    assert_eq!(send(proxy, "GET", "/", &[("x-revision", "r2")], "").status, 403);
     deploy(&["promote", "r2", "--percent", "100"]);
     assert_eq!(served_by(None), "r2");
     deploy(&["rollback"]);

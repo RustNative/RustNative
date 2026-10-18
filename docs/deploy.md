@@ -28,7 +28,7 @@ already guarantees.
 ```sh
 rustnative deploy local start --port 8080 --control 8081   # the proxy
 rustnative deploy local add r1 127.0.0.1:9001              # revision r1 takes all traffic
-rustnative deploy local add r2 127.0.0.1:9002              # r2: a preview (header x-revision: r2)
+rustnative deploy local add r2 127.0.0.1:9002              # r2: a preview (x-revision: r2, with the preview token)
 rustnative deploy local promote r2 --percent 10            # 10% of clients
 rustnative deploy local promote r2 --percent 100
 rustnative deploy local rollback                           # back to r1
@@ -39,6 +39,14 @@ rustnative deploy local status
   `rustnative-server`. It sends each client to a revision by a stable hash
   of the client's address, so a client stays on its revision. It marks
   each response with `x-served-by`.
+- **Previews.** A request with `x-revision: <name>` reaches that revision
+  before it takes any traffic, but only with the run's preview token in
+  `x-preview-token`; without it the proxy answers `403`. `start` writes the
+  token to `deploy-<control port>-preview.token`, next to the control token
+  and as private. The preview token reaches revisions, not the control API,
+  so it can be shared with testers. The proxy removes both headers before
+  forwarding. In code, `TrafficSplitter::with_preview_token` turns previews
+  on, and a splitter without a token serves none.
 - **Moving traffic.** Promotions and rollbacks move traffic without
   restarting anything.
 - **Revisions are immutable.** A name used once cannot be deployed again.
