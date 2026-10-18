@@ -136,7 +136,9 @@ async fn unknown_paths_and_methods_are_refused() {
 async fn unsafe_requests_need_the_forgery_token() {
     let service = app(&counter());
     let body = r#"{"title":"hi"}"#;
-    let response = send(&service, request("POST", "/notes").body(Bytes::from(body)).unwrap()).await;
+    let json =
+        |method: &str, uri: &str| request(method, uri).header("content-type", "application/json");
+    let response = send(&service, json("POST", "/notes").body(Bytes::from(body)).unwrap()).await;
     assert_eq!(response.status(), StatusCode::FORBIDDEN, "no token, no write");
 
     // A page hands out the token and its cookie.
@@ -146,7 +148,7 @@ async fn unsafe_requests_need_the_forgery_token() {
     assert!(cookie.starts_with(&format!("__Host-csrf={token}")), "{cookie}");
     assert!(cookie.contains("Secure") && cookie.contains("SameSite=Strict"));
 
-    let with_header = request("POST", "/notes")
+    let with_header = json("POST", "/notes")
         .header("cookie", format!("__Host-csrf={token}"))
         .header("x-csrf-token", &token)
         .body(Bytes::from(body))
@@ -161,20 +163,27 @@ async fn unsafe_requests_need_the_forgery_token() {
     let response = send(&service, with_field).await;
     assert_eq!(text(&response), "<p>&lt;b&gt;hi&lt;/b&gt;</p>", "output is escaped");
 
-    let wrong = request("POST", "/notes")
+    let wrong = json("POST", "/notes")
         .header("cookie", format!("__Host-csrf={token}"))
         .header("x-csrf-token", "forged")
         .body(Bytes::from(body))
         .unwrap();
     assert_eq!(send(&service, wrong).await.status(), StatusCode::FORBIDDEN);
 
-    let bearer = request("POST", "/notes")
+    let bearer = json("POST", "/notes")
         .header("authorization", "Bearer abc")
         .body(Bytes::from(body))
         .unwrap();
     assert_eq!(send(&service, bearer).await.status(), StatusCode::CREATED, "no ambient credential");
-    let hook = request("POST", "/hook").body(Bytes::from(body)).unwrap();
+    let hook = json("POST", "/hook").body(Bytes::from(body)).unwrap();
     assert_eq!(send(&service, hook).await.status(), StatusCode::CREATED, "declared exempt");
+    // A page on another origin can post `text/plain` with no preflight; an
+    // exempt JSON route still refuses it.
+    let simple = request("POST", "/hook")
+        .header("content-type", "text/plain;charset=UTF-8")
+        .body(Bytes::from(body))
+        .unwrap();
+    assert_eq!(send(&service, simple).await.status(), StatusCode::UNSUPPORTED_MEDIA_TYPE);
 }
 
 #[tokio::test]

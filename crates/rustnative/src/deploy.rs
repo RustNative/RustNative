@@ -116,13 +116,62 @@ fn io(what: String) -> impl FnOnce(std::io::Error) -> Error {
     move |cause| Error::Io { what, cause }
 }
 
-/// A plain HTTP/1.1 request to the loopback control API.
+/// Where the control API's token for `port` is kept: a directory only this
+/// user can read (`$XDG_RUNTIME_DIR/rustnative`, else
+/// `~/.rustnative/run`).
+fn token_path(port: u16) -> Result<PathBuf> {
+    let folder = std::env::var_os("XDG_RUNTIME_DIR")
+        .filter(|dir| !dir.is_empty())
+        .map(|dir| PathBuf::from(dir).join("rustnative"))
+        .or_else(|| {
+            std::env::var_os("HOME")
+                .or_else(|| std::env::var_os("USERPROFILE"))
+                .map(|home| PathBuf::from(home).join(".rustnative").join("run"))
+        })
+        .ok_or_else(|| usage("no per-user directory (set HOME) to keep the control token in"))?;
+    Ok(folder.join(format!("deploy-{port}.token")))
+}
+
+/// Makes a fresh token for this run of the control API on `port` and
+/// writes it where only this user can read it.
+fn issue_token(port: u16) -> Result<(String, PathBuf)> {
+    let path = token_path(port)?;
+    let folder = path.parent().unwrap_or(Path::new("."));
+    std::fs::create_dir_all(folder).map_err(io(format!("create {}", folder.display())))?;
+    let token = rustnative_server::random_token(32);
+    // A new file, created private (never an old one whose mode someone else
+    // set), then renamed into place so a client never reads half of it.
+    let fresh = path.with_extension("token.new");
+    let _ = std::fs::remove_file(&fresh);
+    let mut options = std::fs::OpenOptions::new();
+    options.write(true).create_new(true);
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::{OpenOptionsExt, PermissionsExt};
+        std::fs::set_permissions(folder, std::fs::Permissions::from_mode(0o700))
+            .map_err(io(format!("restrict {}", folder.display())))?;
+        options.mode(0o600);
+    }
+    let mut file = options.open(&fresh).map_err(io(format!("create {}", fresh.display())))?;
+    file.write_all(token.as_bytes()).map_err(io(format!("write {}", fresh.display())))?;
+    std::fs::rename(&fresh, &path).map_err(io(format!("write {}", path.display())))?;
+    Ok((token, path))
+}
+
+/// A plain HTTP/1.1 request to the loopback control API, with this run's
+/// token.
 fn control(port: u16, method: &str, path: &str, body: &str) -> Result<String> {
+    let file = token_path(port)?;
+    let token = std::fs::read_to_string(&file).map_err(io(format!(
+        "read the control token in {} (is `rustnative deploy local start` running?)",
+        file.display()
+    )))?;
     let mut stream = TcpStream::connect(("127.0.0.1", port))
         .map_err(io(format!("reach the deployment on port {port}")))?;
     write!(
         stream,
-        "{method} {path} HTTP/1.1\r\nHost: 127.0.0.1\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{body}",
+        "{method} {path} HTTP/1.1\r\nHost: 127.0.0.1:{port}\r\nAuthorization: Bearer {}\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{body}",
+        token.trim(),
         body.len()
     )
     .map_err(io("send to the deployment".into()))?;
@@ -237,13 +286,15 @@ pub fn run(here: &Path, command: DeployCommand) -> Result<()> {
                     let controller = tokio::net::TcpListener::bind(("127.0.0.1", control_port))
                         .await
                         .map_err(io(format!("listen on {control_port}")))?;
+                    let (token, file) = issue_token(control_port)?;
                     println!(
-                        "deploy: a {} on port {port}; control on 127.0.0.1:{control_port}",
-                        adapter.target().name()
+                        "deploy: a {} on port {port}; control on 127.0.0.1:{control_port}, its token in {}",
+                        adapter.target().name(),
+                        file.display()
                     );
                     tokio::spawn(adapter.splitter().serve(proxy));
                     adapter
-                        .control()
+                        .control(control_port, token)
                         .into_service()
                         .serve(controller, std::future::pending())
                         .await

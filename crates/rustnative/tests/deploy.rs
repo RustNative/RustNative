@@ -8,7 +8,10 @@
     reason = "helper functions in an integration test are test code too: a failed expectation is the test failing"
 )]
 
-use std::process::{Command, Output};
+use std::io::{Read, Write};
+use std::net::{TcpListener, TcpStream};
+use std::process::{Child, Command, Output, Stdio};
+use std::time::{Duration, Instant};
 
 fn project(name: &str) -> std::path::PathBuf {
     let project = std::env::temp_dir().join(format!("rustnative-{name}-{}", std::process::id()));
@@ -119,4 +122,89 @@ fn a_manifest_is_signed_only_with_the_trusted_key() {
     #[cfg(not(windows))]
     let _ = signed;
     let _ = std::fs::remove_dir_all(project);
+}
+
+struct Process(Child);
+
+impl Drop for Process {
+    fn drop(&mut self) {
+        let _ = self.0.kill();
+        let _ = self.0.wait();
+    }
+}
+
+fn free_port() -> u16 {
+    TcpListener::bind("127.0.0.1:0").unwrap().local_addr().unwrap().port()
+}
+
+/// The status line of a raw request to the control port.
+fn status_of(port: u16, request: &str) -> String {
+    let mut stream = TcpStream::connect(("127.0.0.1", port)).unwrap();
+    stream.write_all(request.as_bytes()).unwrap();
+    let mut response = String::new();
+    stream.read_to_string(&mut response).unwrap();
+    response.lines().next().unwrap_or_default().to_owned()
+}
+
+/// `deploy local`'s other commands reach the control API with the token
+/// `start` left for this user; nothing without it does.
+#[test]
+fn the_local_control_api_answers_only_this_user_s_cli() {
+    let runtime = project("deploy-run");
+    let (proxy, control) = (free_port(), free_port());
+    let _deployment = Process(
+        Command::new(env!("CARGO_BIN_EXE_rustnative"))
+            .args(["deploy", "local", "start"])
+            .args(["--port", &proxy.to_string(), "--control", &control.to_string()])
+            .env("XDG_RUNTIME_DIR", &runtime)
+            .stdout(Stdio::null())
+            .spawn()
+            .unwrap(),
+    );
+    let token_file = runtime.join("rustnative").join(format!("deploy-{control}.token"));
+    let started = Instant::now();
+    while !token_file.is_file() || TcpStream::connect(("127.0.0.1", control)).is_err() {
+        assert!(started.elapsed() < Duration::from_secs(60), "the deployment did not start");
+        std::thread::sleep(Duration::from_millis(50));
+    }
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        let mode = std::fs::metadata(&token_file).unwrap().permissions().mode();
+        assert_eq!(mode & 0o777, 0o600, "only this user reads the token");
+    }
+    let cli = |arguments: &[&str]| {
+        Command::new(env!("CARGO_BIN_EXE_rustnative"))
+            .args(["deploy", "local"])
+            .args(arguments)
+            .args(["--control", &control.to_string()])
+            .env("XDG_RUNTIME_DIR", &runtime)
+            .output()
+            .unwrap()
+    };
+    stdout(&cli(&["add", "r1", "127.0.0.1:9001"]));
+    stdout(&cli(&["add", "r2", "127.0.0.1:9002"]));
+    stdout(&cli(&["promote", "r2", "--percent", "100"]));
+    let status = stdout(&cli(&["status"]));
+    assert!(status.contains(r#""weights":{"r2":100}"#), "{status}");
+
+    let body = r#"{"revision":"r1","percent":100}"#;
+    let forged = status_of(
+        control,
+        &format!(
+            "POST /promote HTTP/1.1\r\nHost: 127.0.0.1:{control}\r\nContent-Type: text/plain;charset=UTF-8\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{body}",
+            body.len()
+        ),
+    );
+    assert!(forged.contains(" 401 "), "{forged}");
+    let elsewhere =
+        std::env::temp_dir().join(format!("rustnative-elsewhere-{}", std::process::id()));
+    let other_user = Command::new(env!("CARGO_BIN_EXE_rustnative"))
+        .args(["deploy", "local", "rollback", "--control", &control.to_string()])
+        .env("XDG_RUNTIME_DIR", &elsewhere)
+        .output()
+        .unwrap();
+    assert!(!other_user.status.success(), "no token, no control");
+    assert!(stdout(&cli(&["status"])).contains(r#""weights":{"r2":100}"#));
+    let _ = std::fs::remove_dir_all(runtime);
 }
