@@ -277,7 +277,7 @@ mod host {
             .with_clipboard(Arc::new(backend::WindowsClipboard))
             .with_file_dialogs(Arc::new(backend::WindowsFileDialogs))
             .with_documents(Arc::new(rustnative_core::services::FileDocuments))
-            .with_system(Arc::new(backend::WindowsSystem))
+            .with_system(Arc::new(backend::WindowsSystem::default()))
             .with_state_store(Arc::new(backend::FileStateStore::for_app(&app.id)?))
             .with_permissions(Arc::new(backend::WindowsPermissions::new()))
             .with_locale_service(Arc::new(backend::WindowsLocale))

@@ -57,7 +57,7 @@
 //! let services = Services::default()
 //!     .with_clipboard(Arc::new(WindowsClipboard))
 //!     .with_file_dialogs(Arc::new(WindowsFileDialogs))
-//!     .with_system(Arc::new(WindowsSystem));
+//!     .with_system(Arc::new(WindowsSystem::default()));
 //! # #[cfg(windows)]
 //! assert!(services.clipboard().is_some());
 //! ```

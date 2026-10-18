@@ -434,7 +434,7 @@ pub use scheduler::{
 pub use services::{
     CertificatePins, ClipboardService, FileDialogKind, FileDialogRequest, FileDialogService,
     HttpRequest, HttpResponse, HttpService, MemoryClipboard, MemoryStorage, Method, ServiceError,
-    Services, StorageService, SystemService,
+    Services, StorageService, SystemService, UrlPolicy,
 };
 pub use state::{Derived, Store, StoreSnapshot};
 pub use style::{

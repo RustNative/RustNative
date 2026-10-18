@@ -168,6 +168,15 @@ fn a_url_opens_through_the_openuri_portal() {
             .get::<(String, String, std::collections::HashMap<String, glib::Variant>)>()
             .expect("args");
         assert_eq!(uri, "https://example.com/docs");
+        for refused in ["file:///etc/passwd", "javascript:alert(1)", "mailt€x"] {
+            let error =
+                drive(async move { crate::LinuxSystem::default().open_url(refused.into()).await })
+                    .expect_err("refused");
+            assert!(
+                error.to_string().contains("not opened") || error.to_string().contains("scheme")
+            );
+        }
+        assert_eq!(portal.calls_to("OpenURI").len(), 1, "a refused URL never reached the portal");
     });
 }
 

@@ -841,3 +841,36 @@ mod routes {
         }
     }
 }
+
+// ---------------------------------------------------------------------
+// URL policy (crate::services::url_policy).
+// ---------------------------------------------------------------------
+
+mod url_policy {
+    use proptest::prelude::*;
+
+    use rustnative_core::UrlPolicy;
+
+    proptest! {
+        #![proptest_config(ProptestConfig::with_cases(1024))]
+
+        /// Any Unicode string — including ones whose multi-byte characters
+        /// straddle where a scheme would end — is answered, never a panic;
+        /// and whatever is accepted starts with an allowed scheme and holds
+        /// no whitespace, control character, or backslash.
+        #[test]
+        fn any_string_is_answered_and_only_safe_ones_pass(
+            prefix in prop::sample::select(vec!["", "http", "https://", "mailto:", "notes:", "h", "€", "😀"]),
+            rest in r"\PC{0,24}|.{0,24}",
+        ) {
+            let url = format!("{prefix}{rest}");
+            let policy = UrlPolicy::default().allow_scheme("notes").unwrap();
+            if let Ok(accepted) = policy.check(&url) {
+                let scheme = accepted.split_once(':').unwrap().0.to_ascii_lowercase();
+                prop_assert!(["http", "https", "mailto", "notes"].contains(&scheme.as_str()));
+                prop_assert!(!accepted.chars().any(|c| c.is_whitespace() || c.is_control() || c == '\\'));
+            }
+            let _ = UrlPolicy::default().allow_scheme(&rest);
+        }
+    }
+}

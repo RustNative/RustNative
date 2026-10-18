@@ -11,7 +11,9 @@ use std::collections::VecDeque;
 use std::sync::Arc;
 
 use parking_lot::Mutex;
-use rustnative_core::{HttpRequest, HttpResponse, HttpService, Method, ServiceError};
+use rustnative_core::{
+    HttpRequest, HttpResponse, HttpService, Method, ServiceError, SystemService, UrlPolicy,
+};
 
 /// One scripted HTTP exchange.
 #[derive(Debug, Clone)]
@@ -158,6 +160,79 @@ impl rustnative_core::services::ShareService for AnchoredShare {
             ));
         }
         self.shared.lock().unwrap_or_else(std::sync::PoisonError::into_inner).push(request);
+        Ok(())
+    }
+}
+
+#[derive(Debug, Default)]
+struct SystemState {
+    opened: Vec<String>,
+    notifications: Vec<(String, String)>,
+}
+
+/// A [`SystemService`] that opens nothing and records what it would have:
+/// the URLs its [`UrlPolicy`] allows (refusing the rest exactly as a
+/// desktop backend does) and the notifications posted.
+///
+/// ```
+/// use rustnative_core::{SystemService, UrlPolicy};
+/// use rustnative_headless::RecordingSystem;
+///
+/// let system = RecordingSystem::new();
+/// # fn block_on<F: std::future::Future>(f: F) -> F::Output {
+/// #     use std::task::{Context, Poll, Waker};
+/// #     let mut f = std::pin::pin!(f);
+/// #     let mut cx = Context::from_waker(Waker::noop());
+/// #     loop { if let Poll::Ready(v) = f.as_mut().poll(&mut cx) { return v; } }
+/// # }
+/// assert!(block_on(system.open_url("https://example.com".into())).is_ok());
+/// assert!(block_on(system.open_url("file:///etc/passwd".into())).is_err());
+/// assert_eq!(system.opened(), ["https://example.com"]);
+/// ```
+#[derive(Debug, Clone, Default)]
+pub struct RecordingSystem {
+    state: Arc<Mutex<SystemState>>,
+    url_policy: UrlPolicy,
+}
+
+impl RecordingSystem {
+    /// A system service that has opened and posted nothing, allowing the
+    /// URLs [`UrlPolicy::default`] allows.
+    #[must_use]
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// This service, allowing the URLs `policy` allows.
+    #[must_use]
+    pub fn with_url_policy(mut self, policy: UrlPolicy) -> Self {
+        self.url_policy = policy;
+        self
+    }
+
+    /// The URLs it opened, oldest first.
+    #[must_use]
+    pub fn opened(&self) -> Vec<String> {
+        self.state.lock().opened.clone()
+    }
+
+    /// The notifications it posted (title, body), oldest first.
+    #[must_use]
+    pub fn notifications(&self) -> Vec<(String, String)> {
+        self.state.lock().notifications.clone()
+    }
+}
+
+#[async_trait::async_trait]
+impl SystemService for RecordingSystem {
+    async fn open_url(&self, url: String) -> Result<(), ServiceError> {
+        self.url_policy.check(&url)?;
+        self.state.lock().opened.push(url);
+        Ok(())
+    }
+
+    async fn notify(&self, title: String, body: String) -> Result<(), ServiceError> {
+        self.state.lock().notifications.push((title, body));
         Ok(())
     }
 }
