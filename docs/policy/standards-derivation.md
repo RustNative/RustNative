@@ -1,9 +1,10 @@
 # How the engineering standards were derived
 
 `STANDARDS.md` is the result of a question loop run over the whole
-repository. This page records the loop: its questions, the evidence it ran
-on, what each pass found, and why it stopped. A proposal to change the
-standards answers one of the same questions (`STANDARDS.md` section 36).
+repository in two rounds. This page records the loop: its questions, the
+evidence each round ran on, what each pass found, and why it stopped. A
+proposal to change the standards answers one of the same questions
+(`STANDARDS.md` section 38).
 
 ## The questions
 
@@ -13,7 +14,7 @@ Each domain was taken through nine questions, in this order:
 |---|---|---|
 | Q1 | **What?** What does this domain mean for this framework specifically? | The scope |
 | Q2 | **Why?** What breaks, and for whom, if it is not held? | The rationale |
-| Q3 | **Covers enough?** Does the scope reach every crate, backend, language, and lifecycle stage? | Gaps in scope |
+| Q3 | **Covers enough?** Does the scope reach every crate, backend, language, target, and lifecycle stage? | Gaps in scope |
 | Q4 | **Explore more?** What adjacent concern does this one touch that has no home yet? | New domains or standards |
 | Q5 | **How to enforce?** Which mechanism holds each standard? | The enforcement |
 | Q6 | **Why these methods?** Why this rung of the ladder (E1–E6) and not another? | The rung, justified |
@@ -22,297 +23,298 @@ Each domain was taken through nine questions, in this order:
 | Q9 | **Ask again from the beginning?** Did this pass find anything at all? | Another pass, or the stop |
 
 Q9 makes the sequence a loop. Every finding of a pass (a new domain, a
-scope gap, an enforcement hole, a promotion) went into the next pass as
-input. The loop stopped at the first pass in which all nine questions, for
-every domain, produced nothing new.
+scope gap, an enforcement hole, a promotion, a defect) went into the next
+pass as input. The loop stopped at the first pass in which all nine
+questions, for every domain, produced nothing new.
+
+## Two rounds, and why the second was needed
+
+The first round (passes 1–4) asked the questions against what the
+repository *says*: every tracked file was read by script for known risk
+patterns, and the configuration, policy, and security documents were read
+in full. It produced 31 domains and stopped when a pass found nothing new.
+
+Its stop was premature, and the reason is a lesson the standards now
+encode. A scan by pattern can only find what its patterns name, so Q7 ("is
+this enforcement enough?") was answered by reading enforcement, not by
+testing it. The second round (passes 5–9) asked the same questions against
+what the repository *does*. It compiled, linted, ran, fuzzed, and attacked
+the code, and read the security-relevant modules in full. It found the
+most serious defects of either round, two new domains, about forty new
+standards, and two mistakes in the first round's own claims. That is the
+origin of ladder rule 5 ("evidence is executed").
 
 ## The evidence
 
-The loop ran against the repository at commit `c2a2e67`, reading:
+### Round 1: what the repository says
 
-- **Every tracked file, by script.** Each of the 1,076 files under the
-  working tree (outside `.git`) was read and measured for: `unsafe` blocks,
-  functions, and impls; `SAFETY:` comments; `unwrap`/`expect`/`panic!`/
-  `unreachable!`; `#[allow]` with and without `reason`; crate-level
-  attributes; `println!`/`eprintln!`/`dbg!`; process-wide statics and
-  `static mut`; `process::exit`; thread spawns and sleeps; `transmute` and
-  raw pointers; host `cfg`s; `missing_docs` and `forbid(unsafe_code)`
-  declarations; test functions and `#[ignore]` reasons; `#[non_exhaustive]`
-  and `#[must_use]`; unbounded channels; lossy `as` casts; credential-like
-  literals; plain-`http://` hosts; `// req:` traceability tags; encoding,
-  line endings, final newlines, trailing whitespace, and control bytes.
-- **Every manifest and configuration file in full.** All 60 `Cargo.toml`
-  files, `Cargo.lock` (384 packages), `clippy.toml`, `deny.toml`,
-  `rustfmt.toml`, `rust-toolchain.toml`, `.gitignore`, `.gitattributes`,
-  `.github/workflows/ci.yml`, and every file in `budgets/`.
-- **Every governance and policy document in full.** `CONTRIBUTING.md`,
-  `SECURITY.md`, `docs/policy/`, `docs/security/`, `docs/guarantees.md`,
-  `docs/telemetry-policy.md`, `docs/server/security-checklist.md`,
-  `docs/conformance/`, `docs/performance/`, `docs/invalidation.md`,
-  `docs/api/README.md`, `docs/deploy/update-rules.md`, and
-  `docs/comparison/methodology.md`. `PLAN.md` section 2 (principles),
-  section 9 (cross-cutting quality), and Milestone 65 (engineering
-  discipline), plus the heading structure of `PLAN.md`, `BUILD_STATUS.md`,
-  `README.md`, and `docs/history/2026-08-29-engineering-audit.md`.
-- **The tests that already police the repository.** `doc_claims.rs`,
-  `doc_parity.rs`, `describe.rs`, the syntax and style equivalence suites,
-  and the compile-fail suites.
-- **Code read at each flagged site.** Every scanner hit that could be a
-  defect was opened and read in context. The findings below come from that
-  reading.
-- **Current external references,** checked on 2026-10-18: WCAG 2.2 (a W3C
-  Recommendation since 2023, with WCAG 3 still a draft), SLSA v1.1/v1.2
-  build levels, `cargo-semver-checks`, OpenSSF Scorecard checks, the EU
-  Cyber Resilience Act's reporting dates, Contributor Covenant 3.0, the
-  stabilization of `#[expect]` and `allow_attributes_without_reason` in
-  Rust 1.81, and the rust-lang/rust LLM policy of August 2026.
+At commit `c2a2e67`:
 
-### Scan figures at commit `c2a2e67`
+- **Every tracked file, by script.** Each of the 1,076 files was measured
+  for `unsafe` and `SAFETY:` comments, panicking calls, suppressions with
+  and without reasons, crate attributes, printing, statics, process exits,
+  threads and sleeps, `transmute`, host `cfg`s, documentation and
+  `forbid(unsafe_code)` declarations, tests and `#[ignore]` reasons,
+  unbounded channels, lossy casts, credential-like literals, plain-HTTP
+  hosts, traceability tags, and text hygiene (encoding, line endings,
+  final newlines, control bytes).
+- **Every manifest and configuration file in full:** 60 `Cargo.toml` files,
+  `Cargo.lock`, `clippy.toml`, `deny.toml`, `rustfmt.toml`,
+  `rust-toolchain.toml`, `.gitignore`, `.gitattributes`, the CI workflow,
+  and `budgets/`.
+- **Every governance and policy document in full**, `PLAN.md` sections 2
+  and 9 and Milestone 65, and the tests that already police the
+  repository's documentation (`doc_claims.rs`, `doc_parity.rs`,
+  `describe.rs`).
+- **External references,** checked on 2026-10-18: WCAG 2.2 and the WCAG 3
+  draft, SLSA v1.1/v1.2, `cargo-semver-checks`, OpenSSF Scorecard, the EU
+  Cyber Resilience Act's dates, Contributor Covenant 3.0, Rust 1.81's
+  `#[expect]` and `allow_attributes_without_reason`, and the rust-lang/rust
+  LLM policy of August 2026.
 
-| Signal | Non-test code | Tests |
-|---|---|---|
-| Lines of Rust | 185,360 | 27,125 |
-| `unsafe` blocks / `SAFETY:` comments | 974 / 984 | 37 / 38 |
-| `.unwrap()` / `.expect(` | 442 / 456 (allowed per site, or invariant) | 1,238 / 197 |
-| `#[allow(` with `reason` | 139 of 191 | — |
-| `#[expect(` | 0 | 0 |
-| `Result<_, String>` signatures | 134 | — |
-| Unbounded channels | 19 | 1 |
-| `thread::sleep` in test directories | — | 24 |
-| Crates denying `missing_docs` | 19 of 28 library crates | — |
-| Crates forbidding `unsafe_code` | 0 (18 have no `unsafe`) | — |
-| Explicit recursion-depth limits in first-party parsers | 0 | — |
-| Files over 2,000 lines | 3 | — |
-| Files with control bytes | 3 | — |
-| Tracked build outputs | 1 | — |
+### Round 2: what the repository does
+
+- **Compilation and extended lints on three targets.** The CI clippy gate
+  ran on Linux and as cross-checks for `x86_64-pc-windows-msvc` and
+  `aarch64-linux-android`, on Rust 1.97 and 1.99.1. About 60 additional
+  lints ran over every library and binary, among them `missing_docs`,
+  `allow_attributes_without_reason`, `string_slice`,
+  `let_underscore_must_use`, `map_err_ignore`,
+  `significant_drop_in_scrutinee`, `multiple_unsafe_ops_per_block`,
+  `mem_forget`, `panic`, `as_conversions`, `print_stderr`, and
+  `non_send_fields_in_send_ty`. Results were counted per lint and per
+  crate, and the high-risk sites were read one by one.
+- **Tools:** `cargo deny`, `cargo audit`, `cargo machete`, `shellcheck`,
+  `zizmor`, `actionlint`, and Miri (nightly 2026-10-17).
+- **The test suite,** run workspace-wide three times, once with this
+  machine's `RUST_BACKTRACE=1` and twice without, plus the GTK backend's
+  suite under Xvfb, before and after installing GStreamer's base plug-ins.
+- **Fuzzing.** A scratch crate drove eleven parsers and decoders with 2.5
+  million generated inputs: MQTT packets, the terminal input decoder (raw
+  bytes and an escape-sequence alphabet), the colour, value, and shadow
+  parsers, the style sheet parser, the `rsx!` front end, the update
+  manifest, version comparison, and the terminal's URL check.
+- **Probes,** each a small program running the real code against a
+  suspected defect: cross-site requests to the deploy control API,
+  non-ASCII URLs, the inspection token's file mode, oversized MQTT headers
+  under a memory limit, and accept-loop behaviour under a descriptor limit.
+- **Reading in full:** the server's `security.rs`, sessions, tokens,
+  passwords, passkeys, OAuth, body and request handling, the accept loop,
+  the deploy adapter and its control API, the update verifier, the live
+  session upgrade path, the inspection server, the URL openers of every
+  backend, the HTML escapers, the SQL builders, the job queue, the HTTP
+  clients and certificate pins, the Java bridge's exception handling, the
+  signal handlers, the Windows user-data accessors, and all 47
+  host-callable `extern` functions.
 
 ---
 
-## Pass 1: the seed list
+## Round 1
+
+### Pass 1: the seed list
 
 The seed list came from the request: stability, reliability, security,
-performance, and developer experience. Pass 1 took each of them through
-Q1–Q9. Its Q3 and Q4 answers grew the list to 31 domains before Pass 2.
+performance, and developer experience. Each was taken through Q1–Q9.
 
-### Stability
+- **Stability.** Q1: the framework never takes down the process it lives
+  in. Q3: the word mixed three things, crash-freedom (STB), API stability
+  (CMP), and determinism (COR), so they were split. Q7: `clippy::panic` and
+  `indexing_slicing` are allowed. Q8: promote `panic`, scan for
+  `process::exit`.
+- **Reliability.** Q1: correct behaviour under failure. Q4: idempotency,
+  offline, lifecycle, and data integrity (DAT) had no home. Q7: the MQTT
+  broker's allocation before any check was noticed by reading.
+- **Security.** Q1: secure defaults, untrusted input, cryptography,
+  authorization, code loading, secrets, disclosure. Q4: privacy (PRV) and
+  supply chain (SUP) split out. Q7: a bare-name `LoadLibraryW`. No fuzzing.
+- **Performance.** Q1: declared budgets per target. Q7: a budget can be
+  raised in the change that regresses it. Q8: CODEOWNERS on `budgets/`,
+  an idle-wakeups key.
+- **Developer experience.** Q3: it covered application developers and left
+  out contributors (VCS, CI, GOV) and documentation (DOC). Q4: diagnostics,
+  configuration, Cargo features, the CLI as a stable interface,
+  observability.
 
-- **Q1 What:** the framework never takes down the process it lives in, and
-  leaves the host as it found it.
-- **Q2 Why:** a framework panic is a crash in code the application did not
-  write and cannot catch.
-- **Q3 Covers enough:** no. "Stability" mixed three things: crash-freedom
-  (STB), API stability (CMP), and behavioural determinism (COR). They were
-  split.
-- **Q4 Explore more:** panics crossing foreign frames (MEM), teardown of
-  host state, error boundaries, crash evidence and its privacy (PRV).
-- **Q5 Enforce:** `unwrap_used`/`expect_used` lints, conformance row 10
-  (deliberate panics per backend), teardown tests.
-- **Q6 Why these:** lints catch the source at E2. Only a real host shows
-  whether the host survived, which takes E3.
-- **Q7 Enough:** no. `clippy::panic` and `indexing_slicing` are allowed, and
-  `process::exit` is not policed.
-- **Q8 Better:** promote `clippy::panic` with reasons. Add a `process::exit`
-  scan. Add release-health gating for what tests cannot see.
-- **Q9 Again:** yes, three new domains.
+Q3 and Q4 grew the list to 31 domains. Q9: yes.
 
-### Reliability
+### Pass 2: every domain
 
-- **Q1 What:** correct behaviour under failure: timeouts, retries, partial
-  networks, lifecycle interruptions, hostile peers.
-- **Q2 Why:** applications built on the framework inherit its failure modes.
-- **Q3 Covers enough:** no. Resource exhaustion by an untrusted peer is both
-  a reliability and a security concern, and needed a standard in each
-  (REL-7, SEC-6).
-- **Q4 Explore more:** idempotency (durable, offline replay), offline and
-  constrained networks, capability absence, process death, data integrity
-  (DAT).
-- **Q5 Enforce:** durable, offline, and lifecycle tests. The HTTP server's
-  limits test.
-- **Q6 Why these:** failure behaviour can only be shown by inducing the
-  failure (E3).
-- **Q7 Enough:** no. The scan of listeners found the MQTT broker
-  allocating a client-declared length of up to 256 MiB before any check,
-  with no connection cap and no first-packet timeout. Nothing in the suite
-  would notice.
-- **Q8 Better:** a limits test per listener. Fuzz targets for every decoder.
-- **Q9 Again:** yes.
+Each of the 31 domains was taken through Q1–Q9 against the round-1
+evidence. Pass 2 added source hygiene (control bytes in three doc
+comments), every non-Rust language, environment mutation, generated
+artifacts, configuration and features, energy, regulatory obligations, and
+AI-assisted contributions. Q9: yes.
 
-### Security
+### Pass 3: the standards as a whole
 
-- **Q1 What:** secure defaults, untrusted input, cryptography, authorization,
-  code loading, secrets, and disclosure.
-- **Q2 Why:** every application inherits the framework's attack surface.
-- **Q3 Covers enough:** no. The threat models cover Windows, the server, and
-  the Web. Code loading, process spawning, and CI as an attack surface
-  (SUP) had no home.
-- **Q4 Explore more:** privacy (PRV) and supply chain (SUP) split out.
-  Updates and packages joined SEC-10. Regulatory reporting (LEG-4).
-- **Q5 Enforce:** types (`Secret<T>`, route access, `Html`, `query!`), one
-  test per checklist row, `cargo deny`, `cargo audit`.
-- **Q6 Why these:** the strongest protections already sit at E1, which is
-  the right rung. A route that cannot compile without access cannot ship
-  without it.
-- **Q7 Enough:** no. A bare-name `LoadLibraryW("dxcore.dll")` in
-  `rustnative-windows/src/native/accelerator.rs` follows the default DLL
-  search order. No first-party parser bounds recursion depth. No fuzzing
-  exists.
-- **Q8 Better:** scans forbidding bare `LoadLibrary*` and shell
-  interpolation. Fuzzing. Secret scanning with push protection.
-  CODEOWNERS with two approvals on crypto.
-- **Q9 Again:** yes.
+The questions were asked of the standards themselves. That added the
+waiver process, the process for changing the standards, the ratchet rule,
+and the second-catch rule. Q9: yes.
 
-### Performance
+### Pass 4: the first stop
 
-- **Q1 What:** declared budgets per target, from cold start to edge fuel.
-- **Q2 Why:** without numbers a claim is an anecdote, and regressions
-  arrive one harmless-looking change at a time.
-- **Q3 Covers enough:** mostly. `budgets/` and `rustnative bench --check`
-  cover eight targets. Energy and idle wake-ups had no key.
-- **Q4 Explore more:** memory and artifact size (already budgeted), build
-  time (budgeted, optional), algorithmic complexity on hot paths,
-  scalability over large data (Milestone 54).
-- **Q5 Enforce:** the `budgets` CI job, `doc_claims.rs`, `core_costs.rs`.
-- **Q6 Why these:** a measured gate on every push is the only way a budget
-  holds (E3). A text scan keeps the prose honest.
-- **Q7 Enough:** almost. A `max` can be raised in the same change that
-  regresses it.
-- **Q8 Better:** CODEOWNERS on `budgets/` with a written reason (PRF-2). An
-  idle-wake-ups key (PRF-7).
-- **Q9 Again:** yes.
-
-### Developer experience
-
-- **Q1 What:** the path from `rustnative new` to a running, debuggable,
-  shippable application, and the path from a clone to a merged contribution.
-- **Q2 Why:** adoption and contribution both stop at the first confusing
-  error.
-- **Q3 Covers enough:** no. It covered application developers and left out
-  contributors (VCS, CI, GOV) and the documentation they read (DOC).
-- **Q4 Explore more:** compile-time diagnostics (EQV-6, DX-3), configuration
-  and environment variables, Cargo features, the CLI as a stable interface,
-  observability (OBS), the machine-readable API for tools.
-- **Q5 Enforce:** trybuild goldens, `describe.rs`, the dev-loop and
-  first-run budgets.
-- **Q6 Why these:** diagnostics are output, so goldens hold them (E3).
-- **Q7 Enough:** no. Feature combinations are untested beyond
-  `--all-features`. Environment variables are documented only where they
-  are used.
-- **Q8 Better:** `cargo hack --each-feature`. A generated
-  environment-variable reference.
-- **Q9 Again:** yes.
-
-### Domains added by Pass 1's Q3 and Q4
-
-Splitting and exploring the seed list produced these domains, each taken
-through Q1–Q9 in Pass 2: architecture (ARC), API design (API),
-compatibility (CMP), syntax and style equivalence (EQV), native fidelity
-(NAT), correctness (COR), error handling (ERR), memory safety and FFI (MEM),
-resource lifetime (RES), concurrency (CON), data integrity (DAT), privacy
-(PRV), supply chain (SUP), accessibility (A11Y), internationalization
-(I18N), visual quality (UX), documentation (DOC), observability (OBS),
-testing (TST), code quality (QLT), version control and workflow (VCS), CI,
-release and operations (RLS), portability (PRT), legal and regulatory
-(LEG), and governance (GOV).
+No domain produced a new finding against the round-1 evidence, and the
+loop stopped. Round 2 shows the stop was a limit of the evidence, not of
+the questions.
 
 ---
 
-## Pass 2: every domain
+## Round 2
 
-| Domain | Q1–Q2: what and why | Q3–Q4: scope gaps and adjacent concerns | Q5–Q6: enforcement and its rung | Q7–Q8: holes and promotions |
-|---|---|---|---|---|
-| ARC | `PLAN.md` 2.4–2.6: a platform-free core, one place that names a platform, no backend depending on another. Breaking it breaks every backend at once. | Global state on the render path. File and module size. Written decisions before code. | Today held only by review and by the core's manifest. `PLAN.md` Milestone 65 (`C129`) calls for tests. | No test fails if the core gains a platform crate. Promote to E3 with a `cargo metadata` graph test and a host-`cfg` scan. |
-| API | The public API is the product. | Typestate, sealing, `must_use`, defaults, no hidden blocking. | `clippy::pedantic`, `missing_docs`, `missing_errors_doc`. | `missing_docs` is absent from 9 library crates while `docs/api/README.md` says every crate denies it. Promote to `[workspace.lints.rust]` so no crate can be missed. |
-| CMP | `docs/policy/stability.md` exists, and its promises need teeth. | Wire and persisted formats, host OS and browser floors, capability-package ranges. | MSRV job, codemod corpus, `describe.rs`. | Nothing detects a breaking API change. Promote to E4 with an API snapshot and `cargo-semver-checks`. |
-| EQV | `PLAN.md` 2.9 and 2.14. Equality decays unless tested. | Diagnostics quality. Documentation parity outside `docs/guides/`. | Equivalence suites, expansion goldens, compile-fail suites, `doc_parity.rs`. | Strong already. Extend `doc_parity` to all of `docs/`. |
-| NAT | `PLAN.md` 2.2–2.3, 2.13: real controls, honest capabilities. | Platform idioms per host (only `docs/idioms/windows.md` exists). | Capability tests, the conformance checklist. | "Decorate the box" waits on Milestone 67's row 25, so review holds it until then. |
-| COR | Determinism is what makes the guarantees testable. | Numerics, time, randomness, iteration order, floats, CRDT convergence. | Cast lints denied, proptest, invalidation tests. | Direct clock reads are unpoliced. Add a scan. Hash-order output is caught only by goldens. Add a reproducibility check. |
-| ERR | Callers must match failures, and a string can only be shown. | Swallowed errors. Validation at the boundary. | `# Errors` docs lint. | 134 `Result<_, String>` signatures. Add a scan with a burn-down list. Add `let_underscore_must_use`. |
-| MEM | About 970 `unsafe` blocks. The discipline is strong (984 `SAFETY:` comments, denied lints). | Non-Rust bridge code (Java, JS, C, C#). Environment mutation. `unsafe impl Send/Sync`. | `undocumented_unsafe_blocks`, `unsafe_op_in_unsafe_fn`. | 18 crates have no `unsafe` and do not forbid it. Promote to `forbid`. Proof quality is review-only, so add tools: Miri, ASan, TSan. |
-| RES | Leaked host objects are invisible until a long session fails. | Caches, stale events, threads and child processes. | Census tests per backend, the GDI leak gate. | Bounded caches are tested per cache, not as a rule. Kept at E3 per cache. |
-| CON | `PLAN.md` 2.12 and affinity. | Reentrancy, lock order, unbounded channels, executor abstraction. | `!Send` types, cancellation property, `await_holding_lock`. | 19 unbounded channels with no justification. Add a scan with an allowlist. Add a UI-thread stall watchdog in debug builds. |
-| DAT | Data outlives versions. | Atomic writes, persisted-format upgrades, export and deletion. | Migration tests, `query!`. | No fixtures for old persisted formats. Add one per format. |
-| PRV | Consent and minimization are law and trust. | Hard-coded hosts, platform privacy declarations, in-context permissions. | Consent tests, generated manifests. | 30 plain-`http://` literals outside tests need triage. Add a host scan. |
-| SUP | The dependency tree is code the project ships. | Vendoring, CI as attack surface, provenance, reproducibility, update automation, `--locked`. | `cargo deny`, `cargo audit`, `permissions: contents: read`. | Actions are pinned by tag, not SHA. No provenance and no reproducibility check. Promote with Scorecard, SHA pins, and a release workflow. |
-| A11Y | An inaccessible framework produces inaccessible applications at scale. | Examples and components as teaching material. Live regions. Target size (WCAG 2.2, 2.5.8). | UIA, AT-SPI, and TalkBack suites, layout conformance. | A person's screen-reader pass is irreducibly E6. A check that every node kind has a role mapping per backend is promotable to E3. |
-| I18N | The framework's own strings and layout must work in every locale. | IME, bidi, graphemes, locale formatting, pseudo-localization. | Logical `EdgeInsets` (E1), layout conformance, text-stack tests. | A live CJK IME session is manual and owed. |
-| UX | Host fidelity is the framework's reason to exist. | DPI, motion, layout shift, visual regression. | Goldens, reduced-motion tests, the CLS budget. | Adequate. |
-| DOC | A doc that disagrees with the code is a defect. | Status honesty, working-note labelling, examples. | Doctests, `doc_claims.rs`, `doc_parity.rs`, `RUSTDOCFLAGS=-D warnings`. | 11 examples have no tests. There is no spelling or link check. |
-| OBS | Applications must control where diagnostics go. | Conventions, inspection, render causes, debug-only cost. | Inspection conformance row 26, observe tests. | Library code in `rustnative-core` calls `eprintln!`. Promote with `print_stderr`/`print_stdout` denied in library crates. |
-| TST | Tests are how every other standard is held. | Fuzzing, coverage, flakiness, silent skips, goldens, traceability, hardware-only work. | Per-host CI jobs, conformance suites, proptest, reasons on `#[ignore]`. | No fuzzing, coverage, or flake quarantine (all `C130`). 19 places print "skipped" and pass. 24 sleeps in tests. |
-| QLT | Readable code is reviewable code. | Suppression reasons, generated code, source hygiene, every non-Rust language. | rustfmt, curated clippy policy, `todo`/`unimplemented` denied. | 52 `#[allow]` without reason and no `#[expect]`. Promote with `allow_attributes_without_reason`. No standard existed for Java, JS, shell, SQL, C, C#, CSS, or TOML. |
-| VCS | History is the project's memory. | DCO, CODEOWNERS, branch protection, templates, committed artifacts, binaries. | `.gitattributes` (LF). | A tracked `target/` file exists because `.gitignore` covers only the root. No CODEOWNERS, templates, or DCO. |
-| CI | CI defines "builds". | Timeouts, concurrency, cache neutrality, disabled jobs. | The job matrix, `-D warnings`. | Only one job has `timeout-minutes`. No `concurrency`. No workflow lint. |
-| RLS | A release is the moment every promise is checked. | Release notes, one version for all crates, publish completeness. | Packaging, update, and deploy tests. `cargo_common_metadata`. | No release workflow yet. Owed with SUP-8. |
-| PRT | The plan promises every host class. | `no_std`, adoption, extension points, contributor hosts. | `apple` and `no-std` jobs, adoption examples. | Adequate for the current stage. |
-| LEG | Licensing and regulation decide who may use the framework. | DCO, vendored notices, CRA, accessibility law, export, trademarks. | `cargo deny` licences, generated compliance evidence. | The CRA steward dates are unsettled across sources, so the standard requires checking the official text rather than citing a date. |
-| GOV | Outside contributors need to know the rules of the room. | Conduct, roles, RFCs, triage, AI-assisted contributions, continuity. | None existed. | Every GOV standard starts owed. AI-assisted contributions needed their own standard (GOV-6). |
+### Pass 5: Q7 asked with tools
 
-### What Pass 2's Q4 found that had no home
+Pass 5 re-asked Q7 ("can the standard be broken with every mechanism
+green?") for every domain by running something that would break it.
 
-- **Source hygiene** (QLT-9). Three files hold control bytes left by broken
-  escape sequences in doc comments: a NUL in
-  `rustnative-web/src/client.rs`, two backspaces in
-  `rustnative-webgen/src/items.rs`, and a BEL in
-  `rustnative-style/src/web.rs`. No existing check reads source as bytes.
-- **Languages other than Rust** (QLT-10, MEM-7): 31 Java files, two
-  JavaScript modules, six shell scripts, SQL migrations, C and C# hosts, CSS,
-  and TOML.
-- **Environment mutation** (MEM-8). Edition 2024 already makes it `unsafe`.
-  The standard records the rule the existing `SAFETY:` comments follow.
-- **Generated artifacts** (QLT-8), as a class rather than case by case.
-- **Configuration and environment variables** (DX-4), and **Cargo
-  features** (DX-5).
-- **Energy** (PRF-7).
-- **Regulatory obligations** (LEG-4) and **AI-assisted contributions**
-  (GOV-6), from the external references.
+| Domain | What was run | What it found |
+|---|---|---|
+| CI, SUP | The CI clippy gate on Rust 1.97 and 1.99.1 | It fails on 1.97 and passes on 1.99.1 because `rust-toolchain.toml` says `stable` (F-37). |
+| CI, QLT, MEM | Extended lints on Linux, then on the Windows and Android targets | 38 reasonless suppressions and 42 multi-operation `unsafe` blocks exist only in `#[cfg(windows)]` code, which a Linux pass never compiles. |
+| API | `missing_docs` workspace-wide | 19 hits, almost all in examples and generated code. The nine "ungated" crates are documented. **The round-1 claim was corrected.** |
+| NET, SEC | Cross-site `text/plain` POSTs to the deploy control API | 200 and 200, and the attacker's revision took 100% of traffic (F-01). |
+| NET, STB | 5-byte MQTT headers declaring 256 MiB, under a 3 GiB limit | 16 connections aborted the process (F-02). |
+| NET | Client connections under a 48-descriptor limit | `serve()` returned `EMFILE` after 19 connections and stopped serving (F-03). |
+| SEC | `stat` on the published inspection endpoint file | Mode `644` in a `755` directory under `/tmp`, holding the token (F-08). |
+| COR, TST | The URL checker with non-ASCII input, then 300,000 generated inputs | `"mailto:€"` panics, and 5 distinct panics were found (F-05). |
+| TST, SEC | 2.2 million inputs to ten other parsers and decoders | No panics. **The parsers are robust, which is a finding too:** it makes fuzz targets cheap to adopt. |
+| MEM | Miri over four crates, then the core | No undefined behaviour in the four. In the core, Miri stops at `parking_lot_core` 0.9.12's `futex` call, a dependency's argument type, after the identity and layout tests pass. |
+| SUP | `cargo deny`, `cargo audit`, `cargo machete` | Clean advisories and licences. Four crates declare unused dependencies, and two duplicates are unexplained. |
+| SUP | `zizmor` on the workflow | 43 tag-pinned actions, 13 persisted credentials, 2 floating images (F-35). |
+| QLT | `shellcheck` | 15 findings. |
+| TST | The full test suite | The first run exhausted a 39 GB disk allowance (TST-16). Three clean runs gave identical results: 1,183 passed, 0 failed, 12 ignored, no flakes. |
+| TST | The suite with `RUST_BACKTRACE=1`, this machine's default | Two terminal tests fail because the backtrace scrolls the message they look for off the screen (F-40). |
+| REL | The GTK backend's tests under Xvfb | GTK's media module aborted the whole test binary when GStreamer's `playbin` was missing (F-41). |
+| CRY, REL | The GTK backend's tests behind this machine's HTTPS proxy | The pin test failed: with no TLS handshake to inspect, the pin check never ran, and the proxy's `403` came back as the pinned host's response (F-42). The test's own skip logic would have hidden this on an offline runner. |
 
-Each was taken through Q1–Q8 and written as the standard named. Q9: yes.
+Q9: yes, and the defects were serious enough to restart every domain from
+Q1 with the code read in full.
 
----
+### Pass 6: Q1–Q4 again, with the code read in full
 
-## Pass 3: the standards as a whole
+Reading the security-relevant modules, rather than grepping them, changed
+the answers to Q3 and Q4 for several domains.
 
-Pass 3 asked the questions of the standards themselves rather than of a
-domain.
+- **Q3 for SEC: does it cover developer tooling?** No. The deploy control
+  API, the dev agent, and the inspection server are developer tools, and
+  they held the critical and high findings (F-01, F-08, F-09). None had a
+  threat-model row. SEC-2 was widened to cover tooling.
+- **Q4 for SEC: what has no home?** Two whole areas. Listeners became a
+  domain of their own (**NET**): loopback as a non-boundary, size before
+  allocation, deadlines, accept loops, one choke point per check, IPv6
+  rate-limit keys, graceful shutdown, hostile-peer suites, outbound
+  limits. Cryptography and signing became **CRY**: vetted primitives (three
+  hand-written constant-time comparisons), typed keys (any-length token
+  keys), purpose binding (no associated data, no audience), rotation (one
+  pinned update key), SPKI pins with backups (whole-certificate pins),
+  timestamped signatures (none), and strict verification.
+- **Q3 for NAT: does capability honesty cover services?** No. Capability
+  tables cover UI. A service contract's *behaviour* differed by backend:
+  `open_url` validates on one backend of five (F-04), and HTTP timeouts and
+  limits differ (F-24). NAT-7 was added.
+- **Q4 for ARC: what does the duplication of security code imply?** HTML
+  escaping exists twice, constant-time comparison three times, durable
+  writes twice with different guarantees, and the origin check at one of
+  two entry points. ARC-12 was added: one implementation per primitive.
+- **Q4 for STB: the 47 host-callable functions.** Enumerating them all
+  showed the main entry points guarded and about 15 secondary callbacks
+  not (F-31). It also showed a model signal handler. STB-2 was sharpened,
+  and STB-8 (allocation size) and STB-9 (signal safety) were added.
+- **Q4 for REL:** the job queue's single-instance recovery (F-33) gave
+  REL-8. The Android Play check failing open (F-17) and the Linux pin
+  check failing open (F-42) gave REL-9, stated as a principle: a security
+  check accepts on a positive verdict, never on the absence of a negative
+  one. A host plug-in whose absence aborts the process (F-41) extended
+  REL-4.
+- **Q4 for CON and OBS:** a waker and an exporter called under locks
+  (F-30) gave CON-9 and OBS-6.
+- **Q4 for MEM and RES:** a `mem::forget` that leaks a D-Bus subscription
+  per notification (F-19) gave MEM-10 and RES-6. The Windows user-data
+  accessors gave MEM-9, a standard written from a positive example.
+- **Q4 for API:** sign-in in the framework's own template skips the step
+  its docs require (F-16), giving API-10 and SEC-15. 220 of 257 public
+  enums exhaustive, `Node` among them, sharpened API-4.
+- **Q4 for DOC:** three rustdoc claims are false and untested (F-07, F-23,
+  F-25). The repository's "no claim without a test" rule had reached
+  Markdown only, so DOC-7 was added.
+- **Q4 for DX and CI:** 18 undocumented environment variables gave DX-4. A
+  contributor's inability to reproduce CI's verdict gave DX-8, SUP-11, and
+  CI-9.
+- **Q4 for TST:** every reproduced defect came from a test that played the
+  attacker, which the suite had none of, so TST-14 was added. Miri being
+  clean gave TST-15, the disk exhaustion gave TST-16, and the backtrace-dependent
+  failures gave TST-17 (hermetic tests).
 
-- **Q1–Q2:** a standard without a stated enforcement is a wish, so every
-  standard got an enforcement and a status tag.
-- **Q3:** do the standards cover their own failure modes? There was no
-  way to break a MUST legitimately, so section 34 (waivers) was added. There
-  was no way to change a standard, so section 36 was added.
-- **Q4:** a standard enforced only by review decays. That gave rule 4 of the
-  ladder: a defect class caught twice by a person becomes a check.
-- **Q5–Q6:** the enforcement ladder (E1–E6) and the "highest feasible rung"
-  rule turn "how to enforce" from a choice per standard into a policy.
-- **Q7:** enforcement can be weakened silently by relaxing a lint or making
-  a test optional. That gave the ratchet rule.
-- **Q8:** the owed mechanisms were collected and ordered in
-  `STANDARDS.md` section 35, so they become work rather than prose. Six
-  items fix defects the scan found.
-- **Conflicts:** EQV's two syntaxes against API-9 ("one way to do a thing")
-  were resolved by naming the syntaxes as the deliberate exception, because
-  both produce one tree. PRF-3's rule against unbudgeted claims was applied
-  to `STANDARDS.md` itself.
-- **Q9:** yes, the waiver, change, ratchet, and second-catch rules were new.
+Q9: yes.
 
----
+### Pass 7: Q5–Q8 for the new and changed standards
 
-## Pass 4: the stop
+For each standard added or changed in pass 6, Q5 named its mechanism and
+Q6 its rung. Q7 asked whether the mechanism could pass with the defect
+present, and Q8 looked for a higher rung.
 
-Pass 4 took all 31 domains and the cross-cutting rules through Q1–Q9 once
-more, against the same evidence and the standards as written.
+- **Types where the defect class allows them (E1).** These are
+  `Unverified<T>` (SEC-16), typed SQL identifiers (SEC-17), typed keys
+  (CRY-2), a pin type requiring two SPKI digests (CRY-5), a `PathComponent`
+  (DAT-6), a `Json<T>` that refuses other content types and a loopback
+  builder that cannot be built without a token (NET-1), and a one-call
+  `sign_in` (API-10). A test can be skipped; a type cannot.
+- **Lints where clippy already has the check (E2).** The 11 lint
+  promotions in `STANDARDS.md` section 37, item 8, each with its measured
+  count, so the cost of turning it on is known.
+- **Tests that attack (E3)** where neither types nor lints reach: the
+  hostile-peer suites (NET-8), fault injection for fail-closed decisions
+  (REL-9), two-instance tests (REL-8), file-mode tests (SEC-14), and the
+  boundary scan over `extern` functions (STB-2).
+- **Q7 for those tests: can they pass with the defect present?** Only if
+  they run on the wrong target. That made CI-9 ("every check runs on every
+  target that compiles the code") a precondition of the others.
+
+Q9: yes, CI-9 was new.
+
+### Pass 8: the standards as a whole, again
+
+- **Corrections.** Two round-1 claims were wrong. "No first-party parser
+  bounds its recursion depth" was refuted by the passkey CBOR reader's
+  16-level limit. "Nine crates lack documentation" became "nine crates
+  are documented but not gated". Both were corrected in the standards, and
+  the findings register keeps a gap (F-32) where the retired claim was, so
+  the correction is visible.
+- **Positive findings belong in the standards.** The well-made parts (the
+  signal handler, the user-data accessors, the JNI guard, the CSRF check,
+  the verify-then-parse update path, the parsers that survived fuzzing)
+  are named as models. A standard with a model in the codebase is easier
+  to follow than one without.
+- **The register.** Findings were given IDs and a severity, and each
+  standard cites the findings that break it. A contributor can then see
+  the rule's cost here, and a fixed finding leaves the register in the
+  change that fixes it.
+- **Ladder rule 5.** "Evidence is executed" was added to the ladder: a
+  reading proposes a finding and a run confirms or retires it.
+
+Q9: yes, the rule and the register were new.
+
+### Pass 9: the stop
+
+Pass 9 took all 33 domains and the cross-cutting rules through Q1–Q9 once
+more, against both rounds' evidence and the standards as written.
 
 - **Q1–Q2:** every domain had a scope and a rationale.
-- **Q3:** every crate, backend, non-Rust language, and lifecycle stage
-  (author, review, CI, release, operation) was covered by at least one
-  domain.
+- **Q3:** every crate, backend, target (including the `cfg`-gated
+  Windows, Android, and wasm code), non-Rust language, developer tool,
+  listener, and lifecycle stage was covered by at least one domain.
 - **Q4:** no adjacent concern without a home was found.
 - **Q5–Q6:** every standard named its mechanism and rung.
-- **Q7:** every known hole was either closed by an existing mechanism or
-  listed as owed.
-- **Q8:** every promotion found was recorded in section 35.
+- **Q7:** every hole found by running the code was either closed by an
+  existing mechanism or listed as owed with its finding.
+- **Q8:** every promotion found was recorded in the ordered list of
+  owed mechanisms.
 - **Q9:** no new findings, so the loop stopped.
 
+## What would restart the loop
+
 The loop restarts whenever its inputs change: a new crate, backend,
-language, listener, or format, a new external requirement, or a waiver that
-keeps recurring.
+target, language, listener, format, or developer tool; a new external
+requirement; a waiver that keeps recurring; or a defect that reaches a
+release, which shows that Q7 was answered wrongly somewhere. A restart
+uses round 2's method: compile, lint every target, run, fuzz, attack, and
+read in full.
