@@ -306,8 +306,9 @@ title (`rustnative_tui::guard`; `guard::teardown_policy` for Milestone 39).
 
 `rustnative_tui::services(app_id, name, &channel)`: the OSC 52 clipboard
 (reads where the terminal answers, a copy kept in the process always),
-notifications through the terminal's sequence, URL launch (only a whole
-http, https, or mailto URL, through ShellExecute on Windows — never a
+notifications through the terminal's sequence, URL launch (only a URL
+the core's `UrlPolicy` allows — `http`, `https`, and `mailto` by default,
+widened with `with_url_policy` — through ShellExecute on Windows, never a
 command interpreter), crash-safe state files in the same folders the desktop
 backends use (`$XDG_STATE_HOME/<id>/state`, `%LOCALAPPDATA%\<id>\state`), and
 documents. `rustnative_host::terminal_services` adds the operating system's

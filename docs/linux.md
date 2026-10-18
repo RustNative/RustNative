@@ -124,7 +124,7 @@ AT-SPI2 itself, as Orca does (`gtk::atspi_reader`).
 |---|---|
 | `LinuxClipboard` | the display's `GdkClipboard` |
 | `LinuxFileDialogs` | `GtkFileDialog`: the FileChooser portal where the desktop has one, GTK's own chooser otherwise |
-| `LinuxSystem` | the OpenURI portal or GIO's default handler; notifications through the notification server, or the Notification portal in a sandbox |
+| `LinuxSystem` | the OpenURI portal or GIO's default handler, for a URL the core's `UrlPolicy` allows (`http`, `https`, and `mailto` by default; `with_url_policy` widens it); notifications through the notification server, or the Notification portal in a sandbox |
 | `SoupHttp` | libsoup 3, the system's trust store, the desktop's proxy; certificate pins checked at the TLS handshake, before a byte is sent |
 | `LinuxLocale` | glibc's locales (`strfmon`, `strftime`, `strcoll`, `towupper`) |
 | `LinuxSecureStorage` | the Secret Service (GNOME Keyring, KWallet, KeePassXC) |

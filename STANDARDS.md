@@ -97,9 +97,9 @@ commit messages, waivers, and `#[allow]` reasons, for example
 `reason = "MEM-3: …"`. An ID is never reused. A retired standard keeps its
 number and is marked *retired*.
 
-Findings are cited by their register number, such as `F-01`. The register
-in section 37 records each defect the scan found, where it is, and whether
-it was reproduced by running it. A standard that a finding breaks cites the
+Findings are cited by their register number, such as `F-10`. The register
+in section 37 records each open defect the scan found, where it is, and
+whether it was reproduced by running it. A standard that a finding breaks cites the
 finding, so a contributor can see the rule's cost in this codebase.
 
 ### The enforcement ladder
@@ -287,12 +287,13 @@ comparison, the URL policy (SEC-13), durable atomic file writes (DAT-3),
 path-component validation (DAT-6), origin checks (NET-5), and token parsing.
 Each exists once, in the lowest crate all its callers can depend on, and
 every backend and crate calls that one.
-- *Why:* copies drift, and the drift is a vulnerability. The scan found HTML
-  escaping implemented twice (F-27). It found constant-time comparison
-  hand-written three times (F-14). Durable writes exist in two versions,
-  only one of which `fsync`s (F-21). The URL check exists in one backend
-  out of five (F-04), and the WebSocket origin check in one of two entry
-  points (F-12).
+- *Why:* copies drift, and the drift is a vulnerability. The scan found
+  constant-time comparison hand-written three times, the URL check in one
+  backend out of five, and the WebSocket origin check in one of two entry
+  points; each is now one function (`rustnative_core::secret::constant_time_eq`,
+  `UrlPolicy`, and the live server's origin check). HTML escaping is still
+  implemented twice (F-27), and durable writes exist in two versions, only
+  one of which `fsync`s (F-21).
 - *Enforcement:* E3, a duplicate-signature scan over these primitives (a
   second `fn escape`, a second `constant_time_eq`, a second atomic write)
   **[Owed]**. E5 today.
@@ -314,14 +315,10 @@ identifiers, and constructors that validate over public fields.
 has rustdoc. Every major entry point has a runnable example. Fallible
 functions have `# Errors`, panicking ones have `# Panics`, and `unsafe fn`
 has `# Safety`.
-- *Enforcement:* E2. `missing_docs` is denied in 19 of 28 library crates.
-  The other nine (`rustnative-components`, `-data`, `-durable`, `-host`,
-  `-observe`, `-server`, `-server-macros`, `-sync`, `-update`) are
-  documented, since a workspace-wide `missing_docs` pass finds nothing in
-  them. They are simply not gated, contrary to `docs/api/README.md`.
-  `missing_docs = "deny"` in `[workspace.lints.rust]` closes the gap
-  without new writing. `missing_errors_doc` and `missing_panics_doc` are
-  denied in CI by `-D warnings`. **[Partial]**
+- *Enforcement:* E2. `missing_docs` is denied in every library crate, and
+  `rustnative-conformance/tests/missing_docs.rs` (E3) fails when a
+  `crates/*/src/lib.rs` drops the attribute. `missing_errors_doc` and
+  `missing_panics_doc` are denied in CI by `-D warnings`. **[Enforced]**
 
 **API-3 — Follow the Rust API Guidelines.** Naming (`as_`/`to_`/`into_`,
 `with_*` modifiers, `try_*` for fallible variants), standard traits
@@ -566,8 +563,8 @@ backend may realize the contract in its host's way, but it may not change
 what an application sees.
 - *Why:* `HttpService` has a 30-second timeout on Android and the host
   library's defaults on Windows and Linux, and no backend bounds the
-  response body (F-24). `SystemService::open_url` validates the URL on the
-  terminal backend and hands any string to the OS on Windows (F-04).
+  response body (F-24). `SystemService::open_url` checked URLs on one
+  backend of five until one `UrlPolicy` was given to all of them (SEC-13).
 - *Enforcement:* E3, a conformance suite per service contract in
   `rustnative-conformance`, run on every backend, as the UI guarantees are
   **[Owed]**.
@@ -648,11 +645,13 @@ same string's `char_indices`, `find`, or a check that the prefix is ASCII.
 Untrusted or user text is sliced with `get(..n)`, `strip_prefix`, or
 grapheme segmentation.
 - *Why:* the scan's fuzzer found five panics in the terminal backend's
-  `checked_url`. Every one came from `url[..scheme.len()]` on non-ASCII
-  input, so `checked_url("mailto:€")` crashes the backend (F-05). Clippy
-  finds 124 such slices in non-test code.
-- *Enforcement:* E2, `clippy::string_slice` at warn in library crates,
-  each remaining site with a reason **[Owed]**.
+  URL check. Every one came from `url[..scheme.len()]` on non-ASCII input,
+  so `"mailto:€"` crashed the backend. Clippy found 124 such slices in
+  non-test code.
+- *Enforcement:* E2, `clippy::string_slice` at warn in
+  `[workspace.lints.clippy]` and denied in CI by `-D warnings`; each
+  remaining site carries an `#[allow]` naming why its index is a boundary
+  **[Enforced]**.
 
 ---
 
@@ -729,8 +728,9 @@ process when an allocation fails, so a length that came from outside the
 process (a network header, a file, IPC) is checked against a stated limit
 before it sizes an allocation. See NET-2 for listeners. This standard
 covers files, IPC, and every decoder.
-- *Why:* 16 connections of 5 bytes each aborted the MQTT broker's process
-  under a 3 GiB address-space limit (F-02).
+- *Why:* a peer's declared length can be anything its encoding allows:
+  256 MiB for an MQTT packet. Sixteen 5-byte connections aborted a broker
+  that trusted it, under a 3 GiB address-space limit.
 - *Enforcement:* E3, fuzz targets with an allocation-limited harness
   (TST-6) **[Owed]**.
 
@@ -1154,8 +1154,9 @@ or developer tool that accepts input adds its row (entry point, threat,
 mitigation, holding test) to the relevant `docs/security/threat-model-*.md`
 in the same change. Developer tooling is in scope. The local deploy
 control API, the dev agent, and the inspection server are the surfaces
-where the scan found its most serious defects, and none has a threat-model
-row (F-01, F-08, F-09).
+where the scan found its most serious defects, none of which had a
+threat-model row; their rows are now in `threat-model-server.md` and
+`threat-model-windows.md`.
 - *Enforcement:* E5, CODEOWNERS on listeners and parsers **[Owed]**, plus
   E3: a test that every listener bound in `crates/` appears in a threat
   model **[Owed]**.
@@ -1199,9 +1200,10 @@ to cryptographic code needs two maintainer approvals.
 
 **SEC-8 — Code is loaded only from trusted locations.** Native libraries are
 loaded by full path or with a restricted search. On Windows that means
-`LoadLibraryExW` with `LOAD_LIBRARY_SEARCH_SYSTEM32` for system DLLs,
-never bare `LoadLibraryW`, which `accelerator.rs` uses for `dxcore.dll`
-(F-11). Child processes are started by absolute path or a resolved
+`LoadLibraryExW` with `LOAD_LIBRARY_SEARCH_SYSTEM32` for system DLLs
+(as `accelerator.rs` loads `dxcore.dll`), never bare `LoadLibraryW`, which
+searches the application's directory and the current one first. Child
+processes are started by absolute path or a resolved
 toolchain path, never through a shell with interpolated arguments.
 - *Enforcement:* E3, a scan forbidding `LoadLibraryW`/`LoadLibraryA` and
   `Command::new("sh"|"cmd")` with dynamic arguments outside tests
@@ -1236,8 +1238,10 @@ authenticated.** Inspection is off unless enabled, loopback-only, and
 tokened, and its token is protected as SEC-14 requires. `/healthz` and
 `/metrics` are feature-gated and documented as unauthenticated. Admin,
 deploy, and dev-agent APIs require a credential (NET-1).
-- *Enforcement:* E3 **[Partial]**: the inspection token exists, but the
-  deploy control API has none (F-01).
+- *Enforcement:* E3: the inspection server, the dev agent, and the deploy
+  control API each refuse a caller without their per-run token, with tests
+  (`rustnative-core/tests/inspection.rs`, `rustnative/tests/dev.rs`,
+  `rustnative-server/tests/deploy.rs`) **[Enforced]**.
 
 **SEC-12 — Vulnerabilities are handled privately and on time.** Reports go
 through `SECURITY.md`. They are acknowledged within five working days. The
@@ -1253,12 +1257,16 @@ application's own registered schemes), no control characters or
 whitespace, and no local paths or UNC shares unless the application opted
 in explicitly. An OS "open" call launches whatever handler is registered,
 and a protocol handler or `\\host\share\x.exe` is code execution.
-- *Why:* the Windows backend passes any string to `ShellExecuteW`, the
-  Linux and Android backends accept any scheme, and only the terminal
-  backend checks, with a checker that panics on non-ASCII (F-04, F-05).
-- *Enforcement:* E3, one policy in `rustnative-core` called by every
-  backend's `open_url`, with refusal tests in the NAT-7 conformance suite
-  **[Owed]**.
+- *Why:* `ShellExecuteW` runs a local executable, a UNC path, or any
+  protocol handler (`ms-msdt:`, `search-ms:`), and GIO, the OpenURI portal,
+  and Android's `ACTION_VIEW` open any scheme an installed application
+  claims. The scan found only the terminal backend checking, with a checker
+  that panicked on non-ASCII.
+- *Enforcement:* E3, `rustnative_core::UrlPolicy`, which the Windows,
+  Linux, Android, terminal, and headless backends' `open_url` call before
+  anything reaches the OS, with refusal and property tests in
+  `rustnative-core` and per backend **[Enforced]**. The same refusals in
+  the NAT-7 conformance suite are **[Owed]**.
 
 **SEC-14 — Local secrets and executables never live in shared
 directories.** A token, key, endpoint file, socket, or executable the
@@ -1268,15 +1276,17 @@ and verified for owner and mode when it already exists. Files are created
 `0600` with `O_CREAT | O_EXCL | O_NOFOLLOW`. The system temp directory is
 shared on Linux, where another user can pre-create the directory, read
 what is placed there, or plant symlinks.
-- *Why:* reproduced. The inspection server writes its access token to
+- *Why:* reproduced. The inspection server wrote its access token to
   `/tmp/rustnative-inspect/<pid>.json` with mode `644` in a `755`
-  directory, readable by every local user, who can then read and edit the
-  running application over loopback (F-08). The dev agent writes the
-  executable it is sent into `/tmp/rustnative-dev-agent/`, through a call
-  that follows symlinks, and runs it (F-09).
-- *Enforcement:* E3, mode and owner tests on Unix for every file the
-  framework creates for local IPC, plus a scan forbidding
-  `std::env::temp_dir()` for those uses **[Owed]**.
+  directory, readable by every local user, who could then read and edit
+  the running application over loopback. The dev agent wrote the
+  executable it was sent into `/tmp/rustnative-dev-agent/`, through a call
+  that follows symlinks, and ran it.
+- *Enforcement:* E3, `rustnative_core::secret` (the per-user directory,
+  `create_private_file`, `create_private_executable`), which the
+  inspection server, the dev agent, and `rustnative deploy local` use, with
+  mode, owner, and symlink tests on Unix **[Enforced]**. A scan forbidding
+  `std::env::temp_dir()` for local IPC is **[Owed]**.
 
 **SEC-15 — Templates and examples are security-critical code.** Project
 templates, capability kits, and examples are what applications copy. They
@@ -1337,59 +1347,70 @@ listener also:
   whose `Content-Type` is not `application/json`, which a cross-site
   "simple" request cannot send without a preflight.
 
-- *Why:* reproduced. `rustnative deploy local`'s control API (127.0.0.1:8081
-  by default) has no credential and no CSRF check, and the `Json<T>`
-  extractor ignores `Content-Type`. Two cross-site `text/plain` POSTs, the
-  kind any page can send, registered an attacker's server as a revision and
-  moved 100% of the public proxy's traffic to it, users' cookies included
-  (F-01).
-- *Enforcement:* E1, a `Json<T>` that refuses other content types and a
-  `LoopbackService` builder that cannot be constructed without a token,
-  plus E3, cross-site and rebinding tests per listener **[Owed]**.
+- *Why:* reproduced. Without a credential, a CSRF check, or a
+  `Content-Type` check, two cross-site `text/plain` POSTs, the kind any page
+  can send, registered an attacker's server as a revision on
+  `rustnative deploy local`'s control API and moved 100% of the public
+  proxy's traffic to it, users' cookies included.
+- *Enforcement:* E1, a `Json<T>` that refuses any body not declared
+  `application/json` or `application/*+json` (415) **[Enforced]**. E3, the
+  deploy control API's per-run token, `Host` check, and cross-site refusal,
+  with cross-site, token, and rebinding tests
+  (`rustnative-server/tests/deploy.rs`) **[Enforced]**. A
+  `LoopbackService` builder that cannot be constructed without a token is
+  **[Owed]**.
 
 **NET-2 — Size is checked before allocation.** A length read from a peer is
 compared with a stated maximum before it sizes a buffer, and the maximum is
 configurable with a small default.
-- *Why:* reproduced. The MQTT broker allocates whatever remaining length a
-  client declares, up to 256 MiB, before reading or authenticating
-  anything. Sixteen 5-byte packets aborted the process (F-02).
-- *Enforcement:* E3, an oversized-length test per decoder **[Owed]**.
+- *Why:* reproduced. An MQTT broker that allocated whatever remaining
+  length a client declared, up to 256 MiB, before reading or
+  authenticating anything, was aborted by sixteen 5-byte packets.
+- *Enforcement:* E3, an oversized-length test per listener: the MQTT
+  broker (`rustnative-sync/tests/mqtt_limits.rs`), live sessions
+  (`tests/live.rs`), the inspection server
+  (`rustnative-core/tests/inspection.rs`), and the HTTP server and traffic
+  splitter (`rustnative-server/tests/listener.rs`, `tests/deploy.rs`)
+  **[Enforced]**.
 
 **NET-3 — Every connection has deadlines and every listener has a cap.**
 The cap counts connections and sessions. The deadlines cover the
 handshake, the first request or packet, the request headers, the body,
 idle time, and the whole request. Authentication and rate limiting run
 before the expensive work.
-- *Why:* the HTTP server gives hyper no timer, so its header-read timeout
-  never applies. It collects bodies with no deadline, before rate limiting,
-  and caps no connections. The traffic splitter collects bodies with no
-  size limit. Live sessions accept tungstenite's defaults of 64 MiB per
-  message before the hello. The inspection server reads unbounded lines
-  before checking its token, with one thread per connection (F-03, F-10,
-  F-12, F-13).
-- *Enforcement:* E3, slow-client and flood tests per listener (NET-8)
-  **[Owed]**.
+- *Why:* the scan found an HTTP server whose header-read timeout never
+  applied (hyper had no timer), bodies collected with no deadline or size
+  limit, live sessions accepting 64 MiB per message before the hello, and
+  an inspection server reading unbounded lines before its token check.
+- *Enforcement:* E3, slow-client and flood tests per listener (NET-8): the
+  HTTP server, traffic splitter, live sessions, inspection server, and
+  MQTT broker each have a connection ceiling and deadlines with tests
+  **[Enforced]**.
 
 **NET-4 — An accept error never stops a server.** `EMFILE`, `ENFILE`,
 `ENOBUFS`, `ECONNABORTED`, and other per-connection accept errors are
 transient: log them, back off briefly, and continue. Only shutdown ends an
 accept loop.
-- *Why:* reproduced. `AppService::serve` ends on the first accept error.
-  With the file-descriptor limit at 48, 19 client connections made
-  `accept` fail with `EMFILE`, and the server stopped permanently (F-03).
-  The splitter's and the live server's loops stop the same way, silently.
-- *Enforcement:* E3, a descriptor-exhaustion test per listener
+- *Why:* reproduced. A `serve` loop that ended on the first accept error
+  stopped permanently after 19 client connections under a file-descriptor
+  limit of 48.
+- *Enforcement:* E3, a descriptor-exhaustion test per listener. The HTTP
+  server's is `rustnative-server/tests/accept_errors.rs` **[Enforced]**;
+  the traffic splitter, live sessions, inspection server, and MQTT broker
+  share the same backoff, and their own descriptor-exhaustion tests are
   **[Owed]**.
 
 **NET-5 — Each check has one choke point.** Origin checks, authentication,
 rate limiting, and size limits are applied by one function that every
 entry point to a service passes through. A second entry point that skips
 the check is the defect this standard exists for.
-- *Why:* `LiveServer::mount` checks the WebSocket's `Origin`, and
-  `LiveServer::serve`, the standalone entry point to the same sessions,
-  does not (F-12).
+- *Why:* the scan found `LiveServer::mount` checking the WebSocket's
+  `Origin` and `LiveServer::serve`, the standalone entry point to the same
+  sessions, not checking it. Both now call one function.
 - *Enforcement:* E3, each entry point tested against the same hostile
-  inputs **[Owed]**.
+  inputs: live sessions' standalone listener and `mount`
+  (`rustnative-sync/tests/live.rs`) **[Enforced]**; the other services
+  **[Owed]**.
 
 **NET-6 — Rate limits key on what an attacker cannot multiply.** IPv4
 clients are keyed by address and IPv6 clients by their `/64` prefix,
@@ -1405,16 +1426,21 @@ an attacker who can fill the table could then clear everyone's limit.
 in flight finish first" tracks its connections, stops accepting, drains
 them within a bound, and has a test that a slow request completes across a
 shutdown.
-- *Why:* `AppService::serve` documents this and returns immediately,
-  leaving its connection tasks detached, and no test exercises it (F-07).
-- *Enforcement:* E3 **[Owed]**.
+- *Why:* the scan found `serve` documenting this, returning immediately,
+  and leaving its connection tasks detached, with no test.
+- *Enforcement:* E3, `rustnative-server/tests/listener.rs`: requests in
+  flight finish across a shutdown, and only within
+  `Security::shutdown_grace` **[Enforced]**.
 
 **NET-8 — Every listener has a hostile-peer test suite.** The suite sends
 malformed input, an oversized length, a slow client, a connection flood,
 descriptor exhaustion, and cross-site and rebinding requests where they
 apply. It asserts each is refused and that the listener keeps serving
 others. Its decoder has a fuzz target (TST-6).
-- *Enforcement:* E3 **[Owed]**.
+- *Enforcement:* E3 **[Partial]**: every listener has oversized-length,
+  slow-client, and flood tests (NET-2, NET-3), and the deploy control API
+  has cross-site and rebinding tests. Descriptor exhaustion beyond the
+  HTTP server (NET-4) and the fuzz targets are owed.
 
 **NET-9 — Outbound clients bound what they accept.** HTTP, WebSocket, and
 sync clients bound response size, follow redirects only by a stated policy
@@ -1432,10 +1458,10 @@ identical on every backend.
 **CRY-1 — Primitives come from vetted crates, comparisons included.** Use
 RustCrypto, `ed25519-dalek`, `argon2`, and `subtle`. Never implement a
 primitive, including constant-time comparison. A hand-written fold is not
-guaranteed to stay constant-time after optimization. There are three
-hand-written comparisons: `security::constant_time_eq`, the inspection
-server's, and the dev agent's (F-14). One shared function backed by
-`subtle::ConstantTimeEq` replaces all three (ARC-12).
+guaranteed to stay constant-time after optimization. Every comparison
+of a secret goes through `rustnative_core::secret::constant_time_eq`,
+backed by `subtle::ConstantTimeEq` (ARC-12); `rustnative-server`
+re-exports it as `security::constant_time_eq`.
 - *Enforcement:* E3, a scan for XOR-fold comparison patterns **[Owed]**.
 
 **CRY-2 — Key material is a type that validates itself.** A key is
@@ -1788,7 +1814,8 @@ and mirrored at every text scale. Every function taking text from people
 or the network is tested with non-ASCII, multi-byte, and astral-plane
 input.
 - *Enforcement:* E3, `layout_conformance.rs` **[Enforced]**. Non-ASCII
-  inputs in parser and service tests are **[Partial]**, as F-05 shows.
+  inputs in parser and service tests are **[Partial]**: the URL checker's
+  non-ASCII panics were found by the scan's fuzzer, not by a test.
 
 ---
 
@@ -1929,10 +1956,10 @@ promising behaviour ("requests in flight finish first", "never holds a
 password", "compared in constant time", "valid once") names the test that
 holds it, or is a doctest. The repository's "no claim without a test" rule
 reaches the API reference, not only the Markdown.
-- *Why:* three rustdoc claims are false and untested. `serve` does not
-  drain in-flight requests (F-07). The signing module passes the password
-  on the command line (F-25). `TokenSigner::new`'s "at least 32 bytes" is
-  not checked (F-23).
+- *Why:* the scan found three rustdoc claims false and untested. `serve`
+  did not drain in-flight requests; it does now, with a test (NET-7). The
+  signing module passes the password on the command line (F-25).
+  `TokenSigner::new`'s "at least 32 bytes" is not checked (F-23).
 - *Enforcement:* E5, plus a reviewer's checklist item, and E3 where a claim
   vocabulary can be scanned (`never`, `always`, `only`, `once`, `constant
   time`) for a nearby test reference **[Owed]**.
@@ -2026,8 +2053,8 @@ function that validates text from outside. Targets run briefly in CI and
 continuously elsewhere, under an allocation limit (STB-8). Crashes become
 regression tests.
 - *Why:* a 2.5-million-input generator run over eleven parsers found
-  panics in exactly one function (`checked_url`, five distinct panics) and
-  none in the others (F-05). The parsers are robust today, and fuzz
+  panics in exactly one function (the terminal backend's URL check, five
+  distinct panics) and none in the others. The parsers are robust today, and fuzz
   targets are what keep them so.
 - *Enforcement:* E3 **[Owed]** (`C130`). The scan's generators are a
   starting corpus.
@@ -2086,9 +2113,11 @@ assumed to pass.
 **TST-14 — Hostile inputs are tests, not only reviews.** Every security
 claim has a test that plays the attacker: a cross-site request, a replay,
 an oversized or slow peer, a malformed token, a forged signature, a planted
-file, a non-ASCII URL, an unreachable verdict. The scan reproduced F-01,
-F-02, F-03, F-05, and F-08 by writing such tests against the real code.
-The existing suite caught none of them, and caught F-42 only because this
+file, a non-ASCII URL, an unreachable verdict. The scan reproduced its
+critical and high findings (the deploy control API's forgery, the MQTT
+allocation, the server's accept loop, the URL checker's panics, the
+inspection token's mode) by writing such tests against the real code.
+The suite of the day caught none of them, and caught F-42 only because this
 machine happened to route HTTPS through a proxy.
 - *Enforcement:* E3 **[Owed]**. Reviewers ask "which test attacks this?"
   (E5).
@@ -2183,12 +2212,13 @@ test. Generated code is never edited by hand.
 newline, no trailing whitespace, and no control characters other than tab
 and newline.
 - *Why:* broken escape sequences left raw control bytes in three doc
-  comments: a NUL in `rustnative-web/src/client.rs` ("Subscription \0
-  delivered a value"), backspaces in `rustnative-webgen/src/items.rs`
-  ("\breaks"), and a BEL in `rustnative-style/src/web.rs` ("\auto")
-  (F-18).
-- *Enforcement:* E3, a source-hygiene test over every tracked text file
-  **[Owed]**. `.gitattributes` enforces LF **[Enforced]**.
+  comments: a NUL in `rustnative-web/src/client.rs`, backspaces in
+  `rustnative-webgen/src/items.rs`, and a BEL in
+  `rustnative-style/src/web.rs`.
+- *Enforcement:* E3, `rustnative-conformance/tests/control_bytes.rs` fails
+  on any control character but tab and newline in a tracked text file
+  **[Enforced]**. `.gitattributes` enforces LF **[Enforced]**. The checks
+  for a final newline and trailing whitespace are **[Owed]**.
 
 **QLT-10 — Every language in the repository has a standard.**
 - **Java** (Android host library): Google Java Style, `final` classes by
@@ -2269,10 +2299,11 @@ chosen once and kept.
 
 **VCS-6 — Build outputs are never committed.** `target/` directories at any
 depth, captures, stack dumps, and local state stay out of the repository.
-`examples/hello-label/target/rustnative-dev/last-restart.json` is tracked,
-because `.gitignore` ignores only the root `/target/` (F-20).
-- *Enforcement:* E3, `.gitignore` patterns (`target/`), plus a CI check
-  that fails on tracked files under any `target/` **[Owed]**.
+- *Why:* while `.gitignore` ignored only the root `/target/`, an example's
+  dev-loop state file under `examples/hello-label/target/` was committed.
+- *Enforcement:* `.gitignore` ignores `target/` at every depth
+  **[Enforced]**. A CI check that fails on tracked files under any
+  `target/` is **[Owed]**.
 
 **VCS-7 — Binary files are justified and small.** A binary (goldens, icons,
 fixtures) has a reason, the smallest form that serves it, and a size limit.
@@ -2380,7 +2411,8 @@ is one command, and health and readiness are real. The control surface
 that moves traffic is authenticated (NET-1), and previewing an unpromoted
 revision (`x-revision`) is restricted to authorized callers.
 - *Enforcement:* E3, `rustnative-server/tests/deploy.rs` **[Partial]**: the
-  mechanics are tested, and the control surface is open (F-01).
+  mechanics are tested and the control surface is authenticated (NET-1),
+  but any client can preview a revision with `x-revision` (F-10).
 
 **RLS-6 — Published crates are complete.** Each published crate has its
 `description`, `license`, `repository`, `readme`, `keywords`, and
@@ -2660,29 +2692,17 @@ These are the defects the scan found while deriving the standards, at
 commit `c2a2e67`. "Reproduced" means a test or probe ran the real code and
 showed the defect. "Read" means the code was read in context and the
 defect is certain from the code. Each is cited by the standards it breaks.
+A fixed finding leaves the register and its ID is not reused;
+`docs/policy/standards-derivation.md` records how the scan found it.
 
 | ID | Severity | Where | Defect | Evidence | Breaks |
 |---|---|---|---|---|---|
-| F-01 | Critical | `rustnative-server/src/deploy.rs` `control()`, `request.rs` `Json<T>` | Local deploy control API: no credential, CSRF off, `Content-Type` ignored. A cross-site page can move all traffic to an attacker. | Reproduced: two `text/plain` cross-site POSTs → 200, 100% to the attacker | NET-1, SEC-11, RLS-5 |
-| F-02 | High | `rustnative-sync/src/mqtt.rs` `Packet::read` | Allocates a client-declared length (up to 256 MiB) before any check | Reproduced: 16 × 5-byte packets abort the process | NET-2, STB-8 |
-| F-03 | High | `rustnative-server/src/app.rs` `serve` | One accept error (`EMFILE`) stops the server. No connection cap, no header timer, no body deadline. | Reproduced: stopped after 19 connections at a limit of 48 | NET-3, NET-4 |
-| F-04 | High | `rustnative-windows/src/services/system.rs` `open_url` (and Linux, Android) | Any string handed to `ShellExecuteW` or the default handler | Read | SEC-13, NAT-7 |
-| F-05 | Medium | `rustnative-tui/src/services.rs` `checked_url` | Byte-index slicing panics on non-ASCII | Reproduced: `"mailto:€"` panics, and fuzzing found 5 distinct panics | COR-10, TST-6 |
 | F-06 | Medium | `rustnative-server/src/security.rs` `RateLimiter` | IPv6 keyed per address; a full table clears every bucket | Read | NET-6 |
-| F-07 | Medium | `rustnative-server/src/app.rs` `serve` doc | "Requests in flight finish first" is not implemented or tested | Read | NET-7, DOC-7 |
-| F-08 | High | `rustnative-core/src/inspect/server.rs` `publish` | Access token in `/tmp/rustnative-inspect/<pid>.json`, mode 644 | Reproduced: mode 644, directory 755 | SEC-14, PRV-3 |
-| F-09 | High | `crates/rustnative/src/dev.rs` `agent` | Received executables staged and run from shared `/tmp`, written through a symlink-following call | Read | SEC-14 |
-| F-10 | Medium | `rustnative-server/src/deploy.rs` `TrafficSplitter::serve` | Body collected without limit; no timeouts; any client selects any revision | Read | NET-3, RLS-5 |
-| F-11 | Medium | `rustnative-windows/src/native/accelerator.rs` | `LoadLibraryW("dxcore.dll")` by bare name | Read | SEC-8 |
-| F-12 | Medium | `rustnative-sync/src/live.rs` | Origin checked by `mount` only, not by `serve`. 64 MiB messages accepted before the hello. | Read | NET-5, NET-3 |
-| F-13 | Medium | `rustnative-core/src/inspect/server.rs` `serve` | Unbounded line reads before the token check, a thread per connection | Read | NET-3 |
-| F-14 | Low | `security.rs`, `inspect/server.rs`, `dev.rs` | Three hand-written constant-time comparisons | Read | CRY-1, ARC-12 |
+| F-10 | Medium | `rustnative-server/src/deploy.rs` `TrafficSplitter::forward` | Any client previews any revision with `x-revision` | Read | RLS-5 |
 | F-15 | Medium | `rustnative-server/src/auth/oauth.rs` | `id_token` returned unverified, no nonce | Read | SEC-16 |
 | F-16 | Low | `crates/rustnative/templates/kits/auth.rs`, `examples/web-notes`, `examples/server-demo` | Sign-in without `session.renew()`, which the docs require | Read | API-10, SEC-15 |
 | F-17 | Medium | `rustnative-android/src/update.rs` `from_play`, `RnServices.installer` | Play-install check fails open | Read | REL-9, RLS-4, LEG-4 |
-| F-18 | Low | `rustnative-web/src/client.rs`, `rustnative-webgen/src/items.rs`, `rustnative-style/src/web.rs` | Raw control bytes in doc comments | Read (byte scan) | QLT-9 |
 | F-19 | Medium | `rustnative-linux/src/desktop/notifications.rs` | `mem::forget` leaks a D-Bus subscription per notification | Read | MEM-10, RES-6 |
-| F-20 | Low | `examples/hello-label/target/…` | Build output tracked; `.gitignore` covers only the root | Read | VCS-6 |
 | F-21 | Medium | `rustnative-update/src/lib.rs` `write_atomically` | Rename without `fsync`; a second, weaker atomic write | Read | DAT-3, ARC-12 |
 | F-22 | Low | `rustnative-update/src/lib.rs` `model_directory` | Manifest-supplied name joined into a path unchecked | Read | DAT-6 |
 | F-23 | Medium | `rustnative-server/src/auth/token.rs`, `session.rs` | Any-length key accepted; no purpose binding; empty-signature fallback | Read | CRY-2, CRY-3, DOC-7 |
@@ -2730,39 +2750,34 @@ ordered by how much protection each buys per unit of work.
 
 | # | Mechanism | Raises | Rung |
 |---|---|---|---|
-| 1 | Credential, `Host` check, cross-site refusal, and a `Content-Type`-enforcing `Json<T>` for loopback services (F-01) | NET-1, SEC-11, RLS-5 | E1/E3 |
-| 2 | Size-before-allocation, caps, deadlines, and transient accept errors for every listener, with hostile-peer tests (F-02, F-03, F-10, F-12, F-13) | NET-2…4, NET-8, STB-8 | E3 |
-| 3 | Per-user `0700` runtime directory and `0600` `O_EXCL` files for tokens and staged executables (F-08, F-09) | SEC-14 | E3 |
-| 4 | One portable URL policy for every backend's `open_url`, plus `clippy::string_slice` (F-04, F-05) | SEC-13, COR-10, NAT-7 | E3/E2 |
-| 5 | Pin the toolchain exactly, and pin actions, credentials, and images (F-35, F-37) | SUP-11, SUP-6, CI-4 | E3 |
-| 6 | Fail-closed Play check and positive-verdict pin check on Linux, each with a fault-injection test (F-17, F-42) | REL-9, CRY-5 | E3 |
-| 7 | Source-hygiene test; fix the three corrupted doc comments; ignore `target/` at every depth (F-18, F-20) | QLT-9, VCS-6 | E3 |
-| 8 | Workspace lint promotions: `missing_docs`, `allow_attributes_without_reason`, `significant_drop_in_scrutinee`, `mem_forget`, `multiple_unsafe_ops_per_block`, `print_stdout`/`print_stderr` (libraries), `exit`, `map_err_ignore`, `let_underscore_must_use`, `unused_result_ok`, `missing_debug_implementations` | API-2, API-3, QLT-3, CON-9, MEM-2, MEM-10, OBS-1, STB-6, ERR-3, ERR-5 | E2 |
-| 9 | `#![forbid(unsafe_code)]` in the 18 crates without `unsafe` | MEM-1 | E2 |
-| 10 | Boundary scan for every `extern` function, and the missing boundaries added (F-31) | STB-2 | E3 |
-| 11 | `subtle`-backed comparison; typed keys; purpose binding; SPKI pins with backups; timestamped signing without argv secrets (F-14, F-23, F-24, F-25, F-26) | CRY-1…6, SEC-9 | E1/E3 |
-| 12 | `Unverified<T>`, typed SQL identifiers, client-safe error bodies, and one-call sign-in (F-15, F-16, F-28) | SEC-15…18, API-10 | E1 |
-| 13 | One durable atomic write; `PathComponent` (F-21, F-22) | DAT-3, DAT-6, ARC-12 | E1/E3 |
-| 14 | Leases for the job queue; jittered backoff (F-33, F-34) | REL-8, REL-2 | E3 |
-| 15 | Service-contract conformance suites (`HttpService`, `SystemService`) | NAT-7, NET-9, TST-4 | E3 |
-| 16 | CODEOWNERS, branch protection, PR and issue templates, DCO check | VCS-3…8, GOV-3 | E3/E5 |
-| 17 | Architecture boundary test over `cargo metadata`, plus a host-`cfg` scan of the core | ARC-1…4 | E3 |
-| 18 | `cargo-fuzz` targets seeded from the scan's generators; a nightly Miri job | TST-6, TST-15, MEM-6 | E3 |
-| 19 | Public API snapshot, `cargo-semver-checks`, and the sealing decisions | CMP-1, CMP-2, API-4 | E4 |
-| 20 | `cargo machete`, `--locked`, an `unmaintained` policy, denied unlisted duplicates, an update bot | SUP-1, SUP-3, SUP-4, SUP-9, SUP-10 | E3 |
-| 21 | Environment-variable registry and its generated reference (F-39) | DX-4 | E4 |
-| 22 | Extended lints and scans on the Windows, Android, and wasm targets | CI-9 | E3 |
-| 23 | Typed-error burn-down for the 134 `Result<_, String>` signatures | ERR-1 | E3 |
-| 24 | Coverage on changed lines, with floors for compilers | TST-11 | E3 |
-| 25 | Flake detection and quarantine; sleep and silent-skip scans | TST-7…9 | E3 |
-| 26 | `cargo hack --each-feature`; persisted-format fixtures | DX-5, CMP-6, DAT-2 | E3 |
-| 27 | `shellcheck`, `javac -Xlint:all -Werror`, a broad-catch rule, `taplo`, the JS forbidden-API scan | QLT-10, MEM-7 | E3 |
-| 28 | Markdown spelling and link checks; `doc_parity` for all of `docs/`; rustdoc claim scan | DOC-5, DOC-7, EQV-7 | E3 |
-| 29 | Release workflow with provenance (SLSA Build L2+), SBOM, `publish --dry-run`, and a reproducibility check | SUP-7, SUP-8, RLS-1, RLS-6 | E3 |
-| 30 | `CODE_OF_CONDUCT.md`, `GOVERNANCE.md`, `docs/rfcs/` | GOV-1, GOV-2, GOV-5 | E6 |
-| 31 | A test and an accessibility query per example; generated-code lint test | DOC-3, A11Y-8, QLT-12 | E3 |
-| 32 | Release-health gating of rollouts | STB-7 | E3 |
-| 33 | A hostile-environment CI job; probing abort-prone host dependencies before use (F-40, F-41) | TST-17, REL-4 | E3 |
+| 1 | Pin the toolchain exactly, and pin actions, credentials, and images (F-35, F-37) | SUP-11, SUP-6, CI-4 | E3 |
+| 2 | Fail-closed Play check and positive-verdict pin check on Linux, each with a fault-injection test (F-17, F-42) | REL-9, CRY-5 | E3 |
+| 3 | Workspace lint promotions: `allow_attributes_without_reason`, `significant_drop_in_scrutinee`, `mem_forget`, `multiple_unsafe_ops_per_block`, `print_stdout`/`print_stderr` (libraries), `exit`, `map_err_ignore`, `let_underscore_must_use`, `unused_result_ok`, `missing_debug_implementations` | API-3, QLT-3, CON-9, MEM-2, MEM-10, OBS-1, STB-6, ERR-3, ERR-5 | E2 |
+| 4 | `#![forbid(unsafe_code)]` in the 18 crates without `unsafe` | MEM-1 | E2 |
+| 5 | Boundary scan for every `extern` function, and the missing boundaries added (F-31) | STB-2 | E3 |
+| 6 | Typed keys; purpose binding; SPKI pins with backups; timestamped signing without argv secrets (F-23, F-24, F-25, F-26) | CRY-2…6, SEC-9 | E1/E3 |
+| 7 | `Unverified<T>`, typed SQL identifiers, client-safe error bodies, and one-call sign-in (F-15, F-16, F-28) | SEC-15…18, API-10 | E1 |
+| 8 | One durable atomic write; `PathComponent` (F-21, F-22) | DAT-3, DAT-6, ARC-12 | E1/E3 |
+| 9 | Leases for the job queue; jittered backoff (F-33, F-34) | REL-8, REL-2 | E3 |
+| 10 | Service-contract conformance suites (`HttpService`, `SystemService`) | NAT-7, NET-9, TST-4 | E3 |
+| 11 | CODEOWNERS, branch protection, PR and issue templates, DCO check | VCS-3…8, GOV-3 | E3/E5 |
+| 12 | Architecture boundary test over `cargo metadata`, plus a host-`cfg` scan of the core | ARC-1…4 | E3 |
+| 13 | `cargo-fuzz` targets seeded from the scan's generators; a nightly Miri job | TST-6, TST-15, MEM-6 | E3 |
+| 14 | Public API snapshot, `cargo-semver-checks`, and the sealing decisions | CMP-1, CMP-2, API-4 | E4 |
+| 15 | `cargo machete`, `--locked`, an `unmaintained` policy, denied unlisted duplicates, an update bot | SUP-1, SUP-3, SUP-4, SUP-9, SUP-10 | E3 |
+| 16 | Environment-variable registry and its generated reference (F-39) | DX-4 | E4 |
+| 17 | Extended lints and scans on the Windows, Android, and wasm targets | CI-9 | E3 |
+| 18 | Typed-error burn-down for the 134 `Result<_, String>` signatures | ERR-1 | E3 |
+| 19 | Coverage on changed lines, with floors for compilers | TST-11 | E3 |
+| 20 | Flake detection and quarantine; sleep and silent-skip scans | TST-7…9 | E3 |
+| 21 | `cargo hack --each-feature`; persisted-format fixtures | DX-5, CMP-6, DAT-2 | E3 |
+| 22 | `shellcheck`, `javac -Xlint:all -Werror`, a broad-catch rule, `taplo`, the JS forbidden-API scan | QLT-10, MEM-7 | E3 |
+| 23 | Markdown spelling and link checks; `doc_parity` for all of `docs/`; rustdoc claim scan | DOC-5, DOC-7, EQV-7 | E3 |
+| 24 | Release workflow with provenance (SLSA Build L2+), SBOM, `publish --dry-run`, and a reproducibility check | SUP-7, SUP-8, RLS-1, RLS-6 | E3 |
+| 25 | `CODE_OF_CONDUCT.md`, `GOVERNANCE.md`, `docs/rfcs/` | GOV-1, GOV-2, GOV-5 | E6 |
+| 26 | A test and an accessibility query per example; generated-code lint test | DOC-3, A11Y-8, QLT-12 | E3 |
+| 27 | Release-health gating of rollouts | STB-7 | E3 |
+| 28 | A hostile-environment CI job; probing abort-prone host dependencies before use (F-40, F-41) | TST-17, REL-4 | E3 |
 
 When an item lands, the standards it raises change their tag to
 **[Enforced]**, and the findings it fixes are removed from the register,

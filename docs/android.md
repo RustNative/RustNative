@@ -183,7 +183,7 @@ See [`android/lifecycle.md`](android/lifecycle.md).
 |---|---|
 | `AndroidClipboard` | `ClipboardManager` (Android lets only the focused application read it) |
 | `AndroidFileDialogs` | the Storage Access Framework (`ACTION_OPEN_DOCUMENT`, `ACTION_CREATE_DOCUMENT`, `ACTION_OPEN_DOCUMENT_TREE`); the answer is a `content://` URI, read and written with `read_document`/`write_document`, its grant persisted |
-| `AndroidSystem` | `ACTION_VIEW` for URLs; notifications on channels, with actions returning as `Event::SurfaceAction`; the share sheet (`share`) |
+| `AndroidSystem` | `ACTION_VIEW` for a URL the core's `UrlPolicy` allows (`http`, `https`, and `mailto` by default; `with_url_policy` widens it); notifications on channels, with actions returning as `Event::SurfaceAction`; the share sheet (`share`) |
 | `AndroidHttp` | `HttpsURLConnection`: the system's trust store, the application's network security config (cleartext refused by default), the system proxy; certificate pins checked after the handshake, before a byte is written |
 | `AndroidLocale` | ICU (`android.icu`) |
 | `AndroidSecureStorage` | an AES-GCM key in the Android Keystore — `StrongBox` where the device has one, else the TEE — sealing values in the application's private files |

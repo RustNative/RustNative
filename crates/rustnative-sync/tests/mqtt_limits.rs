@@ -84,7 +84,8 @@ async fn an_oversized_length_is_refused_without_allocating() {
 async fn a_connection_that_never_connects_is_closed() {
     let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
     let address = listener.local_addr().unwrap();
-    let limits = MqttLimits { connect_timeout: Duration::from_millis(100), ..MqttLimits::default() };
+    let limits =
+        MqttLimits { connect_timeout: Duration::from_millis(100), ..MqttLimits::default() };
     tokio::spawn(serve_with(Broker::new(), listener, limits));
     closed(TcpStream::connect(address).await.unwrap()).await;
 }

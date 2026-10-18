@@ -1404,7 +1404,10 @@ Programmatic updates are applied only when the native value differs, avoiding un
 
 ## Verification
 
-On Windows, run:
+Contributions are held to the engineering standards in
+[`STANDARDS.md`](STANDARDS.md) (how they were derived:
+`docs/policy/standards-derivation.md`); [`CONTRIBUTING.md`](CONTRIBUTING.md)
+lists the checks to run and the design rules. On Windows, run:
 
 ```powershell
 cargo fmt --all -- --check
