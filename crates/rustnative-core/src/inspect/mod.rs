@@ -71,7 +71,10 @@ pub use record::{
     HttpTape, NodeRef, RecordedEvent, RecordedHttp, RecordedInput, Recording, RecordingHttp,
     ReplayError,
 };
-pub use server::{Endpoint, InspectServer, endpoint_directory, new_token, request as send_request};
+pub use server::{
+    Endpoint, InspectServer, endpoint_directory, new_token, published_endpoint,
+    published_endpoints, request as send_request,
+};
 pub(crate) use trace::Inspection;
 pub use trace::{PassInfo, RenderInfo, TraceEntry, TraceKind};
 

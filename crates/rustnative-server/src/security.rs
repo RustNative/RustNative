@@ -167,12 +167,10 @@ pub(crate) fn check_csrf(request: &RequestContext) -> Result<(), ServerError> {
     }
 }
 
-/// Compares without leaking where the first difference is.
-#[must_use]
-pub fn constant_time_eq(left: &[u8], right: &[u8]) -> bool {
-    left.len() == right.len()
-        && left.iter().zip(right).fold(0u8, |difference, (a, b)| difference | (a ^ b)) == 0
-}
+/// Compares without leaking where the first difference is: the one
+/// comparison the runtime's inspection server and the development agent
+/// also use, backed by `subtle`.
+pub use rustnative_core::secret::constant_time_eq;
 
 /// A `Set-Cookie` value with secure defaults: `Secure`, `HttpOnly`,
 /// `SameSite=Lax`, `Path=/`.

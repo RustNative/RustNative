@@ -2380,6 +2380,7 @@ dependencies = [
  "criterion",
  "futures-core",
  "getrandom 0.3.4",
+ "libc",
  "parking_lot",
  "proptest",
  "rustnative-i18n",
@@ -2388,6 +2389,7 @@ dependencies = [
  "rustnative-types",
  "serde",
  "serde_json",
+ "subtle",
  "tokio",
 ]
 
