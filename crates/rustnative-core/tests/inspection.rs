@@ -12,8 +12,9 @@
 use std::time::Duration;
 
 use rustnative_core::inspect::{
-    ComponentInfo, HistoryEntry, LayoutExplanation, NoBackend, NodeInfo, Origin, OverlayMode,
-    Recording, Reply, Request, StyleExplanation, TraceEntry, TraceKind, send_request,
+    ComponentInfo, Endpoint, HistoryEntry, LayoutExplanation, MAX_CONNECTIONS, MAX_LINE, NoBackend,
+    NodeInfo, Origin, OverlayMode, Recording, Reply, Request, StyleExplanation, TraceEntry,
+    TraceKind, send_request,
 };
 use rustnative_core::{
     Application, Color, Component, ComponentContext, Event, LayoutStyle, Node, NodeId, Size,
@@ -370,4 +371,67 @@ fn a_style_file_s_tokens_reach_the_running_application_and_quit_is_a_request() {
     let _: bool = ask(&mut app, &Request::Quit);
     assert!(app.take_quit_request(), "the backend closes the application");
     assert!(!app.take_quit_request(), "once");
+}
+
+/// A `Hello` over the transport, answered by `app` on this thread.
+fn hello_over_tcp(app: &mut Application, endpoint: &Endpoint) -> Reply {
+    let client = {
+        let endpoint = endpoint.clone();
+        std::thread::spawn(move || send_request(&endpoint, &Request::Hello).unwrap())
+    };
+    let deadline = std::time::Instant::now() + Duration::from_secs(10);
+    while !client.is_finished() {
+        app.poll_inspection(&NoBackend);
+        assert!(std::time::Instant::now() < deadline, "no request arrived");
+        std::thread::sleep(Duration::from_millis(5));
+    }
+    client.join().unwrap()
+}
+
+/// The first line the server writes on `stream`, or `None` if it closes
+/// without one.
+fn first_line(stream: std::net::TcpStream) -> Option<String> {
+    use std::io::BufRead;
+    stream.set_read_timeout(Some(Duration::from_secs(5))).unwrap();
+    let mut line = String::new();
+    std::io::BufReader::new(stream).read_line(&mut line).ok()?;
+    (!line.is_empty()).then_some(line)
+}
+
+#[test]
+fn a_line_over_the_limit_is_refused_before_the_token_and_the_server_keeps_serving() {
+    use std::io::Write;
+    let mut app = screen();
+    let endpoint = app.enable_inspection(None).unwrap();
+
+    // One byte over the limit, with no line ending (no token, either).
+    let mut hostile = std::net::TcpStream::connect(endpoint.addr).unwrap();
+    hostile.write_all(&vec![b'x'; MAX_LINE + 1]).unwrap();
+    let reply = first_line(hostile);
+    assert!(
+        reply.as_deref().is_some_and(|line| line.contains("line too long")),
+        "an over-long line is refused at once: {reply:?}"
+    );
+
+    assert!(matches!(hello_over_tcp(&mut app, &endpoint), Reply::Ok(_)));
+}
+
+#[test]
+fn connections_past_the_ceiling_are_refused_and_freed_slots_serve_again() {
+    let mut app = screen();
+    let endpoint = app.enable_inspection(None).unwrap();
+    let held: Vec<_> = (0..MAX_CONNECTIONS)
+        .map(|_| std::net::TcpStream::connect(endpoint.addr).unwrap())
+        .collect();
+    std::thread::sleep(Duration::from_millis(100));
+
+    let refused = first_line(std::net::TcpStream::connect(endpoint.addr).unwrap());
+    assert!(
+        refused.as_deref().is_some_and(|line| line.contains("too many inspection connections")),
+        "past the ceiling: {refused:?}"
+    );
+
+    drop(held);
+    std::thread::sleep(Duration::from_millis(100));
+    assert!(matches!(hello_over_tcp(&mut app, &endpoint), Reply::Ok(_)));
 }

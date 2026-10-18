@@ -149,10 +149,20 @@ pub trait DeploymentAdapter: Send + Sync {
     fn status(&self) -> DeploymentStatus;
 }
 
-/// The reverse proxy in front of the revisions.
-#[derive(Clone, Default)]
+/// The reverse proxy in front of the revisions. Its listener keeps the
+/// same resource limits as an application's own: the body limit, the
+/// connection ceiling, and the header and body timeouts of a
+/// [`crate::Security`] ([`Self::with_limits`]; the defaults otherwise).
+#[derive(Clone)]
 pub struct TrafficSplitter {
     status: Arc<Mutex<DeploymentStatus>>,
+    limits: Arc<crate::Security>,
+}
+
+impl Default for TrafficSplitter {
+    fn default() -> Self {
+        Self { status: Arc::default(), limits: Arc::new(crate::Security::default()) }
+    }
 }
 
 fn bucket(key: &str) -> u8 {
@@ -170,6 +180,14 @@ impl TrafficSplitter {
     #[must_use]
     pub fn new() -> Self {
         Self::default()
+    }
+
+    /// Takes the listener's limits from `security`: `body_limit`,
+    /// `max_connections`, `header_timeout`, and `body_timeout`.
+    #[must_use]
+    pub fn with_limits(mut self, security: &crate::Security) -> Self {
+        self.limits = Arc::new(security.clone());
+        self
     }
 
     /// Where traffic goes.
@@ -233,32 +251,56 @@ impl TrafficSplitter {
         }
     }
 
-    /// Serves the proxy on `listener`.
+    /// Serves the proxy on `listener`, until the listener itself fails.
+    /// A request body over the body limit is `413`, and one slower than
+    /// the body timeout `408`; an accept error a peer or a passing
+    /// shortage caused is waited out.
     pub async fn serve(self, listener: tokio::net::TcpListener) {
-        while let Ok((stream, peer)) = listener.accept().await {
+        let slots = Arc::new(tokio::sync::Semaphore::new(self.limits.max_connections));
+        while let Ok((stream, peer)) = crate::listen::accept(&listener).await {
+            let Ok(slot) = Arc::clone(&slots).try_acquire_owned() else { continue };
             let splitter = self.clone();
             tokio::spawn(async move {
+                let _slot = slot;
                 let io = hyper_util::rt::TokioIo::new(stream);
+                let header_timeout = splitter.limits.header_timeout;
                 let service = hyper::service::service_fn(
                     move |request: http::Request<hyper::body::Incoming>| {
                         let splitter = splitter.clone();
                         async move {
-                            let (parts, body) = request.into_parts();
-                            let body = body
-                                .collect()
-                                .await
-                                .map(http_body_util::Collected::to_bytes)
-                                .unwrap_or_default();
-                            let response = splitter
-                                .forward(http::Request::from_parts(parts, body), peer)
-                                .await;
+                            let response = splitter.collect_and_forward(request, peer).await;
                             Ok::<_, std::convert::Infallible>(response.map(Full::new))
                         }
                     },
                 );
-                let _ =
-                    hyper::server::conn::http1::Builder::new().serve_connection(io, service).await;
+                let _ = hyper::server::conn::http1::Builder::new()
+                    .timer(hyper_util::rt::TokioTimer::new())
+                    .header_read_timeout(header_timeout)
+                    .serve_connection(io, service)
+                    .await;
             });
+        }
+    }
+
+    async fn collect_and_forward(
+        &self,
+        request: http::Request<hyper::body::Incoming>,
+        peer: SocketAddr,
+    ) -> Response {
+        let (parts, body) = request.into_parts();
+        let collect = http_body_util::Limited::new(body, self.limits.body_limit).collect();
+        match tokio::time::timeout(self.limits.body_timeout, collect).await {
+            Ok(Ok(body)) => {
+                self.forward(http::Request::from_parts(parts, body.to_bytes()), peer).await
+            }
+            Ok(Err(_)) => {
+                ServerError::new(http::StatusCode::PAYLOAD_TOO_LARGE, "The request is too large")
+                    .into_response()
+            }
+            Err(_) => {
+                ServerError::new(http::StatusCode::REQUEST_TIMEOUT, "The request took too long")
+                    .into_response()
+            }
         }
     }
 }

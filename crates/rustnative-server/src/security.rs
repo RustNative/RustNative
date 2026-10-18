@@ -55,6 +55,20 @@ pub struct Security {
     /// cannot choose its own rate-limit bucket. Add the load balancer's
     /// addresses when the server runs behind one.
     pub trusted_proxies: Vec<std::net::IpAddr>,
+    /// The most connections the application's own listener serves at once
+    /// (default 1024); one more is closed as it arrives. A connection
+    /// upgraded to a WebSocket leaves the count: its handler bounds those.
+    pub max_connections: usize,
+    /// How long a client has to send a request's headers, on the
+    /// application's own listener (default 30 s); an idle kept-alive
+    /// connection is closed after the same time.
+    pub header_timeout: Duration,
+    /// How long a client has to send a request's body, on the
+    /// application's own listener (default 30 s); slower is `408`.
+    pub body_timeout: Duration,
+    /// How long the application's own listener waits, once told to stop,
+    /// for the requests in flight to finish (default 10 s).
+    pub shutdown_grace: Duration,
 }
 
 impl Default for Security {
@@ -70,6 +84,10 @@ impl Default for Security {
                 std::net::IpAddr::V4(std::net::Ipv4Addr::LOCALHOST),
                 std::net::IpAddr::V6(std::net::Ipv6Addr::LOCALHOST),
             ],
+            max_connections: 1024,
+            header_timeout: Duration::from_secs(30),
+            body_timeout: Duration::from_secs(30),
+            shutdown_grace: Duration::from_secs(10),
         }
     }
 }

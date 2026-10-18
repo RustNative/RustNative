@@ -8,15 +8,18 @@
 //! which is generated per process and handed to the client out of band
 //! (the endpoint file `rustnative inspect` reads, or the host's own log).
 //!
-//! Connections are served on their own threads; requests are answered on
-//! the UI thread, which the server wakes and which drains them in
-//! [`InspectServer::poll`] — the application is never touched off its
-//! thread.
+//! Connections are served on their own threads, at most
+//! [`MAX_CONNECTIONS`] at once; requests are answered on the UI thread,
+//! which the server wakes and which drains them in [`InspectServer::poll`]
+//! — the application is never touched off its thread. A line is at most
+//! [`MAX_LINE`] bytes, and a connection that has not yet sent the token
+//! has [`AUTH_TIMEOUT`] for each line.
 
-use std::io::{self, BufRead, BufReader, Write};
+use std::io::{self, BufRead, BufReader, Read, Write};
 use std::net::{SocketAddr, TcpListener, TcpStream};
 use std::path::PathBuf;
 use std::sync::Arc;
+use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::mpsc::{self, Receiver, Sender};
 use std::time::Duration;
 
@@ -26,6 +29,18 @@ use super::{PROTOCOL_VERSION, Reply, Request};
 
 /// How long a connection waits for the UI thread to answer.
 const ANSWER_TIMEOUT: Duration = Duration::from_secs(10);
+
+/// The longest line a client may send, in bytes (1 MiB). A longer one is
+/// answered with an error and the connection is closed.
+pub const MAX_LINE: usize = 1024 * 1024;
+
+/// The most connections served at once; one more is answered with an
+/// error and closed.
+pub const MAX_CONNECTIONS: usize = 16;
+
+/// How long a connection that has not yet sent the token may take over
+/// each line.
+pub const AUTH_TIMEOUT: Duration = Duration::from_secs(10);
 
 /// Where an inspection server listens, and the token it requires.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -107,11 +122,22 @@ impl InspectServer {
         let (sender, requests) = mpsc::channel();
         let token = endpoint.token.clone();
         std::thread::Builder::new().name("rustnative-inspect".into()).spawn(move || {
-            for stream in listener.incoming().flatten() {
+            let connections = Arc::new(AtomicUsize::new(0));
+            while let Some(mut stream) = accept(&listener) {
+                if connections.fetch_add(1, Ordering::SeqCst) >= MAX_CONNECTIONS {
+                    connections.fetch_sub(1, Ordering::SeqCst);
+                    let busy = Reply::Error("too many inspection connections".into());
+                    let _ = writeln!(stream, "{}", encode(&busy));
+                    continue;
+                }
+                let slot = Slot(Arc::clone(&connections));
                 let (sender, wake, token) = (sender.clone(), Arc::clone(&wake), token.clone());
                 let _ = std::thread::Builder::new()
                     .name("rustnative-inspect-connection".into())
-                    .spawn(move || serve(stream, &sender, wake.as_ref(), &token));
+                    .spawn(move || {
+                        let _slot = slot;
+                        serve(stream, &sender, wake.as_ref(), &token);
+                    });
             }
         })?;
         Ok(Self { endpoint, requests, file: None })
@@ -164,6 +190,58 @@ pub fn endpoint_directory() -> PathBuf {
     std::env::temp_dir().join("rustnative-inspect")
 }
 
+/// The next connection; `None` once the listener itself is unusable. An
+/// error a passing shortage caused (out of file descriptors) is waited out
+/// with a short backoff rather than spun on.
+fn accept(listener: &TcpListener) -> Option<TcpStream> {
+    let mut backoff = Duration::from_millis(10);
+    loop {
+        match listener.accept() {
+            Ok((stream, _)) => return Some(stream),
+            Err(error) if error.kind() == io::ErrorKind::InvalidInput => return None,
+            Err(error)
+                if matches!(
+                    error.kind(),
+                    io::ErrorKind::ConnectionAborted
+                        | io::ErrorKind::ConnectionReset
+                        | io::ErrorKind::Interrupted
+                ) => {}
+            Err(_) => {
+                std::thread::sleep(backoff);
+                backoff = (backoff * 2).min(Duration::from_millis(100));
+            }
+        }
+    }
+}
+
+/// Gives a connection's slot back when its thread ends.
+struct Slot(Arc<AtomicUsize>);
+
+impl Drop for Slot {
+    fn drop(&mut self) {
+        self.0.fetch_sub(1, Ordering::SeqCst);
+    }
+}
+
+/// One line of at most [`MAX_LINE`] bytes, without its line ending:
+/// `Ok(None)` at the end of the stream, an error for a longer line.
+fn read_line(reader: &mut impl BufRead) -> io::Result<Option<String>> {
+    let mut line = Vec::new();
+    let limit = u64::try_from(MAX_LINE).unwrap_or(u64::MAX).saturating_add(1);
+    reader.take(limit).read_until(b'\n', &mut line)?;
+    if line.is_empty() {
+        return Ok(None);
+    }
+    if line.last() == Some(&b'\n') {
+        line.pop();
+    } else if line.len() > MAX_LINE {
+        return Err(io::Error::new(io::ErrorKind::InvalidData, "line too long"));
+    }
+    String::from_utf8(line)
+        .map(Some)
+        .map_err(|error| io::Error::new(io::ErrorKind::InvalidData, error))
+}
+
 fn serve(
     stream: TcpStream,
     sender: &Sender<Pending>,
@@ -171,8 +249,24 @@ fn serve(
     token: &str,
 ) {
     let Ok(mut writer) = stream.try_clone() else { return };
-    for line in BufReader::new(stream).lines() {
-        let Ok(line) = line else { return };
+    // Until the token arrives, every line has a deadline.
+    if stream.set_read_timeout(Some(AUTH_TIMEOUT)).is_err() {
+        return;
+    }
+    let mut authenticated = false;
+    let mut reader = BufReader::new(stream);
+    loop {
+        let line = match read_line(&mut reader) {
+            Ok(Some(line)) => line,
+            Ok(None) => return,
+            Err(error) => {
+                if error.kind() == io::ErrorKind::InvalidData {
+                    let refused = Reply::Error(format!("not a request: {error}"));
+                    let _ = writeln!(writer, "{}", encode(&refused));
+                }
+                return;
+            }
+        };
         if line.trim().is_empty() {
             continue;
         }
@@ -183,19 +277,31 @@ fn serve(
                 let _ = writeln!(writer, "{}", encode(&Reply::Error("wrong token".into())));
                 return;
             }
-            Ok(envelope) if envelope.version != PROTOCOL_VERSION => Reply::Error(format!(
-                "this application speaks inspection protocol {PROTOCOL_VERSION}, not {}",
-                envelope.version
-            )),
             Ok(envelope) => {
-                let (reply, answer) = mpsc::channel();
-                if sender.send(Pending { request: envelope.request, reply }).is_err() {
-                    return;
+                // With the token, a client may stay quiet as long as it likes.
+                if !authenticated {
+                    if reader.get_ref().set_read_timeout(None).is_err() {
+                        return;
+                    }
+                    authenticated = true;
                 }
-                wake();
-                answer.recv_timeout(ANSWER_TIMEOUT).unwrap_or_else(|_| {
-                    Reply::Error("the application did not answer (its UI thread is busy)".into())
-                })
+                if envelope.version == PROTOCOL_VERSION {
+                    let (reply, answer) = mpsc::channel();
+                    if sender.send(Pending { request: envelope.request, reply }).is_err() {
+                        return;
+                    }
+                    wake();
+                    answer.recv_timeout(ANSWER_TIMEOUT).unwrap_or_else(|_| {
+                        Reply::Error(
+                            "the application did not answer (its UI thread is busy)".into(),
+                        )
+                    })
+                } else {
+                    Reply::Error(format!(
+                        "this application speaks inspection protocol {PROTOCOL_VERSION}, not {}",
+                        envelope.version
+                    ))
+                }
             }
         };
         if writeln!(writer, "{}", encode(&reply)).is_err() {
