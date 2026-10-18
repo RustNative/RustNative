@@ -16,7 +16,7 @@ use rustnative_sync::bus::{Broker, BusMessage, Connect, LocalBus, QoS, topic_mat
 use rustnative_sync::device::{
     Actuate, DeviceAgent, DeviceModel, DevicePolicy, Twin, decode, encode,
 };
-use rustnative_sync::mqtt::{MqttClient, Packet, serve};
+use rustnative_sync::mqtt::{MqttClient, MqttLimits, Packet, serve, serve_with};
 use rustnative_sync::{Hlc, HlcClock};
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
@@ -307,4 +307,133 @@ async fn mqtt_keeps_its_guarantees_over_tcp() {
         .unwrap();
     assert_eq!(message.payload, b"gone");
     cloud.disconnect().await;
+}
+
+/// Whether the broker closes `stream` within `within`.
+async fn closed_within(stream: &mut tokio::net::TcpStream, within: Duration) -> bool {
+    use tokio::io::AsyncReadExt;
+    let mut buffer = [0u8; 64];
+    let deadline = std::time::Instant::now() + within;
+    loop {
+        let left = deadline.saturating_duration_since(std::time::Instant::now());
+        match tokio::time::timeout(left, stream.read(&mut buffer)).await {
+            Ok(Ok(0) | Err(_)) => return true,
+            Ok(Ok(_)) => {}
+            Err(_) => return false,
+        }
+    }
+}
+
+/// A client that subscribes, publishes to itself, and gets its message back.
+async fn round_trip(address: &str, id: &str) {
+    let mut client = MqttClient::connect(
+        address,
+        Connect { client_id: id.into(), clean_session: true, will: None },
+    )
+    .await
+    .unwrap();
+    client.subscribe("echo/#", QoS::AtLeastOnce).await.unwrap();
+    tokio::time::sleep(Duration::from_millis(50)).await;
+    client
+        .publish(BusMessage {
+            topic: format!("echo/{id}"),
+            payload: b"hi".to_vec(),
+            qos: QoS::AtLeastOnce,
+            retain: false,
+        })
+        .await
+        .unwrap();
+    let message = tokio::time::timeout(Duration::from_secs(2), client.incoming.recv())
+        .await
+        .unwrap()
+        .unwrap();
+    assert_eq!(message.payload, b"hi");
+    client.disconnect().await;
+}
+
+#[tokio::test]
+async fn a_packet_over_the_size_limit_is_refused_before_it_is_allocated() {
+    // The codec: a declared length over the limit is an error, with no body.
+    let mut declared: &[u8] = &[0x10, 0xFF, 0xFF, 0xFF, 0x7F];
+    let refused = Packet::read_limited(&mut declared, 1024).await.unwrap_err();
+    assert!(refused.contains("over the limit"), "{refused}");
+
+    let broker = Broker::new();
+    let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let address = listener.local_addr().unwrap().to_string();
+    tokio::spawn(serve(broker, listener));
+
+    // The largest remaining length MQTT can declare (268 435 455 bytes),
+    // from sixteen clients at once: each is closed, nothing is held for it.
+    let mut hostile = Vec::new();
+    for _ in 0..16 {
+        use tokio::io::AsyncWriteExt;
+        let mut stream = tokio::net::TcpStream::connect(&address).await.unwrap();
+        stream.write_all(&[0x10, 0xFF, 0xFF, 0xFF, 0x7F]).await.unwrap();
+        hostile.push(stream);
+    }
+    for stream in &mut hostile {
+        assert!(closed_within(stream, Duration::from_secs(2)).await, "an oversized CONNECT closes");
+    }
+
+    // Once connected, an oversized PUBLISH closes the connection too.
+    let mut stream = tokio::net::TcpStream::connect(&address).await.unwrap();
+    {
+        use tokio::io::AsyncWriteExt;
+        let connect = Packet::Connect {
+            client_id: "big".into(),
+            clean_session: true,
+            keep_alive: 30,
+            will: None,
+        };
+        stream.write_all(&connect.encode()).await.unwrap();
+        let mut ack = [0u8; 4];
+        tokio::io::AsyncReadExt::read_exact(&mut stream, &mut ack).await.unwrap();
+        stream.write_all(&[0x30, 0xFF, 0xFF, 0xFF, 0x7F]).await.unwrap();
+    }
+    assert!(
+        closed_within(&mut stream, Duration::from_secs(2)).await,
+        "an oversized PUBLISH closes"
+    );
+
+    round_trip(&address, "after").await;
+}
+
+#[tokio::test]
+async fn a_connection_that_never_sends_connect_is_closed() {
+    let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let address = listener.local_addr().unwrap().to_string();
+    let limits =
+        MqttLimits { connect_timeout: Duration::from_millis(200), ..MqttLimits::default() };
+    tokio::spawn(serve_with(Broker::new(), listener, limits));
+
+    let mut silent = tokio::net::TcpStream::connect(&address).await.unwrap();
+    assert!(
+        closed_within(&mut silent, Duration::from_secs(3)).await,
+        "the CONNECT timeout applies"
+    );
+    round_trip(&address, "after").await;
+}
+
+#[tokio::test]
+async fn connections_past_the_broker_s_ceiling_are_closed_and_it_keeps_serving() {
+    let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let address = listener.local_addr().unwrap().to_string();
+    let limits = MqttLimits { max_connections: 2, ..MqttLimits::default() };
+    tokio::spawn(serve_with(Broker::new(), listener, limits));
+
+    let held = [
+        tokio::net::TcpStream::connect(&address).await.unwrap(),
+        tokio::net::TcpStream::connect(&address).await.unwrap(),
+    ];
+    tokio::time::sleep(Duration::from_millis(100)).await;
+    let mut third = tokio::net::TcpStream::connect(&address).await.unwrap();
+    assert!(
+        closed_within(&mut third, Duration::from_secs(1)).await,
+        "past the ceiling, closed as it arrives (well before the CONNECT timeout)"
+    );
+
+    drop(held);
+    tokio::time::sleep(Duration::from_millis(100)).await;
+    round_trip(&address, "after").await;
 }

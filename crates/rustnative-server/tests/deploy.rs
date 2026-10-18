@@ -16,7 +16,9 @@ use std::time::Duration;
 use bytes::Bytes;
 use http::Request;
 use rustnative_server::assets::{self, Asset};
-use rustnative_server::deploy::{DeploymentAdapter, LocalAdapter, Revision, container};
+use rustnative_server::deploy::{
+    DeploymentAdapter, LocalAdapter, Revision, TrafficSplitter, container,
+};
 use rustnative_server::{Security, ServerApp, get};
 
 async fn revision(name: &'static str) -> Revision {
@@ -325,4 +327,49 @@ fn each_target_states_what_its_host_allows() {
     assert_eq!(LocalAdapter::for_target(Target::Edge).limits().filesystem, "none");
     assert_eq!(LocalAdapter::for_target(Target::Static).limits().payload_bytes, Some(0));
     assert_eq!(LocalAdapter::default().limits().deadline, None);
+}
+
+#[tokio::test]
+async fn the_splitter_refuses_oversized_and_slow_bodies_and_keeps_serving() {
+    use tokio::io::{AsyncReadExt, AsyncWriteExt};
+
+    let limits = Security {
+        body_limit: 16,
+        body_timeout: Duration::from_millis(200),
+        ..Security::default()
+    };
+    let adapter = LocalAdapter::new(TrafficSplitter::new().with_limits(&limits));
+    adapter.deploy(revision("r1").await).await.unwrap();
+    adapter.promote("r1", 100).await.unwrap();
+    let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let address = listener.local_addr().unwrap();
+    tokio::spawn(adapter.splitter().serve(listener));
+    let send = |request: Vec<u8>| async move {
+        let mut stream = tokio::net::TcpStream::connect(address).await.unwrap();
+        stream.write_all(&request).await.unwrap();
+        let mut response = String::new();
+        tokio::time::timeout(Duration::from_secs(5), stream.read_to_string(&mut response))
+            .await
+            .expect("the splitter answers")
+            .unwrap();
+        response
+    };
+
+    let mut oversized =
+        b"POST / HTTP/1.1\r\nHost: test\r\nContent-Length: 4096\r\nConnection: close\r\n\r\n"
+            .to_vec();
+    oversized.extend(std::iter::repeat_n(b'x', 4096));
+    let response = send(oversized).await;
+    assert!(response.starts_with("HTTP/1.1 413"), "{response}");
+
+    let slow =
+        b"POST / HTTP/1.1\r\nHost: test\r\nContent-Length: 10\r\nConnection: close\r\n\r\nabc"
+            .to_vec();
+    let response = send(slow).await;
+    assert!(response.starts_with("HTTP/1.1 408"), "{response}");
+
+    let response =
+        send(b"GET / HTTP/1.1\r\nHost: test\r\nConnection: close\r\n\r\n".to_vec()).await;
+    assert!(response.starts_with("HTTP/1.1 200"), "{response}");
+    assert!(response.contains("x-served-by: r1"), "{response}");
 }

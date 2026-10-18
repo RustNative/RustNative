@@ -47,6 +47,8 @@ pub mod handler;
 pub mod head;
 #[cfg(feature = "db")]
 pub mod jobs;
+#[cfg(feature = "serve")]
+mod listen;
 pub mod local;
 pub mod openapi;
 pub mod push;

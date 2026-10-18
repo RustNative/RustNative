@@ -275,6 +275,13 @@ impl ServerApp {
         let security = &self.security;
         let mut lines = vec![
             format!("body limit: {} bytes (default 1 MiB)", security.body_limit),
+            format!(
+                "listener: at most {} connections; {}s for headers, {}s for a body; {}s for requests in flight at shutdown",
+                security.max_connections,
+                security.header_timeout.as_secs(),
+                security.body_timeout.as_secs(),
+                security.shutdown_grace.as_secs()
+            ),
             match security.rate_limit {
                 Some((count, window)) => format!("rate limit: {count} per {}s per client", window.as_secs()),
                 None => "rate limit: off (turned off by the application)".into(),
@@ -589,26 +596,47 @@ impl AppService {
     }
 
     #[cfg(feature = "serve")]
-    /// Serves the application on `listener` until `shutdown` completes;
-    /// requests in flight finish first.
+    /// Serves the application on `listener` until `shutdown` completes.
+    /// Then it stops accepting, lets the requests in flight finish — for up
+    /// to [`Security::shutdown_grace`], after which the rest are cut off —
+    /// and returns.
+    ///
+    /// The listener keeps its resource limits ([`Security::max_connections`],
+    /// [`Security::header_timeout`], [`Security::body_timeout`]), and an
+    /// accept error that a peer or a passing shortage of file descriptors
+    /// caused is waited out rather than returned.
     ///
     /// # Errors
     ///
-    /// Accepting a connection failed.
+    /// The listener itself is unusable.
     pub async fn serve(
         self,
         listener: tokio::net::TcpListener,
         shutdown: impl Future<Output = ()>,
     ) -> std::io::Result<()> {
+        let security = &self.0.app.security;
+        let slots = Arc::new(tokio::sync::Semaphore::new(security.max_connections));
+        let (stopping, stop) = tokio::sync::watch::channel(false);
+        let mut connections = tokio::task::JoinSet::new();
         let mut shutdown = std::pin::pin!(shutdown);
-        loop {
+        let result = loop {
+            while connections.try_join_next().is_some() {}
             let (stream, peer) = tokio::select! {
-                accepted = listener.accept() => accepted?,
-                () = &mut shutdown => return Ok(()),
+                accepted = crate::listen::accept(&listener) => match accepted {
+                    Ok(accepted) => accepted,
+                    Err(error) => break Err(error),
+                },
+                () = &mut shutdown => break Ok(()),
             };
+            // At the ceiling the connection is closed as it arrives.
+            let Ok(slot) = Arc::clone(&slots).try_acquire_owned() else { continue };
             let service = self.clone();
-            tokio::spawn(async move {
+            let mut stop = stop.clone();
+            connections.spawn(async move {
+                let _slot = slot;
                 let io = hyper_util::rt::TokioIo::new(stream);
+                let deadline = service.0.app.security.body_timeout;
+                let header_timeout = service.0.app.security.header_timeout;
                 let answer = hyper::service::service_fn(
                     move |request: http::Request<hyper::body::Incoming>| {
                         let service = service.clone();
@@ -624,23 +652,44 @@ impl AppService {
                                 return Ok::<_, Infallible>(handler(request, Some(peer)));
                             }
                             Ok::<_, Infallible>(
-                                service.collect_and_handle(request, Some(peer)).await,
+                                service
+                                    .collect_and_handle(request, Some(peer), Some(deadline))
+                                    .await,
                             )
                         }
                     },
                 );
-                let _ = hyper::server::conn::http1::Builder::new()
+                let connection = hyper::server::conn::http1::Builder::new()
+                    .timer(hyper_util::rt::TokioTimer::new())
+                    .header_read_timeout(header_timeout)
                     .serve_connection(io, answer)
-                    .with_upgrades()
-                    .await;
+                    .with_upgrades();
+                let mut connection = std::pin::pin!(connection);
+                tokio::select! {
+                    _ = connection.as_mut() => {}
+                    _ = async { stop.wait_for(|stopping| *stopping).await.is_ok() } => {
+                        // The request in flight finishes; no other starts.
+                        connection.as_mut().graceful_shutdown();
+                        let _ = connection.await;
+                    }
+                }
             });
-        }
+        };
+        drop(listener);
+        let _ = stopping.send(true);
+        let grace = self.0.app.security.shutdown_grace;
+        let _ =
+            tokio::time::timeout(grace, async { while connections.join_next().await.is_some() {} })
+                .await;
+        connections.shutdown().await;
+        result
     }
 
     async fn collect_and_handle<B>(
         &self,
         request: http::Request<B>,
         client: Option<SocketAddr>,
+        deadline: Option<std::time::Duration>,
     ) -> http::Response<Body>
     where
         B: http_body::Body + Send,
@@ -648,11 +697,22 @@ impl AppService {
     {
         let (parts, body) = request.into_parts();
         let limit = self.0.app.security.body_limit;
-        let response = match Limited::new(body, limit).collect().await {
-            Ok(collected) => {
+        let collect = Limited::new(body, limit).collect();
+        // The deadline is the application's own listener's: a host the
+        // application is mounted in keeps its own timers.
+        let collected = match deadline {
+            Some(deadline) => tokio::time::timeout(deadline, collect).await.ok(),
+            None => Some(collect.await),
+        };
+        let response = match collected {
+            Some(Ok(collected)) => {
                 self.handle(http::Request::from_parts(parts, collected.to_bytes()), client).await
             }
-            Err(_) => ServerError::new(StatusCode::PAYLOAD_TOO_LARGE, "The request is too large")
+            Some(Err(_)) => {
+                ServerError::new(StatusCode::PAYLOAD_TOO_LARGE, "The request is too large")
+                    .render(false)
+            }
+            None => ServerError::new(StatusCode::REQUEST_TIMEOUT, "The request took too long")
                 .render(false),
         };
         into_body(response)
@@ -676,6 +736,6 @@ where
     fn call(&mut self, request: http::Request<B>) -> Self::Future {
         let service = self.clone();
         let client = request.extensions().get::<SocketAddr>().copied();
-        Box::pin(async move { Ok(service.collect_and_handle(request, client).await) })
+        Box::pin(async move { Ok(service.collect_and_handle(request, client, None).await) })
     }
 }

@@ -3,8 +3,14 @@
 //! for devices: connect with a will and a persistent session, publish and
 //! subscribe at all three `QoS` levels (with acknowledgement and
 //! redelivery), retained messages, keep-alive, and disconnect.
+//!
+//! The broker bounds what a client can make it hold ([`MqttLimits`]): a
+//! packet's declared length is checked against a maximum before anything
+//! is allocated, a new connection has a few seconds to send its `CONNECT`,
+//! and only so many connections are served at once.
 
 use std::collections::BTreeMap;
+use std::sync::Arc;
 use std::time::Duration;
 
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
@@ -12,6 +18,34 @@ use tokio::net::TcpStream;
 use tokio::sync::mpsc;
 
 use crate::bus::{Broker, BusMessage, Connect, QoS};
+
+/// The largest packet [`Packet::read`] accepts unless told otherwise: its
+/// remaining length, in bytes (256 KiB).
+pub const DEFAULT_MAX_PACKET_SIZE: usize = 256 * 1024;
+
+/// What the broker allows its clients ([`serve_with`]).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct MqttLimits {
+    /// The largest packet a client may send, its remaining length in bytes
+    /// (default [`DEFAULT_MAX_PACKET_SIZE`]). A larger one closes the
+    /// connection before any of it is read.
+    pub max_packet_size: usize,
+    /// The most connections served at once (default 1024); one more is
+    /// closed as it arrives.
+    pub max_connections: usize,
+    /// How long a new connection has to send its `CONNECT` (default 10 s).
+    pub connect_timeout: Duration,
+}
+
+impl Default for MqttLimits {
+    fn default() -> Self {
+        Self {
+            max_packet_size: DEFAULT_MAX_PACKET_SIZE,
+            max_connections: 1024,
+            connect_timeout: Duration::from_secs(10),
+        }
+    }
+}
 
 /// A control packet.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -262,12 +296,25 @@ impl Packet {
         })
     }
 
-    /// Reads one packet.
+    /// Reads one packet of at most [`DEFAULT_MAX_PACKET_SIZE`] bytes.
     ///
     /// # Errors
     ///
-    /// The stream ended or the packet was malformed.
+    /// The stream ended, or the packet was malformed or too large.
     pub async fn read(stream: &mut (impl AsyncReadExt + Unpin)) -> Result<Self, String> {
+        Self::read_limited(stream, DEFAULT_MAX_PACKET_SIZE).await
+    }
+
+    /// Reads one packet whose remaining length is at most `max_size`
+    /// bytes; the length is checked before its body is allocated or read.
+    ///
+    /// # Errors
+    ///
+    /// The stream ended, or the packet was malformed or too large.
+    pub async fn read_limited(
+        stream: &mut (impl AsyncReadExt + Unpin),
+        max_size: usize,
+    ) -> Result<Self, String> {
         let header = stream.read_u8().await.map_err(|error| error.to_string())?;
         let mut length = 0usize;
         let mut shift = 0;
@@ -282,24 +329,42 @@ impl Packet {
                 return Err("remaining length too long".into());
             }
         }
+        if length > max_size {
+            return Err(format!("a packet of {length} bytes, over the limit of {max_size}"));
+        }
         let mut body = vec![0u8; length];
         stream.read_exact(&mut body).await.map_err(|error| error.to_string())?;
         Self::decode(header, &body)
     }
 }
 
-/// Serves `broker` over MQTT on `listener`.
+/// Serves `broker` over MQTT on `listener`, with the default
+/// [`MqttLimits`].
 pub async fn serve(broker: Broker, listener: tokio::net::TcpListener) {
-    while let Ok((stream, _)) = listener.accept().await {
+    serve_with(broker, listener, MqttLimits::default()).await;
+}
+
+/// Serves `broker` over MQTT on `listener` within `limits`, until the
+/// listener itself fails. An accept error a peer or a passing shortage of
+/// file descriptors caused is waited out.
+pub async fn serve_with(broker: Broker, listener: tokio::net::TcpListener, limits: MqttLimits) {
+    let slots = Arc::new(tokio::sync::Semaphore::new(limits.max_connections));
+    while let Ok((stream, _)) = crate::listen::accept(&listener).await {
+        // At the ceiling the connection is closed as it arrives.
+        let Ok(slot) = Arc::clone(&slots).try_acquire_owned() else { continue };
         let broker = broker.clone();
-        tokio::spawn(async move { connection(broker, stream).await });
+        tokio::spawn(async move {
+            connection(broker, stream, limits).await;
+            drop(slot);
+        });
     }
 }
 
-async fn connection(broker: Broker, stream: TcpStream) {
+async fn connection(broker: Broker, stream: TcpStream, limits: MqttLimits) {
     let (mut reader, mut writer) = stream.into_split();
-    let Ok(Packet::Connect { client_id, clean_session, keep_alive, will }) =
-        Packet::read(&mut reader).await
+    let first = Packet::read_limited(&mut reader, limits.max_packet_size);
+    let Ok(Ok(Packet::Connect { client_id, clean_session, keep_alive, will })) =
+        tokio::time::timeout(limits.connect_timeout, first).await
     else {
         return;
     };
@@ -336,7 +401,7 @@ async fn connection(broker: Broker, stream: TcpStream) {
                     break;
                 }
             }
-            packet = tokio::time::timeout(timeout, Packet::read(&mut reader)) => {
+            packet = tokio::time::timeout(timeout, Packet::read_limited(&mut reader, limits.max_packet_size)) => {
                 let Ok(Ok(packet)) = packet else { break };
                 let reply = match packet {
                     Packet::Publish { message, id, .. } => match (message.qos, id) {

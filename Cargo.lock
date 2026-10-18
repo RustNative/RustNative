@@ -2539,6 +2539,7 @@ dependencies = [
  "http-body-util",
  "hyper",
  "hyper-util",
+ "libc",
  "p256",
  "rusqlite",
  "rustnative-core",

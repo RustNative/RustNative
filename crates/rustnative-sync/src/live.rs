@@ -338,13 +338,8 @@ impl<A: LiveApp> LiveServer<A> {
                         .and_then(|value| value.to_str().ok())
                         .map(str::to_owned)
                 };
-                let host = header("host").unwrap_or_default();
-                if let Some(origin) = header("origin") {
-                    let origin_host =
-                        origin.split_once("://").map_or(origin.as_str(), |(_, rest)| rest);
-                    if origin_host != host {
-                        return refuse(403);
-                    }
+                if !same_origin(request.headers()) {
+                    return refuse(403);
                 }
                 let Some(key) = header("sec-websocket-key") else { return refuse(400) };
                 if !header("upgrade")
@@ -361,7 +356,7 @@ impl<A: LiveApp> LiveServer<A> {
                         let socket = tokio_tungstenite::WebSocketStream::from_raw_socket(
                             io,
                             Role::Server,
-                            None,
+                            Some(websocket_config()),
                         )
                         .await;
                         server.accept(socket).await;
@@ -379,6 +374,54 @@ impl<A: LiveApp> LiveServer<A> {
         )
     }
 }
+/// The largest message a live client may send (a hello carrying its state
+/// snapshot, an event), in bytes: 1 MiB. A larger one closes the
+/// connection.
+pub const MAX_CLIENT_MESSAGE: usize = 1024 * 1024;
+
+/// The largest WebSocket frame a live client may send, in bytes: 256 KiB.
+pub const MAX_CLIENT_FRAME: usize = 256 * 1024;
+
+/// How many connections a [`LiveServer`] serves at once unless told
+/// otherwise ([`LiveServer::set_max_connections`]).
+pub const DEFAULT_MAX_CONNECTIONS: usize = 4096;
+
+/// How long a connection has to finish its WebSocket handshake and send
+/// its hello.
+const HELLO_TIMEOUT: Duration = Duration::from_secs(10);
+
+/// What a live connection reads: the client's messages and frames bounded
+/// by [`MAX_CLIENT_MESSAGE`] and [`MAX_CLIENT_FRAME`], from the first byte
+/// on.
+fn websocket_config() -> tokio_tungstenite::tungstenite::protocol::WebSocketConfig {
+    tokio_tungstenite::tungstenite::protocol::WebSocketConfig {
+        max_message_size: Some(MAX_CLIENT_MESSAGE),
+        max_frame_size: Some(MAX_CLIENT_FRAME),
+        ..Default::default()
+    }
+}
+
+/// Whether a WebSocket handshake may go on: a browser's (one that sends
+/// `Origin`) only from a page of the origin it connects to, since the
+/// socket carries the person's cookies; a client that is not a browser
+/// sends no `Origin`. Both of a server's paths ask this — its own listener
+/// and an application's it is mounted on.
+fn same_origin(headers: &tokio_tungstenite::tungstenite::http::HeaderMap) -> bool {
+    let Some(origin) = headers.get("origin") else { return true };
+    let Ok(origin) = origin.to_str() else { return false };
+    let host = headers.get("host").and_then(|value| value.to_str().ok()).unwrap_or_default();
+    origin.split_once("://").map_or(origin, |(_, rest)| rest) == host
+}
+
+/// Holds one of a server's connection slots, and gives it back.
+struct ConnectionSlot<'a>(&'a std::sync::atomic::AtomicUsize);
+
+impl Drop for ConnectionSlot<'_> {
+    fn drop(&mut self) {
+        self.0.fetch_sub(1, Ordering::SeqCst);
+    }
+}
+
 /// How a browser client's trees are encoded: the view and the options the
 /// browser sent in its hello, to an object with `element` and `rules`.
 pub type BrowserEncoding = Arc<dyn Fn(&Node, &Value) -> Value + Send + Sync>;
@@ -411,6 +454,10 @@ pub struct LiveServer<A: LiveApp> {
     /// The most sessions held at once: each owns a thread, so this is the
     /// thread ceiling too ([`Self::set_max_sessions`]).
     max_sessions: std::sync::atomic::AtomicUsize,
+    /// The most connections served at once, with or without a session
+    /// ([`Self::set_max_connections`]), and how many are.
+    max_connections: std::sync::atomic::AtomicUsize,
+    connections: std::sync::atomic::AtomicUsize,
 }
 
 /// How many sessions a [`LiveServer`] holds at once unless told otherwise.
@@ -578,6 +625,8 @@ impl<A: LiveApp> LiveServer<A> {
             next: AtomicU64::new(1),
             encoding: Mutex::new(None),
             max_sessions: std::sync::atomic::AtomicUsize::new(DEFAULT_MAX_SESSIONS),
+            max_connections: std::sync::atomic::AtomicUsize::new(DEFAULT_MAX_CONNECTIONS),
+            connections: std::sync::atomic::AtomicUsize::new(0),
             // A per-instance random part, so two instances (even in one
             // process) never mint the same session id.
             instance: {
@@ -630,18 +679,49 @@ impl<A: LiveApp> LiveServer<A> {
         self.max_sessions.store(max, Ordering::SeqCst);
     }
 
+    /// Sets the most connections served at once (default
+    /// [`DEFAULT_MAX_CONNECTIONS`]), counting those still to send their
+    /// hello. One more is closed as it arrives.
+    pub fn set_max_connections(&self, max: usize) {
+        self.max_connections.store(max, Ordering::SeqCst);
+    }
+
     /// How browsers get the tree ([`ServerFrame::Dom`]): the web
     /// backend's element encoding (`rustnative_web::live::encode`).
     pub fn set_browser_encoding(&self, encoding: BrowserEncoding) {
         *self.encoding.lock().unwrap_or_else(PoisonError::into_inner) = Some(encoding);
     }
 
-    /// Serves connections on `listener` until the task is dropped.
+    /// Serves connections on `listener` until the task is dropped (or the
+    /// listener itself fails). A handshake from a page of another origin is
+    /// refused (`403`), as on an application's listener; an accept error a
+    /// peer or a passing shortage of file descriptors caused is waited out.
     pub async fn serve(self: Arc<Self>, listener: tokio::net::TcpListener) {
-        while let Ok((stream, _)) = listener.accept().await {
+        use tokio_tungstenite::tungstenite::handshake::server::{ErrorResponse, Request, Response};
+
+        while let Ok((stream, _)) = crate::listen::accept(&listener).await {
             let server = Arc::clone(&self);
             tokio::spawn(async move {
-                if let Ok(socket) = tokio_tungstenite::accept_async(stream).await {
+                #[allow(
+                    clippy::result_large_err,
+                    reason = "the handshake callback's signature is tungstenite's"
+                )]
+                let check = |request: &Request, response: Response| {
+                    if same_origin(request.headers()) {
+                        Ok(response)
+                    } else {
+                        let mut refused = ErrorResponse::new(None);
+                        *refused.status_mut() =
+                            tokio_tungstenite::tungstenite::http::StatusCode::FORBIDDEN;
+                        Err(refused)
+                    }
+                };
+                let handshake = tokio_tungstenite::accept_hdr_async_with_config(
+                    stream,
+                    check,
+                    Some(websocket_config()),
+                );
+                if let Ok(Ok(socket)) = tokio::time::timeout(HELLO_TIMEOUT, handshake).await {
                     server.accept(socket).await;
                 }
             });
@@ -650,24 +730,37 @@ impl<A: LiveApp> LiveServer<A> {
 
     /// Runs one connection that has already been upgraded to a WebSocket
     /// (by this server's listener, or by an application's own, as
-    /// `rustnative-server` does), until it closes.
+    /// `rustnative-server` does), until it closes. It has ten seconds to say
+    /// hello, and past the connection ceiling it is closed at once.
     pub async fn accept<S>(&self, socket: tokio_tungstenite::WebSocketStream<S>)
     where
         S: tokio::io::AsyncRead + tokio::io::AsyncWrite + Unpin,
     {
+        let held = self.connections.fetch_add(1, Ordering::SeqCst);
+        let _slot = ConnectionSlot(&self.connections);
         let (mut sink, mut stream) = socket.split();
-        let hello = loop {
-            match stream.next().await {
-                Some(Ok(Message::Text(text))) => match serde_json::from_str::<ClientFrame>(&text) {
-                    Ok(ClientFrame::Hello { session, snapshot, dom }) => {
-                        break (session, snapshot, dom);
+        if held >= self.max_connections.load(Ordering::SeqCst) {
+            let _ = sink.send(Message::Close(None)).await;
+            return;
+        }
+        let hello = async {
+            loop {
+                match stream.next().await {
+                    Some(Ok(Message::Text(text))) => {
+                        return match serde_json::from_str::<ClientFrame>(&text) {
+                            Ok(ClientFrame::Hello { session, snapshot, dom }) => {
+                                Some((session, snapshot, dom))
+                            }
+                            _ => None,
+                        };
                     }
-                    _ => return,
-                },
-                Some(Ok(_)) => {}
-                _ => return,
+                    Some(Ok(_)) => {}
+                    _ => return None,
+                }
             }
         };
+        // A connection that says nothing gives its slot back.
+        let Ok(Some(hello)) = tokio::time::timeout(HELLO_TIMEOUT, hello).await else { return };
         self.reap();
         let send =
             |frame: &ServerFrame| Message::Text(serde_json::to_string(frame).unwrap_or_default());

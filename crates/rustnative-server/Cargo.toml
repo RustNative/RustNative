@@ -57,6 +57,10 @@ web-subtree = { path = "../../examples/web-subtree" }
 aes-gcm = "0.10"
 hkdf = "0.12"
 
+[target.'cfg(unix)'.dev-dependencies]
+# Lowering the descriptor limit, to run the listener out of descriptors.
+libc = "0.2"
+
 [features]
 default = ["health", "metrics", "serve", "db", "web"]
 # Serving on a socket: the listener, WebSocket upgrades, the local deploy

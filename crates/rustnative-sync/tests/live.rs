@@ -308,3 +308,85 @@ async fn a_shortcut_reaches_its_command_on_the_server() {
     });
     until("the command", || label(&client, "count").as_deref() == Some("Count 1")).await;
 }
+
+/// Whether the server ends `socket` within `within`.
+async fn ended_within<S>(
+    socket: &mut tokio_tungstenite::WebSocketStream<S>,
+    within: Duration,
+) -> bool
+where
+    S: tokio::io::AsyncRead + tokio::io::AsyncWrite + Unpin,
+{
+    use futures_util::StreamExt;
+    use tokio_tungstenite::tungstenite::Message;
+    let deadline = Instant::now() + within;
+    loop {
+        let left = deadline.saturating_duration_since(Instant::now());
+        match tokio::time::timeout(left, socket.next()).await {
+            Ok(None | Some(Err(_) | Ok(Message::Close(_)))) => return true,
+            Ok(Some(Ok(_))) => {}
+            Err(_) => return false,
+        }
+    }
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn an_oversized_message_closes_the_connection_and_the_server_keeps_serving() {
+    use futures_util::SinkExt;
+    use tokio_tungstenite::tungstenite::Message;
+
+    let (_server, url) = server().await;
+    let (mut socket, _) = tokio_tungstenite::connect_async(url.as_str()).await.unwrap();
+    // Before any hello: two megabytes, over the one-megabyte message limit
+    // (binary, which a connection otherwise skips while it waits).
+    let _ = socket.send(Message::Binary(vec![0; 2 * 1024 * 1024])).await;
+    assert!(
+        ended_within(&mut socket, Duration::from_secs(5)).await,
+        "the oversized message closes"
+    );
+
+    let client = LiveClient::connect(&url);
+    until("a session after the refusal", || label(&client, "count").as_deref() == Some("Count 0"))
+        .await;
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn the_standalone_listener_refuses_a_page_of_another_origin() {
+    use tokio_tungstenite::tungstenite::client::IntoClientRequest;
+
+    let (_server, url) = server().await;
+    let mut foreign = url.as_str().into_client_request().unwrap();
+    foreign.headers_mut().insert("origin", "https://elsewhere.example".parse().unwrap());
+    match tokio_tungstenite::connect_async(foreign).await {
+        Err(tokio_tungstenite::tungstenite::Error::Http(response)) => {
+            assert_eq!(response.status(), 403);
+        }
+        other => panic!("a foreign origin is refused, not {:?}", other.map(|_| ())),
+    }
+
+    let mut own = url.as_str().into_client_request().unwrap();
+    let origin = url.replacen("ws://", "http://", 1);
+    own.headers_mut().insert("origin", origin.parse().unwrap());
+    assert!(tokio_tungstenite::connect_async(own).await.is_ok(), "its own origin is let in");
+    let client = LiveClient::connect(&url);
+    until("a session after the refusal", || label(&client, "count").as_deref() == Some("Count 0"))
+        .await;
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn connections_past_the_ceiling_are_closed_and_freed_slots_serve_again() {
+    let (server, url) = server().await;
+    server.set_max_connections(1);
+    // One connection that never says hello holds the only slot.
+    let (held, _) = tokio_tungstenite::connect_async(url.as_str()).await.unwrap();
+    tokio::time::sleep(Duration::from_millis(100)).await;
+    let (mut second, _) = tokio_tungstenite::connect_async(url.as_str()).await.unwrap();
+    assert!(ended_within(&mut second, Duration::from_secs(2)).await, "past the ceiling, closed");
+
+    drop(held);
+    let client = LiveClient::connect(&url);
+    until("a session once the slot is free", || {
+        label(&client, "count").as_deref() == Some("Count 0")
+    })
+    .await;
+}
