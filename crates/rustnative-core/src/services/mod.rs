@@ -9,12 +9,14 @@
 mod file_state;
 mod hosted;
 mod memory;
+mod url_policy;
 
 pub use file_state::FileStateStore;
 pub use hosted::{
     DocumentService, FileDocuments, ShareRequest, ShareService, WorkConstraints, WorkScheduler,
 };
 pub use memory::{MemoryClipboard, MemoryStorage};
+pub use url_policy::UrlPolicy;
 
 use std::error::Error;
 use std::fmt;
@@ -340,7 +342,10 @@ pub trait FileDialogService: Send + Sync {
 /// notifications.
 #[async_trait::async_trait]
 pub trait SystemService: Send + Sync {
-    /// Opens `url` with the system's default handler.
+    /// Opens `url` with the system's default handler — once the backend's
+    /// [`UrlPolicy`] allows it, which by default means an `http`, `https`,
+    /// or `mailto` URL. An implementation never hands the OS a URL its
+    /// policy refuses.
     async fn open_url(&self, url: String) -> Result<(), ServiceError>;
     /// Posts a system notification with `title` and `body`.
     async fn notify(&self, title: String, body: String) -> Result<(), ServiceError>;

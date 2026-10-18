@@ -186,6 +186,16 @@ impl HeadlessApp {
         self
     }
 
+    /// Replaces the system service with `system` and relaunches, so the URLs
+    /// the application opens (and those its policy refuses) and the
+    /// notifications it posts can be read back from it.
+    #[must_use]
+    pub fn with_system(mut self, system: crate::RecordingSystem) -> Self {
+        self.services = self.services.clone().with_system(Arc::new(system));
+        self.relaunch_fresh();
+        self
+    }
+
     /// Uses `measurer` (for example a larger text scale) and re-realizes.
     #[must_use]
     pub fn with_measurer(mut self, measurer: HeadlessMeasurer) -> Self {

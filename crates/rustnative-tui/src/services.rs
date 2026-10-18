@@ -25,7 +25,7 @@ use std::task::{Context, Poll, Waker as TaskWaker};
 use std::time::{Duration, Instant};
 
 use parking_lot::Mutex;
-use rustnative_core::{ClipboardService, ServiceError, Services, SystemService};
+use rustnative_core::{ClipboardService, ServiceError, Services, SystemService, UrlPolicy};
 
 use crate::decode::base64_encode;
 use crate::probe::{ClipboardSupport, NotificationProtocol, TerminalProfile};
@@ -221,13 +221,22 @@ impl ClipboardService for Osc52Clipboard {
 pub struct TerminalSystem {
     channel: Arc<Channel>,
     name: String,
+    url_policy: UrlPolicy,
 }
 
 impl TerminalSystem {
-    /// The system service over `channel`, posting notifications as `name`.
+    /// The system service over `channel`, posting notifications as `name`
+    /// and opening the URLs [`UrlPolicy::default`] allows.
     #[must_use]
     pub fn new(channel: Arc<Channel>, name: impl Into<String>) -> Self {
-        Self { channel, name: name.into() }
+        Self { channel, name: name.into(), url_policy: UrlPolicy::default() }
+    }
+
+    /// This service, opening the URLs `policy` allows.
+    #[must_use]
+    pub fn with_url_policy(mut self, policy: UrlPolicy) -> Self {
+        self.url_policy = policy;
+        self
     }
 }
 
@@ -262,33 +271,6 @@ pub fn url_opener(remote: bool) -> Option<UrlOpener> {
     } else {
         None
     }
-}
-
-/// Accepts only an `http`, `https`, or `mailto` URL with no whitespace,
-/// control characters, quotes, or shell metacharacters — so whatever opens
-/// it receives one well-formed URL and nothing it could read as more.
-///
-/// # Errors
-///
-/// The URL is not one of those, or carries such a character.
-pub fn checked_url(url: &str) -> Result<&str, ServiceError> {
-    let scheme = ["http://", "https://", "mailto:"].iter().any(|scheme| {
-        url.len() > scheme.len()
-            && url.get(..scheme.len()).is_some_and(|prefix| prefix.eq_ignore_ascii_case(scheme))
-    });
-    if !scheme {
-        return Err(ServiceError::new(format!("`{url}` is not an http, https, or mailto URL")));
-    }
-    if let Some(bad) = url.chars().find(|c| {
-        c.is_whitespace()
-            || c.is_control()
-            || matches!(c, '"' | '\'' | '`' | '<' | '>' | '|' | '^' | '\\')
-    }) {
-        return Err(ServiceError::new(format!(
-            "the URL contains {bad:?}, which a URL carries only percent-encoded"
-        )));
-    }
-    Ok(url)
 }
 
 #[cfg(windows)]
@@ -328,6 +310,7 @@ fn shell_execute(_url: &str) -> Result<(), ServiceError> {
 #[async_trait::async_trait]
 impl SystemService for TerminalSystem {
     async fn open_url(&self, url: String) -> Result<(), ServiceError> {
+        let url = self.url_policy.check(&url)?;
         let remote = self.channel.profile().is_some_and(|profile| profile.remote);
         let Some(opener) = url_opener(remote) else {
             return Err(ServiceError::new(if remote {
@@ -336,7 +319,6 @@ impl SystemService for TerminalSystem {
                 "there is no desktop session to open a URL in"
             }));
         };
-        let url = checked_url(&url)?;
         match opener {
             UrlOpener::ShellExecute => shell_execute(url),
             UrlOpener::Program(program) => std::process::Command::new(program)
@@ -482,26 +464,22 @@ mod tests {
     }
 
     #[test]
-    fn a_url_reaches_its_opener_only_whole_and_well_formed() {
-        assert!(checked_url("https://example.com/search?q=a&lang=en#top").is_ok());
-        assert!(checked_url("mailto:someone@example.com").is_ok());
-        // Byte 8 (the length of `https://`) is inside the `€`.
-        assert!(checked_url("mailto:€").is_ok());
-        for refused in [
-            "https://example.com/\" & calc.exe",
-            "https://example.com/a b",
-            "https://example.com/|whoami",
-            "https://example.com/^&x",
-            "https://example.com/\nnext",
-            "file:///etc/passwd",
-            "javascript:alert(1)",
-            "--help",
-            "https://",
-            // Byte 7 is inside the second `é`: refused, not a panic.
-            "httpéé",
-        ] {
-            assert!(checked_url(refused).is_err(), "{refused:?} was refused");
+    fn a_url_the_policy_refuses_never_reaches_an_opener() {
+        // Over SSH nothing is ever launched, so the error says which check
+        // answered: the policy's, or the opener's.
+        let remote = channel(ClipboardSupport::None, None);
+        let mut profile = remote.profile().unwrap();
+        profile.remote = true;
+        remote.set_profile(profile);
+        for refused in ["file:///etc/passwd", r"\\host\share\x", "mailt€x", "http😀"] {
+            let system = TerminalSystem::new(Arc::clone(&remote), "App");
+            let error = futures_lite_block_on(system.open_url(refused.into())).unwrap_err();
+            assert!(!error.to_string().contains("SSH"), "{refused:?}: {error}");
         }
+        let system = TerminalSystem::new(remote, "App")
+            .with_url_policy(UrlPolicy::default().allow_scheme("notes").unwrap());
+        let error = futures_lite_block_on(system.open_url("notes://items/7".into())).unwrap_err();
+        assert!(error.to_string().contains("SSH"), "{error}");
     }
 
     #[test]

@@ -5,16 +5,34 @@ use super::{notifications, run_blocking};
 #[cfg(windows)]
 use crate::ffi::wide_string;
 
-/// Native shell integration. `open_url` delegates to the user's registered
-/// browser and returns an explicit error when Windows rejects the request.
+/// Native shell integration. `open_url` hands a URL its [`UrlPolicy`]
+/// allows (by default `http`, `https`, and `mailto`) to the user's
+/// registered handler and returns an explicit error when Windows rejects
+/// the request. `ShellExecuteW` would otherwise run a local executable, a
+/// UNC path, or any protocol handler it is given.
+///
+/// [`UrlPolicy`]: rustnative_core::UrlPolicy
 #[cfg(windows)]
 #[derive(Debug, Default)]
-pub struct WindowsSystem;
+pub struct WindowsSystem {
+    url_policy: rustnative_core::UrlPolicy,
+}
+
+#[cfg(windows)]
+impl WindowsSystem {
+    /// This service, opening the URLs `policy` allows.
+    #[must_use]
+    pub fn with_url_policy(mut self, policy: rustnative_core::UrlPolicy) -> Self {
+        self.url_policy = policy;
+        self
+    }
+}
 
 #[cfg(windows)]
 #[async_trait::async_trait]
 impl rustnative_core::SystemService for WindowsSystem {
     async fn open_url(&self, url: String) -> Result<(), rustnative_core::ServiceError> {
+        self.url_policy.check(&url)?;
         run_blocking(move || {
             use windows_sys::Win32::UI::Shell::ShellExecuteW;
             use windows_sys::Win32::UI::WindowsAndMessaging::SW_SHOWNORMAL;

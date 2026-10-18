@@ -1,11 +1,14 @@
 //! Opening a URL with the person's chosen handler: the OpenURI portal
 //! (`org.freedesktop.portal.OpenURI`) where one is on the bus — the only
 //! way out of a sandbox, and what a desktop with portals routes through —
-//! and GIO's default handler for the URL's type otherwise.
+//! and GIO's default handler for the URL's type otherwise. Either opens any
+//! scheme an installed application claims, so a URL goes to them only once
+//! a [`UrlPolicy`] allows it.
 
 use std::collections::HashMap;
 
 use gio::prelude::*;
+use rustnative_core::UrlPolicy;
 
 const PORTAL: &str = "org.freedesktop.portal.Desktop";
 const PATH: &str = "/org/freedesktop/portal/desktop";
@@ -19,12 +22,14 @@ pub enum Opened {
     DefaultHandler,
 }
 
-/// Opens `url`.
+/// Opens `url`, if `policy` allows it.
 ///
 /// # Errors
 ///
-/// Neither the portal nor a default handler could open it.
-pub async fn open(url: &str) -> Result<Opened, String> {
+/// `policy` refuses `url`, or neither the portal nor a default handler
+/// could open it.
+pub async fn open(url: &str, policy: &UrlPolicy) -> Result<Opened, String> {
+    policy.check(url).map_err(|refused| refused.to_string())?;
     if let Ok(connection) = gio::bus_get_future(gio::BusType::Session).await {
         let options: HashMap<String, glib::Variant> = HashMap::new();
         let opened = connection

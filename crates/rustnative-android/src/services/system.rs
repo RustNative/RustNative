@@ -5,7 +5,7 @@ use std::sync::atomic::{AtomicI32, Ordering};
 
 use rustnative_core::{
     ClipboardService, FileDialogKind, FileDialogRequest, FileDialogService, ServiceError,
-    SystemService,
+    SystemService, UrlPolicy,
 };
 
 use super::{Answer, abandon, checked, java, off_thread, pending};
@@ -113,10 +113,14 @@ impl rustnative_core::services::DocumentService for AndroidDocuments {
     }
 }
 
-/// URLs, notifications, and the share sheet.
+/// URLs, notifications, and the share sheet. A URL is sent as
+/// `ACTION_VIEW` only once its [`UrlPolicy`] allows it (by default `http`,
+/// `https`, and `mailto`); any installed application can claim any other
+/// scheme.
 #[derive(Debug, Default)]
 pub struct AndroidSystem {
     channel: Option<String>,
+    url_policy: UrlPolicy,
 }
 
 /// Notification ids, so each notification is its own.
@@ -128,7 +132,14 @@ impl AndroidSystem {
     /// than the default one.
     #[must_use]
     pub fn on_channel(channel: impl Into<String>) -> Self {
-        Self { channel: Some(channel.into()) }
+        Self { channel: Some(channel.into()), url_policy: UrlPolicy::default() }
+    }
+
+    /// This service, opening the URLs `policy` allows.
+    #[must_use]
+    pub fn with_url_policy(mut self, policy: UrlPolicy) -> Self {
+        self.url_policy = policy;
+        self
     }
 
     /// Posts a notification whose `actions` (id, label) return as
@@ -185,14 +196,18 @@ impl rustnative_core::services::ShareService for AndroidSystem {
             None => request.text.clone(),
         };
         let channel = self.channel.clone();
-        off_thread(move || AndroidSystem { channel }.share(&text, request.subject.as_deref()))
-            .await?
+        off_thread(move || {
+            AndroidSystem { channel, url_policy: UrlPolicy::default() }
+                .share(&text, request.subject.as_deref())
+        })
+        .await?
     }
 }
 
 #[async_trait::async_trait]
 impl SystemService for AndroidSystem {
     async fn open_url(&self, url: String) -> Result<(), ServiceError> {
+        self.url_policy.check(&url)?;
         off_thread(move || {
             checked(java(
                 Class::Services,

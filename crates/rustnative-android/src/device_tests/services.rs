@@ -12,6 +12,7 @@ use rustnative_core::product::{CommerceService, PushService, SecureStorage};
 use rustnative_core::{
     ClipboardService, FileDialogKind, FileDialogRequest, FileDialogService, HttpRequest,
     HttpService, Locale, Permission, PermissionService, PermissionState, StateStore, SystemService,
+    UrlPolicy,
 };
 use rustnative_data::{Conditions, ImageDecoder};
 
@@ -38,10 +39,14 @@ pub(super) fn the_clipboard_round_trips(_: &Instrumentation) {
 }
 
 pub(super) fn a_url_nothing_opens_says_so(_: &Instrumentation) {
-    let error =
-        block_on(AndroidSystem::default().open_url("rustnative-nothing-handles-this://x".into()))
-            .expect_err("unhandled");
+    let policy = UrlPolicy::default().allow_scheme("rustnative-nothing-handles-this").unwrap();
+    let system = AndroidSystem::default().with_url_policy(policy);
+    let error = block_on(system.open_url("rustnative-nothing-handles-this://x".into()))
+        .expect_err("unhandled");
     assert!(error.to_string().contains("nothing on this device opens"), "{error}");
+    let error = block_on(AndroidSystem::default().open_url("file:///sdcard/x".into()))
+        .expect_err("refused");
+    assert!(error.to_string().contains("not opened"), "{error}");
 }
 
 pub(super) fn a_notification_posts_on_its_channel_with_its_actions(
