@@ -29,6 +29,8 @@
 //! rate limiting, a body size limit, and escaping [`Html`] are on unless an
 //! application turns them off.
 
+#![deny(missing_docs)]
+
 #[cfg(feature = "db")]
 pub mod admin;
 pub mod app;

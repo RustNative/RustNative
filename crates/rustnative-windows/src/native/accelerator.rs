@@ -37,10 +37,18 @@ type CreateFactory = unsafe extern "system" fn(*const GUID, *mut *mut core::ffi:
 /// time: it ships with Windows 10 2004 and later, and an older system
 /// simply has no NPU to report.
 pub(crate) fn npu_available() -> bool {
-    use windows_sys::Win32::System::LibraryLoader::{GetProcAddress, LoadLibraryW};
+    use windows_sys::Win32::System::LibraryLoader::{
+        GetProcAddress, LOAD_LIBRARY_SEARCH_SYSTEM32, LoadLibraryExW,
+    };
     let name = crate::native::util::wide("dxcore.dll");
-    // SAFETY: a NUL-terminated library name.
-    let module = unsafe { LoadLibraryW(name.as_ptr()) };
+    // Only from System32: a bare name would otherwise be searched for in
+    // the application's directory and the current one first, where a
+    // planted `dxcore.dll` would be loaded in its place.
+    // SAFETY: a NUL-terminated library name, no file handle, and a
+    // search flag `LoadLibraryExW` documents.
+    let module = unsafe {
+        LoadLibraryExW(name.as_ptr(), std::ptr::null_mut(), LOAD_LIBRARY_SEARCH_SYSTEM32)
+    };
     if module.is_null() {
         return false;
     }

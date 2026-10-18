@@ -1,4 +1,4 @@
-/target/
+target/
 *.zip
 *.stackdump
 *.actual.bmp

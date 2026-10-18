@@ -146,9 +146,9 @@ pub struct Cx<'a> {
     pub tokens: &'a mut Vec<String>,
     pub server_fns: &'a mut Vec<syn::Path>,
     pub self_ty: Option<String>,
-    /// Inside a loop used as a value: the temporary its reak assigns.
+    /// Inside a loop used as a value: the temporary its `break` assigns.
     pub break_target: Option<Option<String>>,
-    /// The type a value-reak gave.
+    /// The type a value-`break` gave.
     pub break_ty: Option<Ty>,
     /// Integer literals in rewritten arithmetic, with their kinds.
     pub lits: Vec<(String, IntK)>,

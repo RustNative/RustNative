@@ -214,7 +214,7 @@ pub fn size_value(value: &StyleValue) -> Option<SizeValue> {
 /// A contextual size value: what a width or height declaration says.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum SizeValue {
-    /// uto.
+    /// `auto`: the size the content asks for.
     Auto,
     /// Fill what the parent offers.
     Fill,

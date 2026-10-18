@@ -15,6 +15,8 @@
 //! - [`device`]: device desired and reported state, and messaging with
 //!   stated delivery guarantees (an in-process broker and MQTT 3.1.1).
 
+#![deny(missing_docs)]
+
 #[cfg(feature = "net")]
 pub mod bus;
 #[cfg(feature = "net")]

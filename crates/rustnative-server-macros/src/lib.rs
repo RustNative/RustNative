@@ -7,6 +7,8 @@
 //! compile error with SQLite's own message; the row type is inferred from
 //! the result columns.
 
+#![deny(missing_docs)]
+
 use std::collections::HashMap;
 use std::path::PathBuf;
 

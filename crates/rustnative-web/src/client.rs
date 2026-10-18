@@ -1257,7 +1257,7 @@ pub enum ClientMessage<M> {
     Reply(M),
     /// An effect finished with no answer.
     Done,
-    /// Subscription   delivered a value.
+    /// Subscription `.0` (its index) delivered a value.
     Topic(usize, M),
 }
 

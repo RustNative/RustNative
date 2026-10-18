@@ -50,6 +50,8 @@
 //! (`rustnative_web::capability`). The headless backend is for tests
 //! (`rustnative-headless`).
 
+#![deny(missing_docs)]
+
 use std::fmt;
 use std::sync::Arc;
 

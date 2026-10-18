@@ -19,6 +19,8 @@
 //! application or has expired: a stale manifest served forever (a freeze
 //! attack) stops being believed at its `expires` time.
 
+#![deny(missing_docs)]
+
 use std::path::{Path, PathBuf};
 use std::time::{SystemTime, UNIX_EPOCH};
 
