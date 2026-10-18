@@ -526,8 +526,7 @@ enum TagContext {
 }
 
 fn tag_context(prefix: &str) -> Option<TagContext> {
-    let open = prefix.rfind('<')?;
-    let after = &prefix[open + 1..];
+    let (_, after) = prefix.rsplit_once('<')?;
     if after.contains('>') || after.starts_with('/') {
         return None;
     }
@@ -669,7 +668,7 @@ pub fn echo_server() -> Result<()> {
                 .lines()
                 .enumerate()
                 .find_map(|(line, content)| {
-                    content.find("gap").map(|at| (line, content[..at].chars().count()))
+                    content.split_once("gap").map(|(before, _)| (line, before.chars().count()))
                 })
                 .unwrap_or((0, 0));
             let notification = json!({

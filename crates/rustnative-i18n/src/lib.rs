@@ -223,6 +223,10 @@ fn is_identifier(text: &str) -> bool {
 }
 
 /// Parses a pattern's text (placeables and selectors included).
+#[allow(
+    clippy::string_slice,
+    reason = "`open` is a `find` of an ASCII `{`, `close` a `char_indices` position"
+)]
 fn parse_pattern(text: &str, line: usize) -> Result<Vec<Element>, ParseError> {
     let error = |message: String| ParseError { line, message };
     let mut out = Vec::new();

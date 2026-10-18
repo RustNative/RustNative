@@ -329,7 +329,7 @@ pub fn url_path(url: &str) -> &str {
     let Some((_, rest)) = url.split_once("://") else {
         return url;
     };
-    rest.find('/').map_or("/", |start| &rest[start..])
+    rest.find('/').and_then(|start| rest.get(start..)).unwrap_or("/")
 }
 
 fn split(path: &str) -> impl Iterator<Item = &str> {

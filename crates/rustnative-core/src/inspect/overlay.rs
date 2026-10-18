@@ -112,8 +112,8 @@ pub(crate) fn draw(
 /// The node an event's debug text names, found among `rects`.
 fn event_target(event: &str, rects: &HashMap<NodeId, Rect>) -> Option<NodeId> {
     // `target: NodeId(<n>)` — the only form an event's target prints in.
-    let start = event.find("NodeId(")? + "NodeId(".len();
-    let end = start + event[start..].find(')')?;
-    let id: u128 = event[start..end].parse().ok()?;
+    let (_, rest) = event.split_once("NodeId(")?;
+    let (digits, _) = rest.split_once(')')?;
+    let id: u128 = digits.parse().ok()?;
     rects.keys().copied().find(|node| node.get() == id)
 }

@@ -69,6 +69,7 @@ fn sources(root: &Path) -> Vec<PathBuf> {
     files
 }
 
+#[allow(clippy::string_slice, reason = "callers pass where a `find` matched")]
 fn line_of(text: &str, offset: usize) -> usize {
     text[..offset].matches('\n').count() + 1
 }
@@ -76,6 +77,10 @@ fn line_of(text: &str, offset: usize) -> usize {
 /// Message identifiers used in `text`: `messages::fn_name(` (the
 /// identifier, underscores as the catalogue writes them resolved by the
 /// caller) and `Message::new("id")`.
+#[allow(
+    clippy::string_slice,
+    reason = "every index is a `find` position, or a marker's length past one"
+)]
 fn uses_in(text: &str) -> Vec<(String, usize)> {
     let mut found = Vec::new();
     for (marker, quoted) in [("messages::", false), ("Message::new(\"", true)] {
@@ -194,6 +199,10 @@ fn locales(root: &Path) -> Vec<String> {
 }
 
 /// Literal text where a message belongs: `(file, line, text)`.
+#[allow(
+    clippy::string_slice,
+    reason = "every index is a `find` position, or a marker's length past one"
+)]
 fn literals(root: &Path, allow: &[String]) -> Result<Vec<(PathBuf, usize, String)>> {
     let worth = |text: &str| {
         text.chars().any(char::is_alphabetic) && !allow.iter().any(|allowed| allowed == text)

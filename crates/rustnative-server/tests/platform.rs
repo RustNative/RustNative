@@ -164,6 +164,19 @@ async fn the_api_schema_comes_from_the_types() {
 }
 
 #[test]
+fn client_names_survive_non_ascii_and_empty_id_segments() {
+    // An id segment starting with a multi-byte character, or an empty one,
+    // used to be cut at byte 1.
+    let document = serde_json::json!({ "paths": {
+        "/_fn/a": { "post": { "operationId": "notes.élan" } },
+        "/_fn/b": { "post": { "operationId": "notes..€uro" } },
+    }});
+    let client = typescript_client(&document);
+    assert!(client.contains("export async function notesÉlan("), "{client}");
+    assert!(client.contains("export async function notes€uro("), "{client}");
+}
+
+#[test]
 fn heads_are_escaped_and_validated() {
     let head = Head::new("A \"quoted\" <title>", "short").canonical("/relative").structured_data(
         serde_json::json!({ "@type": "Article", "name": "</script><script>alert(1)" }),

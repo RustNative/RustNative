@@ -185,8 +185,8 @@ fn assert_restored(terminal: &pty::Pty) {
 /// starts, and that mode is the host's, not one a session left behind.
 fn set_by_host(terminal: &pty::Pty, mode: u16) -> bool {
     let output = String::from_utf8_lossy(&terminal.screen.output);
-    let before = output.find("BEFORE").unwrap_or(output.len());
-    cfg!(windows) && output[..before].contains(&format!("\x1b[?{mode}h"))
+    let before = output.split_once("BEFORE").map_or(&*output, |(before, _)| before);
+    cfg!(windows) && before.contains(&format!("\x1b[?{mode}h"))
 }
 
 #[cfg(unix)]
@@ -394,7 +394,8 @@ fn a_stop_gives_the_terminal_back_and_retakes_it() {
         terminal.pump(Duration::from_millis(20));
         let after = String::from_utf8_lossy(&terminal.screen.output[mark..]).into_owned();
         let left = after.find("\x1b[?1049l");
-        let back = left.and_then(|at| after[at..].find("\x1b[?1049h").map(|offset| at + offset));
+        let back =
+            left.and_then(|at| after.get(at..)?.find("\x1b[?1049h").map(|offset| at + offset));
         if let (Some(_), Some(_)) = (left, back) {
             // Retaken, the screen was cleared and drawn again in full.
             let shown = terminal.screen.emulator.screen().text().contains("hello pty");

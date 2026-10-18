@@ -27,6 +27,6 @@ mod tests {
     #[test]
     fn a_class_name_is_base_36() {
         let name = class_name("v", "hello");
-        assert!(name[1..].chars().all(|c| c.is_ascii_digit() || c.is_ascii_lowercase()));
+        assert!(name.chars().skip(1).all(|c| c.is_ascii_digit() || c.is_ascii_lowercase()));
     }
 }

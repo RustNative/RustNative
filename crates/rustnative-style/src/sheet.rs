@@ -34,7 +34,13 @@ impl StyleError {
     /// The 1-based line and column of the start of the range in `source`.
     #[must_use]
     pub fn line_column(&self, source: &str) -> (usize, usize) {
-        let before = &source[..self.range.start.min(source.len())];
+        // `range` is a public field: back off to a character boundary
+        // rather than trusting it to be one.
+        let start = (0..=self.range.start.min(source.len()))
+            .rev()
+            .find(|&index| source.is_char_boundary(index))
+            .unwrap_or_default();
+        let before = source.get(..start).unwrap_or_default();
         let line = before.matches('\n').count() + 1;
         let column = before.rsplit('\n').next().map_or(0, |last| last.chars().count()) + 1;
         (line, column)
@@ -139,6 +145,10 @@ pub fn parse(source: &str) -> Result<Sheet, Vec<StyleError>> {
 }
 
 /// Replaces `/* … */` with spaces, keeping every byte offset.
+#[allow(
+    clippy::string_slice,
+    reason = "every index is a `find` of an ASCII `/*` or `*/`, or a length"
+)]
 fn blank_comments(source: &str) -> String {
     let mut out = String::with_capacity(source.len());
     let mut rest = source;
@@ -218,6 +228,11 @@ impl Parser<'_> {
         (bytes.len(), brace)
     }
 
+    #[allow(
+        clippy::string_slice,
+        reason = "`position` and `statement_end` are boundaries (a trimmed start, just past an ASCII byte); \
+                  `keyword` is ASCII after the ASCII `@`"
+    )]
     fn top_level(&mut self) -> Option<Item> {
         let start = self.position;
         let (end, brace) = self.statement_end();
@@ -348,6 +363,7 @@ impl Parser<'_> {
         range: Range<usize>,
     ) -> Option<Item> {
         let name = prelude.to_owned();
+        #[allow(clippy::string_slice, reason = "`name_start` follows the ASCII `@keyword`")]
         let offset =
             self.text[name_start..].find(prelude).map_or(name_start, |found| name_start + found);
         let name_range = offset..offset + name.len();
@@ -419,6 +435,7 @@ impl Parser<'_> {
             return None;
         };
         let condition = condition.trim().strip_suffix(')').unwrap_or(condition).trim().to_owned();
+        #[allow(clippy::string_slice, reason = "`start` is the statement's start, a boundary")]
         let offset = self.text[start..].find(&condition).map_or(start, |found| start + found);
         Some(Item::CustomVariant {
             name: name.trim().to_owned(),
@@ -430,6 +447,10 @@ impl Parser<'_> {
 
 /// The `;`-terminated statements (and nested blocks) between `open` and
 /// `close`, with their ranges.
+#[allow(
+    clippy::string_slice,
+    reason = "`close` is an ASCII `}`, and `statement_end` stops just past an ASCII byte"
+)]
 fn statements(text: &str, open: usize, close: usize) -> Vec<(&str, Range<usize>)> {
     let mut out = Vec::new();
     let mut parser = Parser { text: &text[..close], position: open, errors: Vec::new() };
@@ -447,6 +468,7 @@ fn statements(text: &str, open: usize, close: usize) -> Vec<(&str, Range<usize>)
 }
 
 #[cfg(test)]
+#[allow(clippy::string_slice, reason = "tests slice at offsets they constructed or checked")]
 mod tests {
 
     #[test]
@@ -472,6 +494,15 @@ mod tests {
     }
 
     use super::*;
+
+    #[test]
+    fn a_range_inside_a_character_reports_its_line_and_column() {
+        // Byte 2 is inside the three-byte `€`: the column is the one the
+        // character starts in, not a panic.
+        let source = "a\n€ b";
+        assert_eq!(StyleError::new("x", 3..4).line_column(source), (2, 1));
+        assert_eq!(StyleError::new("x", 7..8).line_column(source), (2, 4));
+    }
 
     #[test]
     fn a_theme_a_utility_and_a_variant_parse() {

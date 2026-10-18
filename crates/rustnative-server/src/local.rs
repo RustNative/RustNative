@@ -27,8 +27,8 @@ impl HttpService for InProcess {
         // Only the path and query reach the application.
         let url = request.url();
         let path = url
-            .find("://")
-            .and_then(|scheme| url[scheme + 3..].find('/').map(|slash| &url[scheme + 3 + slash..]))
+            .split_once("://")
+            .and_then(|(_, rest)| rest.find('/').and_then(|slash| rest.get(slash..)))
             .unwrap_or(url);
         let mut builder = http::Request::builder().method(method).uri(path);
         for (name, value) in request.headers() {

@@ -112,7 +112,7 @@ fn parse_code_line(line: &str) -> Option<(String, usize, String)> {
     let bar = line.find(" | ").or_else(|| line.strip_suffix(" |").map(str::len))?;
     let (head, tail) = line.split_at(bar);
     let number: usize = head.trim().parse().ok()?;
-    let gutter = head[..head.len() - head.trim_start().len()].to_owned();
+    let gutter = head.strip_suffix(head.trim_start()).unwrap_or_default().to_owned();
     Some((gutter, number, tail.get(3..).unwrap_or("").to_owned()))
 }
 

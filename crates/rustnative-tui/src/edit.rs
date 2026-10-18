@@ -159,8 +159,11 @@ pub fn visual_lines(value: &str, columns: usize, width: Width, wrap: bool) -> Ve
 pub fn position(value: &str, offset: usize, lines: &[Line], width: Width) -> (usize, usize) {
     let row = lines.iter().rposition(|line| line.start <= offset).unwrap_or(0);
     let Some(line) = lines.get(row) else { return (0, 0) };
+    // `offset` should be a cluster boundary; one inside a character counts
+    // from where that character starts.
     let end = offset.min(line.end).max(line.start);
-    (width.of(&value[line.start..end]), row)
+    let end = (line.start..=end).rev().find(|&index| value.is_char_boundary(index)).unwrap_or(end);
+    (value.get(line.start..end).map_or(0, |text| width.of(text)), row)
 }
 
 /// The offset nearest `column` on visual line `row`.
@@ -168,7 +171,8 @@ pub fn position(value: &str, offset: usize, lines: &[Line], width: Width) -> (us
 pub fn offset_at(value: &str, lines: &[Line], column: usize, row: usize, width: Width) -> usize {
     let Some(line) = lines.get(row.min(lines.len().saturating_sub(1))) else { return 0 };
     let mut used = 0;
-    for (index, grapheme) in value[line.start..line.end].grapheme_indices(true) {
+    let text = value.get(line.start..line.end).unwrap_or_default();
+    for (index, grapheme) in text.grapheme_indices(true) {
         let cells = width.of_grapheme(grapheme);
         if used + cells.div_ceil(2) > column {
             return line.start + index;
@@ -178,7 +182,11 @@ pub fn offset_at(value: &str, lines: &[Line], column: usize, row: usize, width: 
     line.end
 }
 
+#[allow(clippy::string_slice, reason = "the selection is clamped to cluster boundaries first")]
 fn replace_selection(value: &str, edit: &mut Edit, text: &str) -> String {
+    // `Edit`'s fields are public: an offset inside a character must not
+    // reach the slicing below.
+    edit.clamp(value);
     let range = edit.selection();
     let mut next = String::with_capacity(value.len() + text.len());
     next.push_str(&value[..range.start]);
@@ -241,13 +249,13 @@ pub fn key(
             if range.is_empty() {
                 outcome.handled = false;
             } else {
-                outcome.copied = Some(value[range].to_owned());
+                outcome.copied = value.get(range).map(str::to_owned);
             }
         }
         KeyCode::Character('x') if modifiers.ctrl && !modifiers.alt => {
             let range = edit.selection();
             if !range.is_empty() {
-                outcome.copied = Some(value[range].to_owned());
+                outcome.copied = value.get(range).map(str::to_owned);
                 outcome.value = Some(replace_selection(value, edit, ""));
             }
         }
@@ -468,6 +476,16 @@ mod tests {
             Width::default(),
         );
         assert_eq!(edit.caret, 3);
+    }
+
+    #[test]
+    fn an_offset_inside_a_character_is_snapped_not_sliced() {
+        // `Edit`'s fields are public; byte 2 is inside the `€`.
+        let value = "a€b";
+        let mut edit = Edit { caret: 2, anchor: 2, scroll: 0, goal: None };
+        assert_eq!(insert(value, &mut edit, "x", false), "ax€b");
+        let lines = visual_lines(value, 20, Width::default(), false);
+        assert_eq!(position(value, 2, &lines, Width::default()), (1, 0));
     }
 
     #[test]

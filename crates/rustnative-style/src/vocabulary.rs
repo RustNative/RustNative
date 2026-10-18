@@ -1086,6 +1086,7 @@ fn distance(a: &str, b: &str) -> usize {
 }
 
 /// Whitespace-separated words with their byte offsets.
+#[allow(clippy::string_slice, reason = "every index comes from `char_indices`")]
 fn words(input: &str) -> Vec<(usize, &str)> {
     let mut out = Vec::new();
     let mut start = None;
@@ -1105,6 +1106,7 @@ fn words(input: &str) -> Vec<(usize, &str)> {
 }
 
 #[cfg(test)]
+#[allow(clippy::string_slice, reason = "tests slice at ranges the parser reported")]
 mod tests {
     use super::*;
 

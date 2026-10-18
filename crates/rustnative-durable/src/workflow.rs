@@ -295,6 +295,7 @@ impl WorkflowContext {
     /// # Errors
     ///
     /// [`WorkflowError::Suspended`] until it arrives.
+    #[allow(unknown_lints, reason = "`unused_async_trait_impl` is newer than some clippy versions")]
     #[allow(
         clippy::unused_async,
         clippy::unused_async_trait_impl,

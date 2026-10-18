@@ -27,14 +27,13 @@ pub fn var_name(text: &str) -> Option<&str> {
 #[must_use]
 pub fn function(text: &str) -> Option<(&str, &str)> {
     let text = text.trim();
-    let open = text.find('(')?;
-    let name = &text[..open];
+    let (name, rest) = text.split_once('(')?;
     if name.is_empty()
         || !name.chars().all(|character| character.is_ascii_alphanumeric() || character == '-')
     {
         return None;
     }
-    let inner = text[open + 1..].strip_suffix(')')?;
+    let inner = rest.strip_suffix(')')?;
     // The closing parenthesis must match the opening one.
     let mut depth = 0_i32;
     for character in inner.chars() {
@@ -158,6 +157,10 @@ impl<'a> Calc<'a> {
                         }
                         index += 1;
                     }
+                    #[allow(
+                        clippy::string_slice,
+                        reason = "`index` only ever steps over or stops at ASCII bytes"
+                    )]
                     tokens.push(CalcToken::Value(&expression[start..index]));
                 }
             }

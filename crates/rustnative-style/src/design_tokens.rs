@@ -139,14 +139,17 @@ fn variable(token: &Token) -> Result<String, String> {
 /// A token's value in CSS, resolving aliases through `names`.
 fn css_value(value: &Value, names: &BTreeMap<String, String>) -> Result<String, String> {
     match value {
-        Value::String(text) if text.starts_with('{') && text.ends_with('}') => {
-            let target = text[1..text.len() - 1].split('.').map(slug).collect::<Vec<_>>().join("-");
-            names
-                .get(&target)
-                .map(|variable| format!("var(--{variable})"))
-                .ok_or_else(|| format!("the alias {text} names no token"))
-        }
-        Value::String(text) => Ok(text.clone()),
+        Value::String(text) => match text.strip_prefix('{').and_then(|rest| rest.strip_suffix('}'))
+        {
+            Some(alias) => {
+                let target = alias.split('.').map(slug).collect::<Vec<_>>().join("-");
+                names
+                    .get(&target)
+                    .map(|variable| format!("var(--{variable})"))
+                    .ok_or_else(|| format!("the alias {text} names no token"))
+            }
+            None => Ok(text.clone()),
+        },
         Value::Number(number) => Ok(number.to_string()),
         Value::Array(families) => Ok(families
             .iter()
@@ -243,6 +246,10 @@ pub fn import(json: &str) -> Result<Imported, String> {
 /// `style` with its token block replaced by `block` (or `block` prepended
 /// when it has none) — what `rustnative tokens import` writes.
 #[must_use]
+#[allow(
+    clippy::string_slice,
+    reason = "`start` and `end` are where `find` matched `BEGIN` and `END`"
+)]
 pub fn replace_block(style: &str, block: &str) -> String {
     match (style.find(BEGIN), style.find(END)) {
         (Some(start), Some(end)) if end > start => {

@@ -152,7 +152,7 @@ fn native_role(tag: &str, input_type: Option<&str>, size: bool) -> Accessibility
         ("li", _) => AccessibilityRole::ListItem,
         ("dialog", _) => AccessibilityRole::Dialog,
         ("h1" | "h2" | "h3" | "h4" | "h5" | "h6", _) => {
-            let level = tag[1..].parse().unwrap_or(1);
+            let level = tag.strip_prefix('h').and_then(|digit| digit.parse().ok()).unwrap_or(1);
             AccessibilityRole::Heading { level }
         }
         _ => AccessibilityRole::None,

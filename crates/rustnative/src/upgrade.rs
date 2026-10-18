@@ -47,7 +47,7 @@ pub const CODEMODS: &[Codemod] = &[Codemod {
 /// characters).
 fn offset(text: &str, line: usize, column: usize) -> usize {
     let start: usize = text.split_inclusive('\n').take(line.saturating_sub(1)).map(str::len).sum();
-    let rest = &text[start..];
+    let rest = text.get(start..).unwrap_or_default();
     start + rest.char_indices().nth(column).map_or(rest.len(), |(at, _)| at)
 }
 
@@ -165,7 +165,7 @@ fn logical_insets(text: &str) -> Rewrite {
     renames.sort_by_key(|rename| std::cmp::Reverse((rename.0, rename.1)));
     for (line, column, old, new) in &renames {
         let at = offset(text, *line, *column);
-        if text[at..].starts_with(old) {
+        if text.get(at..).is_some_and(|rest| rest.starts_with(*old)) {
             edited.replace_range(at..at + old.len(), new);
         }
     }

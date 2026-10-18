@@ -65,10 +65,10 @@ fn cx(path: &str) -> PageContext {
 }
 
 fn page_data(html: &str) -> Value {
-    let start = html.find("<script type=\"application/json\" id=\"rn-data\">").expect("page data")
-        + "<script type=\"application/json\" id=\"rn-data\">".len();
-    let end = start + html[start..].find("</script>").unwrap();
-    serde_json::from_str(&html[start..end]).unwrap()
+    let (_, rest) =
+        html.split_once("<script type=\"application/json\" id=\"rn-data\">").expect("page data");
+    let (data, _) = rest.split_once("</script>").unwrap();
+    serde_json::from_str(data).unwrap()
 }
 
 /// A static root with a client component inside a column.

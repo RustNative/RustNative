@@ -212,7 +212,13 @@ pub fn typescript_client(document: &Value) -> String {
                 .split('.')
                 .enumerate()
                 .map(|(index, part)| {
-                    if index == 0 { part.to_owned() } else { part[..1].to_uppercase() + &part[1..] }
+                    let mut characters = part.chars();
+                    match characters.next() {
+                        Some(first) if index > 0 => {
+                            first.to_uppercase().chain(characters).collect()
+                        }
+                        _ => part.to_owned(),
+                    }
                 })
                 .collect::<String>()
                 .replace('-', "_");

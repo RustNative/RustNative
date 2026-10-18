@@ -169,3 +169,11 @@ arithmetic_side_effects = "allow"
 # a collection the same function just built or guarded by a preceding
 # `contains`/`len` check.
 indexing_slicing = "allow"
+# Byte-range slicing of a `&str` (`text[a..b]`) is the one form of indexing
+# above that panics on input the caller cannot see coming: an index that
+# lands inside a multi-byte character. That is how the terminal backend's
+# old URL check crashed on `mailto:€`. Every remaining slice either uses a
+# char-boundary-safe form (`split_once`, `strip_prefix`, `str::get`,
+# `char_indices`) or carries an `#[allow]` saying why its index is a
+# boundary (a `find` of an ASCII byte, a `char_indices` position).
+string_slice = "warn"

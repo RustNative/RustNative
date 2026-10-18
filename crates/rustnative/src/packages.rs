@@ -174,11 +174,8 @@ pub fn add(here: &Path, package: &str, index_path: Option<&Path>) -> Result<()> 
         return Ok(());
     }
     let line = format!("{name} = {dependency}\n");
-    let updated = match text.find("[dependencies]\n") {
-        Some(at) => {
-            let insert = at + "[dependencies]\n".len();
-            format!("{}{line}{}", &text[..insert], &text[insert..])
-        }
+    let updated = match text.split_once("[dependencies]\n") {
+        Some((before, after)) => format!("{before}[dependencies]\n{line}{after}"),
         None => format!("{}\n[dependencies]\n{line}", text.trim_end()),
     };
     std::fs::write(&manifest, updated)

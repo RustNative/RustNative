@@ -28,7 +28,7 @@ pub const JOB_ATTEMPT: &str = "rustnative.job.attempt";
 /// The path of a URL (for span names, which must not carry query strings).
 #[must_use]
 pub fn path_of(url: &str) -> &str {
-    let after_scheme = url.find("://").map_or(url, |at| &url[at + 3..]);
-    let path = after_scheme.find('/').map_or("/", |at| &after_scheme[at..]);
+    let after_scheme = url.split_once("://").map_or(url, |(_, rest)| rest);
+    let path = after_scheme.find('/').and_then(|at| after_scheme.get(at..)).unwrap_or("/");
     path.split(['?', '#']).next().unwrap_or("/")
 }

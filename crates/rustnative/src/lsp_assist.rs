@@ -40,7 +40,12 @@ pub fn offset(text: &str, line: usize, character: usize) -> Option<usize> {
 /// The LSP position of byte `offset`.
 #[must_use]
 pub fn position(text: &str, offset: usize) -> Value {
-    let before = &text[..offset.min(text.len())];
+    // An offset inside a character counts from where that character starts.
+    let end = (0..=offset.min(text.len()))
+        .rev()
+        .find(|&index| text.is_char_boundary(index))
+        .unwrap_or_default();
+    let before = text.get(..end).unwrap_or_default();
     let line = before.matches('\n').count();
     let character = before.rsplit('\n').next().map_or(0, |last| last.chars().count());
     json!({ "line": line, "character": character })
@@ -63,6 +68,10 @@ pub struct ClassString {
 
 /// The class or declaration string `offset` is inside, if any.
 #[must_use]
+#[allow(
+    clippy::string_slice,
+    reason = "every index is a `find` position, or a marker's length past one"
+)]
 pub fn class_string_at(text: &str, offset: usize, rsx_file: bool) -> Option<ClassString> {
     let literal = |value: (usize, usize)| {
         (text.as_bytes().get(value.0) == Some(&b'"') && value.1 > value.0 + 1)
@@ -98,6 +107,11 @@ pub fn class_string_at(text: &str, offset: usize, rsx_file: bool) -> Option<Clas
 /// The class under `offset` in `string` (whitespace-separated), and the part
 /// before the cursor.
 #[must_use]
+#[allow(
+    clippy::string_slice,
+    reason = "`string` comes from `class_string_at` and `offset` from `offset`, both at char boundaries; \
+              the rest are `find` positions within it"
+)]
 pub fn class_at(text: &str, string: ClassString, offset: usize) -> (String, String) {
     let content = &text[string.start..string.end];
     let at = offset.saturating_sub(string.start).min(content.len());
@@ -340,6 +354,7 @@ pub fn structural(
 }
 
 #[cfg(test)]
+#[allow(clippy::string_slice, reason = "tests slice at offsets they found")]
 mod tests {
     use super::*;
 

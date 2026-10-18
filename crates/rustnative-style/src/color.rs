@@ -230,6 +230,7 @@ pub fn to_linear(color: Color) -> [f64; 3] {
 }
 
 /// Splits `text` on commas outside parentheses.
+#[allow(clippy::string_slice, reason = "every index comes from `char_indices`")]
 pub(crate) fn split_top_level(text: &str, separator: char) -> Vec<&str> {
     let mut parts = Vec::new();
     let mut depth = 0_i32;

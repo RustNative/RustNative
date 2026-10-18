@@ -262,6 +262,10 @@ fn declare_module(lib: &str, declaration: &str) -> String {
 }
 
 /// `lib.rs` with `entry` added to `previews()`'s list.
+#[allow(
+    clippy::string_slice,
+    reason = "`open` is just past where `find` matched the ASCII `vec![`"
+)]
 fn add_preview(lib: &str, entry: &str) -> Option<String> {
     let function = lib.find("pub fn previews()")?;
     let open = function + lib[function..].find("vec![")? + "vec![".len();

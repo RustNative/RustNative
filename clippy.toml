@@ -36,7 +36,7 @@ allowed-duplicate-crates = ["syn", "jni-sys", "windows-sys"]
 allow-unwrap-in-tests = true
 allow-expect-in-tests = true
 
-# Proper names the Linux backend's documentation uses, which
-# `doc_markdown` would otherwise ask to be code (`..` keeps clippy's own
-# list).
-doc-valid-idents = ["..", "XTest", "LXQt", "WSLg", "Xwayland", "GNOME", "KDE", "AppImage", "AppStream", "GDBus", "GLib", "GObject", "OpenURI", "FileChooser", "NetworkManager", "UPower", "UnifiedPush", "KWallet", "KeePassXC", "StatusNotifierItem", "XEmbed", "AppIndicator", "GApplication", "EndeavourOS", "CentOS", "TalkBack", "HyperOS", "AndroidX"]
+# Proper names the documentation uses (the Linux backend's, and the server's
+# `SQLite`), which `doc_markdown` would otherwise ask to be code (`..` keeps
+# clippy's own list).
+doc-valid-idents = ["..", "SQLite", "XTest", "LXQt", "WSLg", "Xwayland", "GNOME", "KDE", "AppImage", "AppStream", "GDBus", "GLib", "GObject", "OpenURI", "FileChooser", "NetworkManager", "UPower", "UnifiedPush", "KWallet", "KeePassXC", "StatusNotifierItem", "XEmbed", "AppIndicator", "GApplication", "EndeavourOS", "CentOS", "TalkBack", "HyperOS", "AndroidX"]

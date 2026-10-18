@@ -16,8 +16,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let key = if settings.secret_key.expose().len() == 64 {
         let hex = settings.secret_key.expose();
         let mut key = [0u8; 32];
-        for (index, byte) in key.iter_mut().enumerate() {
-            *byte = u8::from_str_radix(&hex[index * 2..index * 2 + 2], 16)?;
+        for (byte, pair) in key.iter_mut().zip(hex.as_bytes().chunks_exact(2)) {
+            *byte = u8::from_str_radix(std::str::from_utf8(pair)?, 16)?;
         }
         key
     } else {

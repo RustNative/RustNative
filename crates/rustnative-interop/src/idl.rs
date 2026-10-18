@@ -210,6 +210,10 @@ fn is_ident(name: &str) -> bool {
 }
 
 impl Parser {
+    #[allow(
+        clippy::string_slice,
+        reason = "every index comes from `char_indices`, or follows an ASCII `///`"
+    )]
     fn new(source: &str) -> Self {
         let mut tokens = Vec::new();
         let mut line = 1;

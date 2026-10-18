@@ -272,9 +272,10 @@ pub fn url_opener(remote: bool) -> Option<UrlOpener> {
 ///
 /// The URL is not one of those, or carries such a character.
 pub fn checked_url(url: &str) -> Result<&str, ServiceError> {
-    let scheme = ["http://", "https://", "mailto:"]
-        .iter()
-        .any(|scheme| url.len() > scheme.len() && url[..scheme.len()].eq_ignore_ascii_case(scheme));
+    let scheme = ["http://", "https://", "mailto:"].iter().any(|scheme| {
+        url.len() > scheme.len()
+            && url.get(..scheme.len()).is_some_and(|prefix| prefix.eq_ignore_ascii_case(scheme))
+    });
     if !scheme {
         return Err(ServiceError::new(format!("`{url}` is not an http, https, or mailto URL")));
     }
@@ -484,6 +485,8 @@ mod tests {
     fn a_url_reaches_its_opener_only_whole_and_well_formed() {
         assert!(checked_url("https://example.com/search?q=a&lang=en#top").is_ok());
         assert!(checked_url("mailto:someone@example.com").is_ok());
+        // Byte 8 (the length of `https://`) is inside the `€`.
+        assert!(checked_url("mailto:€").is_ok());
         for refused in [
             "https://example.com/\" & calc.exe",
             "https://example.com/a b",
@@ -494,6 +497,8 @@ mod tests {
             "javascript:alert(1)",
             "--help",
             "https://",
+            // Byte 7 is inside the second `é`: refused, not a panic.
+            "httpéé",
         ] {
             assert!(checked_url(refused).is_err(), "{refused:?} was refused");
         }

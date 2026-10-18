@@ -89,9 +89,19 @@ pub fn tar(files: &[File]) -> Vec<u8> {
         let (name, prefix) = if path.len() <= 100 {
             (path.as_str(), "")
         } else {
-            // ustar splits a long path at a `/` into prefix and name.
-            let split = path[..path.len().min(155)].rfind('/').unwrap_or(0);
-            (&path[split + 1..], &path[..split])
+            // ustar splits a long path at a `/` into prefix and name; the
+            // prefix holds 155 bytes, which may end inside a character.
+            let limit = (0..=path.len().min(155))
+                .rev()
+                .find(|&index| path.is_char_boundary(index))
+                .unwrap_or_default();
+            match path.get(..limit).and_then(|head| head.rfind('/')) {
+                Some(split) => (
+                    path.get(split + 1..).unwrap_or_default(),
+                    path.get(..split).unwrap_or_default(),
+                ),
+                None => (path.as_str(), ""),
+            }
         };
         header[..name.len().min(100)].copy_from_slice(&name.as_bytes()[..name.len().min(100)]);
         let (mode, size, kind) = match file {
@@ -711,6 +721,16 @@ mod tests {
             archive,
             "reproducible"
         );
+    }
+
+    #[test]
+    fn a_long_non_ascii_path_splits_at_a_slash_not_inside_a_character() {
+        // Byte 155, where the ustar prefix ends, is inside an `é`.
+        let path = format!("a/{}/x", "é".repeat(80));
+        let archive = tar(&[File { path, data: Vec::new(), executable: false }]);
+        // The entries are `a/`, `a/é…/`, and the file; the second one's
+        // prefix is `a`.
+        assert_eq!(&archive[512 + 345..512 + 347], b"a\0");
     }
 
     #[test]

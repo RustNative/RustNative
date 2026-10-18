@@ -198,6 +198,10 @@ pub fn compile(source: &str, options: &CompileOptions) -> Result<RsxOutput, Vec<
     Ok(apply_edits(source, &edits, &options.source_path))
 }
 
+#[allow(
+    clippy::string_slice,
+    reason = "edits start and end at token spans or at an ASCII `//!`; `code` is cut just after a newline"
+)]
 fn apply_edits(source: &str, edits: &[Edit], path: &Path) -> RsxOutput {
     let mut code = String::with_capacity(source.len() + edits.len() * 24);
     let mut map = SourceMap { source: path.display().to_string(), lines: BTreeMap::new() };
@@ -402,6 +406,7 @@ impl Scanner<'_> {
                     replacement: "// ".to_owned(),
                 });
             } else if trimmed.starts_with("#![") {
+                #[allow(clippy::string_slice, reason = "`offset` is the start of a line")]
                 let line_number = self.source[..offset].matches('\n').count() + 1;
                 self.errors.push(RsxError {
                     line: line_number,
@@ -545,6 +550,7 @@ fn fn_context_from(tokens: &[TokenTree]) -> FnContext {
 }
 
 #[cfg(test)]
+#[allow(clippy::string_slice, reason = "tests slice at offsets they checked")]
 mod tests {
     use super::*;
 

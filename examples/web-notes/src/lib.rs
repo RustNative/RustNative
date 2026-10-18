@@ -448,11 +448,19 @@ pub fn app(data: Data, key: [u8; 32]) -> ServerApp {
 /// instance of every shape reads the same sessions.
 #[must_use]
 pub fn key_from_env() -> [u8; 32] {
-    let hex = std::env::var("NOTES_SECRET_KEY").unwrap_or_default();
+    key_from_hex(&std::env::var("NOTES_SECRET_KEY").unwrap_or_default())
+}
+
+/// 64 hex digits as a key; anything else (a non-hex or non-ASCII digit
+/// included) reads as zero.
+fn key_from_hex(hex: &str) -> [u8; 32] {
     let mut key = [0u8; 32];
     if hex.len() == 64 {
-        for (index, byte) in key.iter_mut().enumerate() {
-            *byte = u8::from_str_radix(&hex[index * 2..index * 2 + 2], 16).unwrap_or(0);
+        for (byte, pair) in key.iter_mut().zip(hex.as_bytes().chunks_exact(2)) {
+            *byte = std::str::from_utf8(pair)
+                .ok()
+                .and_then(|pair| u8::from_str_radix(pair, 16).ok())
+                .unwrap_or(0);
         }
     }
     key
@@ -648,5 +656,20 @@ pub mod local {
             .csrf_exempt()
             .public(),
         )
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::key_from_hex;
+
+    #[test]
+    fn a_key_with_a_non_ascii_digit_reads_as_zero_not_a_panic() {
+        // 64 bytes, with a two-byte `é` straddling the first pair boundary.
+        let hex = format!("a{}{}", "é", "0".repeat(61));
+        assert_eq!(hex.len(), 64);
+        let key = key_from_hex(&hex);
+        assert_eq!(key[0], 0);
+        assert_eq!(key_from_hex(&"ab".repeat(32)), [0xab; 32]);
     }
 }

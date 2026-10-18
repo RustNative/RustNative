@@ -120,7 +120,7 @@ impl Component for Animated {
         self.wide = !self.wide;
     }
     fn render(&mut self, context: &mut ComponentContext<'_, ()>) -> Node {
-        let delay = context.sleep(Duration::from_millis(1_000));
+        let delay = context.sleep(Duration::from_secs(1));
         context.spawn(delay);
         self.view()
     }

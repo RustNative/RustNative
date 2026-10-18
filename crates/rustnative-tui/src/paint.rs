@@ -651,7 +651,7 @@ fn draw_field_line(
     let selection = widget.edit.selection();
     let mut column = 0_usize;
     let mut offset = start;
-    for grapheme in crate::width::graphemes(&value[start..end]) {
+    for grapheme in crate::width::graphemes(value.get(start..end).unwrap_or_default()) {
         let cells = context.width.of_grapheme(grapheme);
         if column >= scroll_columns && column + cells <= scroll_columns + columns {
             let mut look = style;

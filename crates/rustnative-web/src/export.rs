@@ -312,6 +312,10 @@ impl Site {
 }
 
 /// The text of a document: what is outside its tags (and its scripts).
+#[allow(
+    clippy::string_slice,
+    reason = "every index is a `find` of ASCII `<`, `>`, or `</script>`, plus its length"
+)]
 fn visible_text(html: &str) -> String {
     let mut text = String::new();
     let mut rest = html;

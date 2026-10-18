@@ -1520,12 +1520,12 @@ impl Cx<'_> {
                     "is_negative" => done!(format!("({r} < 0)"), Ty::Bool),
                     "checked_add" | "checked_sub" | "checked_mul" | "checked_div" | "checked_rem" => {
                         let (args, _) = args!(Ty::Int(kind));
-                        let operation = &method[8..];
+                        let operation = method.strip_prefix("checked_").unwrap_or(method);
                         done!(format!("rn.checked(\"{operation}\", {r}, {}, {k})", args[0]), Ty::Opt(Box::new(Ty::Int(kind))));
                     }
                     "saturating_add" | "saturating_sub" | "saturating_mul" => {
                         let (args, _) = args!(Ty::Int(kind));
-                        let operation = &method[11..];
+                        let operation = method.strip_prefix("saturating_").unwrap_or(method);
                         done!(format!("rn.saturating(\"{operation}\", {r}, {}, {k})", args[0]), Ty::Int(kind));
                     }
                     "rem_euclid" => {
@@ -2294,7 +2294,13 @@ impl Cx<'_> {
             (
                 Ty::Constraints,
                 "with_min_width" | "with_max_width" | "with_min_height" | "with_max_height",
-            ) => (vec![int], format!("rn.constrain({r}, \"{}\", $0)", &method[5..])),
+            ) => (
+                vec![int],
+                format!(
+                    "rn.constrain({r}, \"{}\", $0)",
+                    method.strip_prefix("with_").unwrap_or(method)
+                ),
+            ),
             (Ty::VirtualList, "overscan") => (vec![USIZE], format!("rn.w({r}, \"overscan\", $0)")),
             (Ty::VirtualList, "axis") => (vec![Ty::Axis], format!("rn.w({r}, \"axis\", $0)")),
             (Ty::A11y, "name" | "description" | "automation_id" | "text_value") => {

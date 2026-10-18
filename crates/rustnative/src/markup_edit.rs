@@ -57,6 +57,10 @@ impl ElementRange {
 /// The regions of `text` that hold markup: all of it for a `.rsx` file,
 /// the bodies of `rsx!` invocations for a `.rs` file.
 #[must_use]
+#[allow(
+    clippy::string_slice,
+    reason = "a byte scanner: every offset is at or just past an ASCII byte"
+)]
 pub fn regions(text: &str, rsx_file: bool) -> Vec<(usize, usize)> {
     if rsx_file {
         return vec![(0, text.len())];
@@ -167,6 +171,10 @@ fn element_starts(bytes: &[u8], index: usize, region_start: usize) -> bool {
 
 /// Every top-level element in `text[start..end]`.
 #[must_use]
+#[allow(
+    clippy::string_slice,
+    reason = "a byte scanner: every offset is at or just past an ASCII byte"
+)]
 pub fn elements(text: &str, start: usize, end: usize) -> Vec<ElementRange> {
     let bytes = text.as_bytes();
     let mut out = Vec::new();
@@ -191,6 +199,10 @@ pub fn elements(text: &str, start: usize, end: usize) -> Vec<ElementRange> {
 }
 
 /// The element whose `<` is at `start`.
+#[allow(
+    clippy::string_slice,
+    reason = "a byte scanner: every offset is at or just past an ASCII byte"
+)]
 fn element(text: &str, start: usize, limit: usize) -> Option<ElementRange> {
     let bytes = text.as_bytes();
     let name_end = (start + 1..limit).find(|&at| !is_name_byte(bytes[at]))?;
@@ -336,6 +348,10 @@ pub fn apply(text: &str, edits: &[Edit]) -> String {
 }
 
 /// The whitespace at the start of the line `offset` is on.
+#[allow(
+    clippy::string_slice,
+    reason = "element offsets come from `scan`, so they are char boundaries"
+)]
 fn indentation(text: &str, offset: usize) -> &str {
     let line_start = text[..offset].rfind('\n').map_or(0, |at| at + 1);
     let line = &text[line_start..];
@@ -346,6 +362,10 @@ fn indentation(text: &str, offset: usize) -> &str {
 /// `"Save"`, `{count}`), replacing its value or adding it after the last
 /// attribute.
 #[must_use]
+#[allow(
+    clippy::string_slice,
+    reason = "element offsets come from `scan`, so they are char boundaries"
+)]
 pub fn set_attribute(text: &str, element: &ElementRange, name: &str, value: &str) -> Edit {
     if let Some(attr) = element.attrs.iter().find(|attr| attr.name == name) {
         if attr.value.0 == attr.value.1 {
@@ -372,6 +392,10 @@ pub fn set_attribute(text: &str, element: &ElementRange, name: &str, value: &str
 
 /// Removes `element`, and the line it stood on when it stood alone.
 #[must_use]
+#[allow(
+    clippy::string_slice,
+    reason = "element offsets come from `scan`, so they are char boundaries"
+)]
 pub fn remove_element(text: &str, element: &ElementRange) -> Edit {
     let line_start = text[..element.start].rfind('\n').map_or(0, |at| at + 1);
     let alone_before = text[line_start..element.start].trim().is_empty();
@@ -390,6 +414,10 @@ pub fn remove_element(text: &str, element: &ElementRange) -> Edit {
 /// # Errors
 ///
 /// `parent` closes itself, so it has no children to insert among.
+#[allow(
+    clippy::string_slice,
+    reason = "element offsets come from `scan`, so they are char boundaries"
+)]
 pub fn insert_element(
     text: &str,
     parent: &ElementRange,
@@ -422,6 +450,10 @@ pub fn insert_element(
 /// # Errors
 ///
 /// As [`insert_element`], or `parent` is inside `element`.
+#[allow(
+    clippy::string_slice,
+    reason = "element offsets come from `scan`, so they are char boundaries"
+)]
 pub fn move_element(
     text: &str,
     element: &ElementRange,
@@ -449,6 +481,7 @@ pub fn move_element(
 }
 
 #[cfg(test)]
+#[allow(clippy::string_slice, reason = "tests slice at ranges the scanner reported")]
 mod tests {
     use super::*;
 

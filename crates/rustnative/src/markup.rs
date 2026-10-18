@@ -250,6 +250,10 @@ pub fn format_file(path: &Path) -> Result<String> {
 /// Formats every `name!` call's body in `source`. With `unwrap`, a call is
 /// replaced by its formatted markup alone (the `.rsx` formatter's private
 /// wrapper, and any context it inserted, disappear).
+#[allow(
+    clippy::string_slice,
+    reason = "a site starts and ends at token spans; the rest are `find` positions of ASCII `\\n` and `!`"
+)]
 fn format_macro_calls(source: &str, name: &str, unwrap: bool) -> Result<String> {
     let sites = macro_sites(source, name)?;
     let mut out = String::with_capacity(source.len());

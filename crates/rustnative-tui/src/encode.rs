@@ -211,8 +211,8 @@ impl Encoder {
         if previous.bg != wanted.bg {
             color_params(&mut params, wanted.bg, true);
         }
-        if !params.is_empty() {
-            let _ = write!(self, "\x1b[{}m", &params[1..]);
+        if let Some(params) = params.strip_prefix(';') {
+            let _ = write!(self, "\x1b[{params}m");
         }
         self.style = Some(wanted);
     }
