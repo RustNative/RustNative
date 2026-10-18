@@ -423,18 +423,67 @@ struct Promotion {
     percent: u8,
 }
 
+/// Whether the control API on `port` may answer `request`: it names this
+/// loopback listener in `Host` (a page whose name rebinds to 127.0.0.1
+/// still sends its own), no browser page sent it (`Origin`,
+/// `Sec-Fetch-Site`), and it presents `token` as a bearer token.
+fn admit_control(
+    request: &crate::RequestContext,
+    port: u16,
+    token: &str,
+) -> Result<(), ServerError> {
+    let host = request.header("host").unwrap_or_default().to_ascii_lowercase();
+    if host != format!("127.0.0.1:{port}") && host != format!("localhost:{port}") {
+        return Err(ServerError::new(
+            http::StatusCode::FORBIDDEN,
+            "The control API answers only 127.0.0.1 and localhost",
+        ));
+    }
+    let from_a_page = request.headers().contains_key(http::header::ORIGIN)
+        || request.header("sec-fetch-site").is_some_and(|site| site != "none");
+    if from_a_page {
+        return Err(ServerError::new(
+            http::StatusCode::FORBIDDEN,
+            "The control API does not answer web pages",
+        ));
+    }
+    let presented = request
+        .header("authorization")
+        .and_then(|value| value.strip_prefix("Bearer "))
+        .unwrap_or_default();
+    if !crate::constant_time_eq(presented.as_bytes(), token.as_bytes()) {
+        return Err(ServerError::new(
+            http::StatusCode::UNAUTHORIZED,
+            "The control API needs this run's token",
+        ));
+    }
+    Ok(())
+}
+
 impl LocalAdapter {
-    /// The control API `rustnative deploy local` speaks, to serve on a
-    /// loopback address only: `GET /status`, `GET /target` (its name and
-    /// limits), `POST /revisions` (a [`Revision`]), `POST /promote`
+    /// The control API `rustnative deploy local` speaks, to serve on
+    /// loopback port `port` only: `GET /status`, `GET /target` (its name
+    /// and limits), `POST /revisions` (a [`Revision`]), `POST /promote`
     /// (`{ revision, percent }`), and `POST /rollback`.
+    ///
+    /// Whoever drives it decides where the public proxy sends every
+    /// client, so every request must present `token` (`Authorization:
+    /// Bearer`), name `127.0.0.1:<port>` or `localhost:<port>` as its
+    /// `Host`, and carry no sign of coming from a web page; bodies must be
+    /// `application/json`.
     #[must_use]
-    pub fn control(&self) -> crate::ServerApp {
+    pub fn control(&self, port: u16, token: impl Into<String>) -> crate::ServerApp {
         let (status, deploying, promoting, rolling) =
             (self.clone(), self.clone(), self.clone(), self.clone());
         let target = self.target;
+        let token: String = token.into();
         crate::ServerApp::new()
+            // The bearer token is the request-forgery defence: there are no
+            // cookies to forge with.
             .security(crate::Security { csrf: false, hsts: false, ..crate::Security::default() })
+            .before(Arc::new(move |request: &mut crate::RequestContext| {
+                admit_control(request, port, &token)
+            }))
             .route(
                 "/target",
                 crate::get(move || async move {

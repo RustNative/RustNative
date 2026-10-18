@@ -259,8 +259,25 @@ impl<T: DeserializeOwned> FromRequest for Form<T> {
     }
 }
 
+/// Whether `value` names JSON: `application/json` or an
+/// `application/…+json` type, with any parameters.
+fn is_json(value: &str) -> bool {
+    let essence = value.split(';').next().unwrap_or_default().trim().to_ascii_lowercase();
+    essence == "application/json"
+        || essence.strip_prefix("application/").is_some_and(|subtype| subtype.ends_with("+json"))
+}
+
+/// A JSON body, parsed. The request must say it is JSON: a body sent as
+/// `text/plain` (which any page may send cross-site, with no preflight) is
+/// refused with a `415` before it is read.
 impl<T: DeserializeOwned> FromRequest for Json<T> {
     fn from_request(request: &RequestContext) -> Result<Self, ServerError> {
+        if !request.header("content-type").is_some_and(is_json) {
+            return Err(ServerError::new(
+                http::StatusCode::UNSUPPORTED_MEDIA_TYPE,
+                "The body must be sent as application/json",
+            ));
+        }
         serde_json::from_slice(&request.body)
             .map(Json)
             .map_err(|error| ServerError::bad_request(format!("Invalid JSON: {error}")))

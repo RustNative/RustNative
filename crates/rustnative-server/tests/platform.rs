@@ -351,9 +351,11 @@ async fn the_admin_surface_is_generated_and_guarded() {
         db.get().query_row("SELECT COUNT(*) FROM notes", [], |row| row.get(0)).unwrap();
     assert_eq!(count, 0);
 
-    let inspected = service
-        .handle(send("POST", "/__inspect", bearer(true), r#"{"request":"jobs"}"#), None)
-        .await;
+    let mut inspect = send("POST", "/__inspect", bearer(true), r#"{"request":"jobs"}"#);
+    inspect
+        .headers_mut()
+        .insert("content-type", http::HeaderValue::from_static("application/json"));
+    let inspected = service.handle(inspect, None).await;
     let reply: rustnative_core::inspect::Reply = serde_json::from_slice(inspected.body()).unwrap();
     assert!(
         matches!(reply, rustnative_core::inspect::Reply::Ok(serde_json::Value::Array(_))),

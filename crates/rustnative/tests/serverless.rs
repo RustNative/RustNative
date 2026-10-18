@@ -81,9 +81,12 @@ fn send(port: u16, method: &str, path: &str, headers: &[(&str, &str)], body: &st
     let mut stream = TcpStream::connect(("127.0.0.1", port)).unwrap();
     stream.set_read_timeout(Some(Duration::from_secs(120))).unwrap();
     let mut head = format!(
-        "{method} {path} HTTP/1.1\r\nhost: localhost\r\nconnection: close\r\ncontent-length: {}\r\n",
+        "{method} {path} HTTP/1.1\r\nconnection: close\r\ncontent-length: {}\r\n",
         body.len()
     );
+    if !headers.iter().any(|(name, _)| name.eq_ignore_ascii_case("host")) {
+        head.push_str("host: localhost\r\n");
+    }
     for (name, value) in headers {
         head.push_str(&format!("{name}: {value}\r\n"));
     }
@@ -553,21 +556,33 @@ fn a_function_deployment_previews_promotes_and_rolls_back() {
     let _r1 = revision(first);
     let _r2 = revision(second);
     let (proxy, control) = (free_port(), free_port());
+    // The control token goes in a per-user directory: this test's own.
+    let runtime =
+        std::env::temp_dir().join(format!("rustnative-deploy-run-{}", std::process::id()));
+    let _ = std::fs::remove_dir_all(&runtime);
     let _deployment = Process(
         Command::new(env!("CARGO_BIN_EXE_rustnative"))
             .args(["deploy", "local", "start", "--target", "function"])
             .args(["--port", &proxy.to_string(), "--control", &control.to_string()])
+            .env("XDG_RUNTIME_DIR", &runtime)
             .stdout(Stdio::null())
             .spawn()
             .unwrap(),
     );
     wait_for(proxy);
     wait_for(control);
+    let token_file = runtime.join("rustnative").join(format!("deploy-{control}.token"));
+    let started = Instant::now();
+    while !token_file.is_file() {
+        assert!(started.elapsed() < Duration::from_secs(60), "no control token");
+        std::thread::sleep(Duration::from_millis(50));
+    }
     let deploy = |arguments: &[&str]| {
         let status = Command::new(env!("CARGO_BIN_EXE_rustnative"))
             .args(["deploy", "local"])
             .args(arguments)
             .args(["--control", &control.to_string()])
+            .env("XDG_RUNTIME_DIR", &runtime)
             .stdout(Stdio::null())
             .status()
             .unwrap();
@@ -583,11 +598,17 @@ fn a_function_deployment_previews_promotes_and_rolls_back() {
         assert!(reply.body.contains("Sign in"), "{}", reply.body);
         reply.header("x-served-by").unwrap().to_owned()
     };
-    assert!(send(control, "GET", "/target", &[], "").body.contains("function runtime"));
+    let token = std::fs::read_to_string(&token_file).unwrap();
+    let (host, bearer) = (format!("127.0.0.1:{control}"), format!("Bearer {token}"));
+    let target =
+        send(control, "GET", "/target", &[("host", &host), ("authorization", &bearer)], "");
+    assert!(target.body.contains("function runtime"), "{}", target.body);
+    assert_eq!(send(control, "GET", "/target", &[("host", &host)], "").status, 401);
     assert_eq!(served_by(None), "r1", "the first revision takes the traffic");
     assert_eq!(served_by(Some("r2")), "r2", "a preview, by name");
     deploy(&["promote", "r2", "--percent", "100"]);
     assert_eq!(served_by(None), "r2");
     deploy(&["rollback"]);
     assert_eq!(served_by(None), "r1");
+    let _ = std::fs::remove_dir_all(&runtime);
 }

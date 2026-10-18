@@ -42,6 +42,15 @@ rustnative deploy local status
 - **Moving traffic.** Promotions and rollbacks move traffic without
   restarting anything.
 - **Revisions are immutable.** A name used once cannot be deployed again.
+- **The control API.** It listens on `127.0.0.1` only. Whoever drives it
+  decides where the proxy sends every client, so `start` makes a random
+  token for each run and writes it to `deploy-<control port>.token` in a
+  directory only you can read (`$XDG_RUNTIME_DIR/rustnative`, else
+  `~/.rustnative/run`; the file is `0600`). The other commands read it and
+  send it as `Authorization: Bearer`. A request without the token, with a
+  `Host` other than `127.0.0.1:<port>` or `localhost:<port>`, or from a
+  web page (`Origin`, `Sec-Fetch-Site`) is refused. Bodies must be
+  `application/json`.
 - **Client addresses.** Behind the proxy, every request reaches a revision
   from the proxy's address. The proxy sends the client's address in
   `x-forwarded-for`, replacing any the client sent, and a revision believes

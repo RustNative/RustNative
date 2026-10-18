@@ -19,7 +19,7 @@ use rustnative_server::assets::{self, Asset};
 use rustnative_server::deploy::{
     DeploymentAdapter, LocalAdapter, Revision, TrafficSplitter, container,
 };
-use rustnative_server::{Security, ServerApp, get};
+use rustnative_server::{Json, Security, ServerApp, get};
 
 async fn revision(name: &'static str) -> Revision {
     let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
@@ -85,25 +85,182 @@ async fn revisions_are_previewed_promoted_by_percentage_and_rolled_back() {
     assert_eq!(adapter.status().weights.get("r1"), Some(&100));
 }
 
+const CONTROL_PORT: u16 = 8081;
+const TOKEN: &str = "this-run-s-control-token";
+
+/// A JSON request to the control API naming `host`, with `token` if any.
+fn to_control(method: &str, path: &str, host: &str, token: Option<&str>) -> http::request::Builder {
+    let request = Request::builder()
+        .method(method)
+        .uri(path)
+        .header("host", host)
+        .header("content-type", "application/json");
+    match token {
+        Some(token) => request.header("authorization", format!("Bearer {token}")),
+        None => request,
+    }
+}
+
+/// A request to the control API as `rustnative deploy local` sends it.
+fn from_the_cli(method: &str, path: &str) -> http::request::Builder {
+    to_control(method, path, &format!("127.0.0.1:{CONTROL_PORT}"), Some(TOKEN))
+}
+
 #[tokio::test]
 async fn the_control_api_drives_the_same_adapter() {
     let adapter = LocalAdapter::default();
-    let control = adapter.control().into_service();
+    let control = adapter.control(CONTROL_PORT, TOKEN).into_service();
     let r1 = revision("r1").await;
-    let post = |path: &str, body: String| {
-        Request::builder()
-            .method("POST")
-            .uri(path)
-            .header("content-type", "application/json")
-            .body(Bytes::from(body))
-            .unwrap()
-    };
+    let post =
+        |path: &str, body: String| from_the_cli("POST", path).body(Bytes::from(body)).unwrap();
     let added = control.handle(post("/revisions", serde_json::to_string(&r1).unwrap()), None).await;
     assert!(added.status().is_success(), "{:?}", added.body());
     let refused =
         control.handle(post("/promote", r#"{"revision":"nope","percent":10}"#.into()), None).await;
     assert_eq!(refused.status(), http::StatusCode::BAD_REQUEST);
+    let status =
+        control.handle(from_the_cli("GET", "/status").body(Bytes::new()).unwrap(), None).await;
+    assert!(status.status().is_success(), "{:?}", status.body());
+    let localhost = control
+        .handle(
+            to_control("GET", "/status", &format!("localhost:{CONTROL_PORT}"), Some(TOKEN))
+                .body(Bytes::new())
+                .unwrap(),
+            None,
+        )
+        .await;
+    assert!(localhost.status().is_success(), "localhost names the same listener");
     assert_eq!(adapter.status().revisions, vec![r1]);
+}
+
+/// The attack: a page on any origin posts `text/plain` (no preflight) to
+/// the loopback control port, adding its own server as a revision and
+/// sending every client of the public proxy to it.
+#[tokio::test]
+async fn a_cross_site_page_cannot_redirect_the_deployment() {
+    let adapter = LocalAdapter::default();
+    let control = adapter.control(CONTROL_PORT, TOKEN).into_service();
+    let simple = |path: &str, body: &'static str| {
+        Request::builder()
+            .method("POST")
+            .uri(path)
+            .header("host", format!("127.0.0.1:{CONTROL_PORT}"))
+            .header("content-type", "text/plain;charset=UTF-8")
+            .header("origin", "https://attacker.example")
+            .header("sec-fetch-site", "cross-site")
+            .body(Bytes::from_static(body.as_bytes()))
+            .unwrap()
+    };
+    for (path, body) in [
+        ("/revisions", r#"{"name":"evil","address":"203.0.113.7:80"}"#),
+        ("/promote", r#"{"revision":"evil","percent":100}"#),
+    ] {
+        let response = control.handle(simple(path, body), None).await;
+        assert!(response.status().is_client_error(), "{path}: {:?}", response.status());
+    }
+    // Even holding the token, a page is refused: it sent `Origin`.
+    let with_token = control
+        .handle(
+            from_the_cli("POST", "/rollback")
+                .header("origin", "https://attacker.example")
+                .body(Bytes::new())
+                .unwrap(),
+            None,
+        )
+        .await;
+    assert_eq!(with_token.status(), http::StatusCode::FORBIDDEN);
+    let fetched = control
+        .handle(
+            from_the_cli("GET", "/status")
+                .header("sec-fetch-site", "cross-site")
+                .body(Bytes::new())
+                .unwrap(),
+            None,
+        )
+        .await;
+    assert_eq!(fetched.status(), http::StatusCode::FORBIDDEN);
+    assert_eq!(adapter.status(), rustnative_server::deploy::DeploymentStatus::default());
+}
+
+#[tokio::test]
+async fn the_control_api_needs_this_run_s_token() {
+    let adapter = LocalAdapter::default();
+    let control = adapter.control(CONTROL_PORT, TOKEN).into_service();
+    let body = r#"{"name":"r1","address":"127.0.0.1:9001"}"#;
+    let host = format!("127.0.0.1:{CONTROL_PORT}");
+    let without = to_control("POST", "/revisions", &host, None)
+        .body(Bytes::from_static(body.as_bytes()))
+        .unwrap();
+    assert_eq!(control.handle(without, None).await.status(), http::StatusCode::UNAUTHORIZED);
+    let wrong = to_control("POST", "/revisions", &host, Some("another-run-s-token"))
+        .body(Bytes::from_static(body.as_bytes()))
+        .unwrap();
+    assert_eq!(control.handle(wrong, None).await.status(), http::StatusCode::UNAUTHORIZED);
+    let status = to_control("GET", "/status", &host, None).body(Bytes::new()).unwrap();
+    assert_eq!(control.handle(status, None).await.status(), http::StatusCode::UNAUTHORIZED);
+    assert!(adapter.status().revisions.is_empty());
+}
+
+/// DNS rebinding: a page whose name now resolves to 127.0.0.1 still sends
+/// its own name as `Host`.
+#[tokio::test]
+async fn the_control_api_answers_only_its_own_loopback_name() {
+    let adapter = LocalAdapter::default();
+    let control = adapter.control(CONTROL_PORT, TOKEN).into_service();
+    for host in [
+        "attacker.example".to_owned(),
+        format!("attacker.example:{CONTROL_PORT}"),
+        "127.0.0.1".to_owned(),
+        "127.0.0.1:9999".to_owned(),
+        "0.0.0.0:8081".to_owned(),
+    ] {
+        let request = to_control("GET", "/status", &host, Some(TOKEN)).body(Bytes::new()).unwrap();
+        assert_eq!(
+            control.handle(request, None).await.status(),
+            http::StatusCode::FORBIDDEN,
+            "{host}"
+        );
+    }
+    let missing = Request::builder()
+        .uri("/status")
+        .header("authorization", format!("Bearer {TOKEN}"))
+        .body(Bytes::new())
+        .unwrap();
+    assert_eq!(control.handle(missing, None).await.status(), http::StatusCode::FORBIDDEN);
+}
+
+#[tokio::test]
+async fn a_json_body_must_say_it_is_json() {
+    let app = ServerApp::new().security(Security { csrf: false, ..Security::default() }).route(
+        "/echo",
+        rustnative_server::post(|Json(value): Json<serde_json::Value>| async move { Json(value) })
+            .public(),
+    );
+    let service = app.into_service();
+    let send = |content_type: Option<&'static str>| {
+        let service = service.clone();
+        async move {
+            let mut request = Request::builder().method("POST").uri("/echo");
+            if let Some(content_type) = content_type {
+                request = request.header("content-type", content_type);
+            }
+            service.handle(request.body(Bytes::from_static(b"{}")).unwrap(), None).await.status()
+        }
+    };
+    for refused in [
+        None,
+        Some("text/plain;charset=UTF-8"),
+        Some("application/x-www-form-urlencoded"),
+        Some("multipart/form-data; boundary=x"),
+        Some("text/json"),
+    ] {
+        assert_eq!(send(refused).await, http::StatusCode::UNSUPPORTED_MEDIA_TYPE, "{refused:?}");
+    }
+    for accepted in
+        ["application/json", "Application/JSON; charset=utf-8", "application/merge-patch+json"]
+    {
+        assert_eq!(send(Some(accepted)).await, http::StatusCode::OK, "{accepted}");
+    }
 }
 
 #[tokio::test]
