@@ -73,7 +73,7 @@ pub use record::{
 };
 pub use server::{
     AUTH_TIMEOUT, Endpoint, InspectServer, MAX_CONNECTIONS, MAX_LINE, endpoint_directory,
-    new_token, request as send_request,
+    new_token, published_endpoint, published_endpoints, request as send_request,
 };
 pub(crate) use trace::Inspection;
 pub use trace::{PassInfo, RenderInfo, TraceEntry, TraceKind};

@@ -42,6 +42,13 @@ serde_json = "1"
 getrandom = { version = "0.3", optional = true }
 # The stream contract `TaskScope::collect` accepts (Milestone 47).
 futures-core = "0.3"
+# `secret::constant_time_eq`: the token comparison the inspection server,
+# the development agent, and `rustnative-server` share.
+subtle = "2.6"
+
+# `secret`'s private files: `geteuid` for the owner check, `O_NOFOLLOW`.
+[target.'cfg(unix)'.dependencies]
+libc = "0.2"
 
 [features]
 # The markup syntax (`rsx!`, and `.rsx` files, which lower to it). On by

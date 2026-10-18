@@ -8,12 +8,12 @@
 //! to.
 
 use std::net::SocketAddr;
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 
 use clap::{Subcommand, ValueEnum};
 use rustnative_core::inspect::{
     Endpoint, OverlayMode, PROTOCOL_VERSION, Recording, Reply, Request, endpoint_directory,
-    send_request,
+    published_endpoints, send_request,
 };
 use serde_json::Value;
 
@@ -173,14 +173,7 @@ fn endpoint(target: &Target) -> Result<Endpoint> {
         return android_endpoint();
     }
     let directory = endpoint_directory();
-    let read = |path: &Path| -> Option<(std::time::SystemTime, Endpoint)> {
-        let modified = std::fs::metadata(path).and_then(|meta| meta.modified()).ok()?;
-        let endpoint = serde_json::from_slice(&std::fs::read(path).ok()?).ok()?;
-        Some((modified, endpoint))
-    };
-    let mut found: Vec<(std::time::SystemTime, Endpoint)> = std::fs::read_dir(&directory)
-        .map(|entries| entries.flatten().filter_map(|entry| read(&entry.path())).collect())
-        .unwrap_or_default();
+    let mut found = published_endpoints().map_err(io("read the published inspection endpoints"))?;
     if let Some(pid) = target.pid {
         found.retain(|(_, endpoint)| endpoint.pid == pid);
     }

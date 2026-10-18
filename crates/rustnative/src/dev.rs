@@ -39,7 +39,8 @@ use std::path::{Path, PathBuf};
 use std::process::{Child, Command};
 use std::time::{Duration, Instant, SystemTime};
 
-use rustnative_core::inspect::{Endpoint, Reply, Request, endpoint_directory, send_request};
+use rustnative_core::inspect::{Endpoint, Reply, Request, published_endpoint, send_request};
+use rustnative_core::secret;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
@@ -263,12 +264,13 @@ fn resource_env(resources: &[(String, PathBuf)]) -> Vec<(String, String)> {
 
 /// Waits for process `pid` to publish its inspection endpoint.
 fn wait_for_endpoint(pid: u32, mut exited: impl FnMut() -> Option<String>) -> Result<Endpoint> {
-    let file = endpoint_directory().join(format!("{pid}.json"));
     let started = Instant::now();
     loop {
-        if let Some(endpoint) =
-            std::fs::read(&file).ok().and_then(|bytes| serde_json::from_slice(&bytes).ok())
-        {
+        let published = published_endpoint(pid).map_err(|cause| Error::Io {
+            what: "read the application's inspection endpoint".into(),
+            cause,
+        })?;
+        if let Some(endpoint) = published {
             return Ok(endpoint);
         }
         if let Some(status) = exited() {
@@ -816,7 +818,9 @@ pub fn deploy(remote: &Remote, executable: &Path, args: &[String]) -> Result<Dep
 
 /// Runs the agent on `listen`: receives builds, starts them, and hands back
 /// their inspection endpoints. It runs what a token holder sends it, so it
-/// binds loopback unless told otherwise, and prints the token once.
+/// binds loopback unless told otherwise, and prints the token once. Builds
+/// are written to `rustnative-dev-agent` in this user's own directory
+/// ([`secret::user_directory`]), never the shared temporary directory.
 ///
 /// # Errors
 ///
@@ -831,8 +835,8 @@ pub fn agent(listen: SocketAddr, max_deployments: Option<usize>) -> Result<()> {
         .map_err(|cause| Error::Io { what: "generate the agent's token".into(), cause })?;
     println!("rustnative dev-agent listening on {addr} token {token}");
     let _ = std::io::stdout().flush();
-    let folder = std::env::temp_dir().join("rustnative-dev-agent");
-    let mut running: Option<Child> = None;
+    let folder = secret::user_directory("rustnative-dev-agent");
+    let mut running: Option<Running> = None;
     let mut served = 0;
     for stream in listener.incoming() {
         let Ok(stream) = stream else { continue };
@@ -845,10 +849,24 @@ pub fn agent(listen: SocketAddr, max_deployments: Option<usize>) -> Result<()> {
             break;
         }
     }
-    if let Some(mut child) = running {
-        let _ = child.kill();
+    if let Some(running) = running {
+        running.stop();
     }
     Ok(())
+}
+
+/// The deployment the agent last started, and the file it ran.
+struct Running {
+    child: Child,
+    path: PathBuf,
+}
+
+impl Running {
+    fn stop(mut self) {
+        let _ = self.child.kill();
+        let _ = self.child.wait();
+        let _ = std::fs::remove_file(&self.path);
+    }
 }
 
 fn serve_deployment(
@@ -856,7 +874,7 @@ fn serve_deployment(
     token: &str,
     folder: &Path,
     listen: SocketAddr,
-    running: &mut Option<Child>,
+    running: &mut Option<Running>,
 ) -> Deployed {
     let failed =
         |error: String| Deployed { pid: 0, endpoint: None, exited: None, error: Some(error) };
@@ -870,9 +888,7 @@ fn serve_deployment(
     let Ok(header) = serde_json::from_str::<Deploy>(&line) else {
         return failed("the header is not a deployment".into());
     };
-    let same = header.token.len() == token.len()
-        && header.token.bytes().zip(token.bytes()).fold(0, |acc, (a, b)| acc | (a ^ b)) == 0;
-    if !same {
+    if !secret::constant_time_eq(header.token.as_bytes(), token.as_bytes()) {
         return failed("wrong token".into());
     }
     let Ok(size) = usize::try_from(header.size) else { return failed("too large".into()) };
@@ -887,23 +903,27 @@ fn serve_deployment(
     let Some(name) = Path::new(&header.name).file_name() else {
         return failed("no executable name".into());
     };
-    if let Some(mut previous) = running.take() {
-        let _ = previous.kill();
-        let _ = previous.wait();
+    if let Some(previous) = running.take() {
+        previous.stop();
     }
-    let path = folder.join(name);
-    if let Err(error) = std::fs::create_dir_all(folder).and_then(|()| std::fs::write(&path, &bytes))
+    // The folder is this user's alone (refused otherwise), and the file is
+    // new under a name nobody can predict: created, never opened, so no
+    // file or link another user put there is written through or run.
+    if let Err(error) = secret::private_directory(folder) {
+        return failed(format!("cannot use {}: {error}", folder.display()));
+    }
+    let unique = match rustnative_core::inspect::new_token() {
+        Ok(unique) => unique,
+        Err(error) => return failed(format!("cannot name the executable: {error}")),
+    };
+    let path = folder.join(format!("{unique}-{}", name.to_string_lossy()));
+    // Owner-only and runnable where the file system has an execute bit;
+    // closed before it is started.
+    if let Err(error) =
+        secret::create_private_executable(&path).and_then(|mut file| file.write_all(&bytes))
     {
+        let _ = std::fs::remove_file(&path);
         return failed(format!("cannot write {}: {error}", path.display()));
-    }
-    // Runnable where the file system has an execute bit.
-    #[cfg(unix)]
-    {
-        use std::os::unix::fs::PermissionsExt as _;
-        if let Err(error) = std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o755))
-        {
-            return failed(format!("cannot make {} executable: {error}", path.display()));
-        }
     }
     let bind = SocketAddr::new(listen.ip(), 0);
     let child = Command::new(&path)
@@ -913,7 +933,10 @@ fn serve_deployment(
         .spawn();
     let mut child = match child {
         Ok(child) => child,
-        Err(error) => return failed(format!("cannot start {}: {error}", path.display())),
+        Err(error) => {
+            let _ = std::fs::remove_file(&path);
+            return failed(format!("cannot start {}: {error}", path.display()));
+        }
     };
     let pid = child.id();
     let mut exited = None;
@@ -933,7 +956,7 @@ fn serve_deployment(
         }
         endpoint
     });
-    *running = Some(child);
+    *running = Some(Running { child, path });
     Deployed { pid, endpoint, exited, error: None }
 }
 

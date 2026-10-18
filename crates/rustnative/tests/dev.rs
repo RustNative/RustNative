@@ -59,9 +59,20 @@ fn the_agent_runs_what_a_token_holder_sends_and_nothing_else() {
     assert!(ran["error"].is_null(), "{ran}");
     assert!(ran["pid"].as_u64().unwrap() > 0);
     assert_eq!(ran["exited"], json!(0));
-    let written = std::env::temp_dir().join("rustnative-dev-agent").join("app.exe");
-    assert_eq!(std::fs::read(&written).unwrap(), program, "written under its own folder only");
     assert!(agent.wait().unwrap().success());
+    // Written under the user's own folder only — never the shared temporary
+    // directory, nor outside the folder — and removed once it is done.
+    let folder = rustnative_core::secret::user_directory("rustnative-dev-agent");
+    assert!(!folder.with_file_name("escape").exists(), "the name's directories are dropped");
+    assert!(!std::env::temp_dir().join("rustnative-dev-agent").join("app.exe").exists());
+    assert_eq!(std::fs::read_dir(&folder).unwrap().count(), 0, "the deployment is cleaned up");
+    rustnative_core::secret::check_private_directory(&folder).unwrap();
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt as _;
+        let mode = std::fs::metadata(&folder).unwrap().permissions().mode() & 0o777;
+        assert_eq!(mode, 0o700);
+    }
 }
 
 #[test]

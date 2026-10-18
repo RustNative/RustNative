@@ -51,9 +51,13 @@ line is a `Reply`.
   application can also call `Application::enable_inspection`.
 - **Authenticated.** The token is 128 bits, generated per process. It reaches
   the client out of band, in the endpoint file
-  `<temp>/rustnative-inspect/<pid>.json`. The file is removed when the server
-  stops. A connection that presents the wrong token gets one refusal and is
-  closed.
+  `rustnative-inspect/<pid>.json` in the user's own directory:
+  `$XDG_RUNTIME_DIR` on Linux (else `$XDG_CACHE_HOME` or `~/.cache`), the
+  per-user `$TMPDIR` on macOS, `%LOCALAPPDATA%` on Windows. The directory is
+  mode `0700` and refused if another user owns it or can reach it; the file is
+  created afresh with mode `0600`, never through a link. It is removed when the
+  server stops. A connection that presents the wrong token gets one refusal and
+  is closed (the comparison is constant-time).
 - **Versioned.** A request for another protocol version is refused, not
   answered wrongly.
 - **Answered on the UI thread.** Connections are served on their own threads.

@@ -351,6 +351,7 @@ pub mod preview;
 pub mod product;
 pub mod reconcile;
 pub mod scheduler;
+pub mod secret;
 pub mod server_fn;
 pub mod services;
 pub mod state;
