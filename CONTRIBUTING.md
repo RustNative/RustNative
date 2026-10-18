@@ -1,5 +1,10 @@
 # Contributing
 
+Every contribution is held to the engineering standards in
+[`STANDARDS.md`](STANDARDS.md): what each standard requires, why, and what
+enforces it, with the checklist reviewers verify against (its section 33).
+This page lists the commands to run and the framework's design rules.
+
 ## Development checks
 
 Run the following before opening a change:
