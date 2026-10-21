@@ -2263,6 +2263,28 @@ Iteration 4 was a fresh Q1–Q10 pass over every layer, run as eight parallel re
 
 After iteration 5, the same two conditions are checked again.
 
+### Iteration 5 (2026-10-21): result
+
+Iteration 5 was a fresh Q1–Q10 pass over every layer, again as eight parallel reviews that read each layer's findings first, with U36 and U37 as new lenses. Each review favoured the code earlier passes had covered least, and `rustnative-markup`'s `lower.rs`, `rsx_file.rs`, `rsx_scan.rs`, and `parse.rs` were read in full. P1 claims and the main P2 claims were checked against the code, and their reproductions' output files were read, before recording. The findings are in each layer's "Iteration 5" section; the scratch programs are in `rustnative-tools/layer-solidity/verify15/`.
+
+| Measure | Value |
+|---|---|
+| New P1 | 2: L3-RP7 ✅ (layout), L9-F51 ✅ (durable workflows) |
+| New P2 | 23: L2-F34 ✅; L3-RP8 ✅, RP9 ✅, RP10 ✅, RP11 ✅; L4-F19 ✅; L6-F61 ✅, F62 ✅, F63 ✅, F67, F68, F69, F70, F71; L7-F25 ✅, F26 ✅, F27 ✅, F28 ✅; L9-F52 ✅, F53 ✅, F54 ✅; L10-F24 ✅, F25 ✅ |
+| New P3 | 32: L2-F35–F40 ✅; L3-RP12 ✅, RP13; L4-F20 ✅, F21 ✅, F22 ✅; L6-F64 ✅, F65, F66, F72–F75; L7-F29–F32 ✅, F33; L8-F17 ✅, F18; L9-F55, F56, F57; L10-F26 ✅, F27 ✅, F28 ✅, F29 |
+| Layers with nothing new | L0, L1, L5 |
+| New universal indicator | 1: U38 (what is planned, shown, or declared is computed by the same function that acts). U22 and U30 gained proving findings; L4.9 sharpens U36 (validate each oracle against an injected real failure) |
+| New layer indicators | 14: L2.26–L2.27; L3.4.15, L3.9.9, L3.2.9; L4.9; L6.12–L6.13; L7.15–L7.16; L9.21–L9.22; L10.14–L10.15 |
+| Not reproducible here | Windows and Android findings (L6-F54–F60, F66–F75) are confirmed by reading; they need a device run |
+
+**Is this enough, or must the questions be asked again?**
+- (a) **holds**: every source row is `read`.
+- (b) **fails**: iteration 5 found 2 new P1s, 23 P2s, 32 P3s, 1 universal indicator, and 14 layer indicators. P1s per iteration fell from 9 (iteration 2) to 4, 1, and 2, but every pass still finds new P2s in most layers, so the loop has not converged.
+
+**Wave 0 additions** (same red-test-first procedure as tasks 0.1–0.10):
+- **Task 0.30:** the layout sharing pass uses each child's resolved size (`Fixed` included), and a property test asserts siblings never overlap and the sharing pass agrees with placement (L3-RP7; U38, L3.4.15).
+- **Task 0.31:** workflow runners claim an execution with a lease before replaying it, a journal-key conflict means "another runner recorded this step", and every status change is compare-and-set on `status = 'running'` (L9-F51; U30, L9.21).
+
 ### Standing triggers
 
 The method is also periodic. **Re-run Part A's ten questions for a layer when:**
@@ -2273,6 +2295,81 @@ The method is also periodic. **Re-run Part A's ten questions for a layer when:**
 4. a gate's canary (U19) fails or a gate is quarantined;
 5. before any public release (all layers, full pass);
 6. quarterly otherwise, starting with L3 (the core), because review findings in upper layers trace back to missing core contracts.
+
+---
+
+## E.8 Where the loop stopped (2026-10-21)
+
+The loop was stopped on request after iteration 5, before condition (b) held. This section is the summary of every iteration; Appendix 4 lists every finding.
+
+| Iteration | Method | New P0 | New P1 | New P2 | New P3 | New universal indicators |
+|---|---|---|---|---|---|---|
+| 1 | Layer-by-layer reading, first deep pass (223 files read in full) | 3 | about 30 | about 160 P2 and P3 together | — | U20–U28 |
+| 2 | Remaining source, and a re-pass of L0–L5 with U20–U28 | 0 | 9 (session 3) plus the session-2 P1s in E.7 | 26 (session 3) | recorded per layer | U29–U33, U24 extension |
+| 3 | The 158 skimmed source files read in full, measurements, U29–U33 re-pass | 0 | 4 | 16 | 24 | U34–U35 |
+| 4 | Fresh pass over every layer, eight parallel reviews | 0 | 1 | 20 | 20 | U36–U37 |
+| 5 | Fresh pass over every layer, eight parallel reviews | 0 | 2 | 23 | 32 | U38 |
+
+**Totals across the register (Appendix 4):** 397 rows — P0 3, P1 45, P2 171, P3 154, and 24 strengths or refuted candidates. Universal indicators U1–U38 (U19 is the gate canary in Part B). Five findings are fixed by merged commits: L6-F16, L9-F8, L9-F10, L9-F16, and L3-F19.
+
+**Termination status:**
+- (a) holds: 730 ledger rows (208 284 lines); 608 `read`, 122 `skimmed`, and every `skimmed` row is a test.
+- (b) does not hold: the last pass still found new P1s. The trend in P1s (9, 4, 1, 2) suggests the severe defects are thinning, while P2s and P3s keep appearing at a steady rate in the backends (L6), web (L7), server (L9), and tooling (L10).
+
+**Every P0 and P1 recorded, with its status:**
+
+| ID | Sev | Iter | Status | Finding |
+|---|---|---|---|---|
+| L3-F1 | P0 | 1 | ✅ open | The diff cannot see several node fields, so native objects go stale. |
+| L9-F1 | P0 | 1 | ✅ open | Live sessions can be hijacked by guessing their id. |
+| L9-F2 | P0 | 1 | ✅ open | The resume snapshot is client-supplied and trusted. |
+| L0-F1 | P1 | 1 | open | `Scalar` claims to be "a finite `f32`" but `Scalar::new` passes `±∞` through. Any consumer relying on finiteness (division, interpolation, layout rounding) can |
+| L1-F1 | P1 | 1 | open | Breakpoint precedence differs between the Web and every native backend. |
+| L1-F2 | P1 | 1 | open | `rtl:`/`ltr:` precedence differs too. |
+| L10-F1 | P1 | 1 | open | `rustnative fmt` deletes the user's comments and rewrites files non-atomically. |
+| L10-F6 | P1 | 2 | open | The generated sign-up makes the first account to register an administrator. |
+| L10-F9 | P1 | 3 | ✅ open | `rustnative db rollback <db> --to <name>` with a name that is not applied reverses every migration and exits 0. |
+| L11-F1 | P1 | 1 | open | No dynamic-analysis job. |
+| L2-F1 | P1 | 1 | ✅ open | `.rsx` compiler panics |
+| L2-F13 | P1 | 1 | ✅ open | Unlisted languages silently get English plural rules |
+| L2-F2 | P1 | 1 | ✅ open | `pub mod child;` in a `.rsx` file produces invalid Rust |
+| L2-F3 | P1 | 1 | ✅ open | `rustnative fmt` deletes comments inside markup. |
+| L3-F17 | P1 | 1 | open | A transient read error destroys saved state. |
+| L3-F19 | P1 | 1 | fixed (268034b) | The inspector's token is written to a shared temp directory |
+| L3-F2 | P1 | 1 | ✅ open | After an uncontained render panic, the tree is permanently broken. |
+| L3-F3 | P1 | 1 | open | Containment gaps. |
+| L3-F30 | P1 | 1 | open | Every render pays O(whole tree), measured. |
+| L3-F33 | P1 | 1 | open | Wire keys address any component |
+| L3-F37 | P1 | 1 | open | `FileDocuments::write` is not atomic |
+| L3-F4 | P1 | 1 | open | State written in reaction to `Lifecycle::Terminating`/`Suspending` is never flushed by `lifecycle()` |
+| L3-F5 | P1 | 1 | open | Crash reports contain the whole UI tree with every text-input value |
+| L3-RP7 | P1 | 5 | ✅ open | Fixed sizes are left out of main-axis space sharing and out of a container's natural size, so "fixed sidebar or header plus fill content" overflows on every backend. |
+| L4-F1 | P1 | 1 | open | Headless rebuilds its realized tree from the full snapshot, not by applying diff ops. |
+| L4-F2 | P1 | 1 | open | `terminate_and_relaunch` / `kill_and_restore` drop the app gracefully |
+| L5-F12 | P1 | 1 | ✅ open | Ellipse and path fills iterate over their whole bounds before clipping. |
+| L5-F5 | P1 | 1 | open | Version parsing accepts garbage silently, which feeds downgrade and freeze decisions. |
+| L6-F1 | P1 | 1 | ✅ open | A *caught* panic hands the terminal back while the app keeps running. |
+| L6-F12 | P1 | 2 | open | Whether a panic is survivable depends on the input device. |
+| L6-F16 | P1 | 2 | fixed (fd3a789) | On Windows, `SystemService::open_url` runs whatever it is given. |
+| L6-F2 | P1 | 1 | open | After a contained panic, the TUI loops on the broken tree |
+| L6-F21 | P1 | 2 | ✅ open | Writing a text field re-enters the window procedure while the runtime is mutably borrowed, so two `&mut Runtime` coexist. |
+| L6-F54 | P1 | 4 | open | Leaking an `ExternalLoop` (or the `embed` root) in safe code leaves windows holding a dangling `&mut Application`. |
+| L7-F1 | P1 | 1 | open | Link and form URLs are never scheme-checked. |
+| L7-F11 | P1 | 3 | ✅ open | Form and query decoding is quadratic in the number of fields, and it runs on the server's async workers. |
+| L7-F6 | P1 | 2 | ✅ open | The offline call queue replays `/_fn/` POSTs without idempotency, without expiry, and under whoever is signed in later. |
+| L8-F11 | P1 | 3 | ✅ open | Sorting a `DataTable` column that mixes numbers and text panics in `render`. |
+| L8-F6 | P1 | 2 | ✅ open | `VersionedStore` destroys data on a rollback, and silently nulls any value that is not JSON. |
+| L9-F12 | P1 | 2 | open | One peer can poison every replica's clock forever. |
+| L9-F15 | P1 | 2 | ✅ open | Push requests go to whatever URL the subscriber supplied, with the server's credentials attached. |
+| L9-F27 | P1 | 2 | ✅ open | Sync has no authorization and trusts the client's conflict metadata. |
+| L9-F29 | P1 | 2 | open | Long-running operations are readable and cancellable by anyone who can count. |
+| L9-F3 | P1 | 1 | open | Live events bypass disabled and hidden state. |
+| L9-F37 | P1 | 2 | ✅ open | The MQTT broker silently drops "exactly once" messages once a client reuses a packet id. |
+| L9-F43 | P1 | 3 | ✅ open | Idle keep-alive connections hold `max_connections` slots forever, so 1 024 idle sockets lock out the server. |
+| L9-F51 | P1 | 5 | ✅ open | Two runners of one `LocalEngine` execute the same step twice, and the loser compensates the work and marks a successful execution failed. |
+| L9-F7 | P1 | 2 | open | The MQTT broker has no authentication, no authorization, and no transport security. |
+
+**To resume the loop:** run iteration 6 as a fresh pass over every layer with U38 as a new lens (HANDOVER.md has the procedure), confirm the Windows and Android findings on devices, measure L6-F26 on Windows, and fix the Wave 0 tasks red-test first, rerunning each finding's scratch program before and after its fix.
 
 ---
 
@@ -2344,3 +2441,491 @@ Status after loop iteration 1: **confirmed** (by reading, or ✅ by running), **
 - *"Limit or further?"*: Q9 per layer and E.6.
 - *"Enough or ask again?"*: E.7's verdict and re-check triggers.
 - *"Don't change any code"*: this document is the only file written; no source, test, CI, or configuration file was modified.
+
+# Appendix 4 — Findings register (all iterations)
+
+Every finding the evidence loop recorded, iterations 1–5, generated from the layer files in `layer-solidity/`, where each row has its full description and file:line evidence. **Sev** is the severity; "—" marks a strength or a refuted candidate the loop recorded so that it is not re-examined. **Iter** is the iteration whose section holds the row. **Status**: ✅ reproduced by running code; *read* confirmed by reading; *fixed* closed by the named commit.
+
+Totals: 397 rows — P0 3, P1 45, P2 171, P3 154, strengths or refuted 24.
+
+## L0 — Value types
+
+7 rows: P1 1, P2 1, P3 3, — 2. Source: `layer-solidity/L0-types.md`.
+
+| ID | Sev | Iter | Status | Finding |
+|---|---|---|---|---|
+| L0-F1 | P1 | 1 | read | `Scalar` claims to be "a finite `f32`" but `Scalar::new` passes `±∞` through. Any consumer relying on finiteness (division, interpolation, layout rounding) can |
+| L0-F2 | P3 | 1 | read | Module doc and crate description say "totally ordered scalars", but `Scalar` implements only `PartialEq`/`Eq`/`Hash` — total *equality*, no `PartialOrd`/`Ord`. |
+| L0-F3 | P3 | 1 | read | `From<u32> for Color` silently discards the top byte. `Color::from(0x336699CC)` written by someone expecting `0xRRGGBBAA` yields `rgb(0x66,0x99,0xCC)` — a wrong |
+| L0-F4 | P2 | 1 | read | `Size` is `u32` but `Rect`/`Point`/`SizeMode::Fixed`/`EdgeInsets` are `i32`: negative widths, negative fixed sizes, and negative insets are representable and th |
+| L0-F5 | P3 | 1 | read | `serde` field names are the public field names (`start`/`end`, `red`…); renaming a field silently changes every persisted/wire format that embeds these types (c |
+| L0-F6 | — | 1 | — | `Scalar` has no `serde` impl — good: a derived `Deserialize` would bypass `Scalar::new` (deserializing `NaN`/`-0.0` raw and breaking `Eq`). Must stay this way, |
+| L0-F7 | — | 1 | — | `#![no_std]` with no `extern crate alloc`: allocation is structurally impossible — L0.6 is already E5. `#![deny(missing_docs)]` already on. |
+
+## L1 — Style model
+
+22 rows: P1 2, P2 7, P3 11, — 2. Source: `layer-solidity/L1-style.md`.
+
+| ID | Sev | Iter | Status | Finding |
+|---|---|---|---|---|
+| L1-F1 | P1 | 1 | read | Breakpoint precedence differs between the Web and every native backend. |
+| L1-F2 | P1 | 1 | read | `rtl:`/`ltr:` precedence differs too. |
+| L1-F3 | P2 | 1 | read | Both diverge from the claimed vocabulary. |
+| L1-F4 | P2 | 1 | read | An unterminated `/*` silently swallows the rest of the file. |
+| L1-F5 | P3 | 1 | read | One stray `)` (paren depth goes negative) or an unterminated quote makes `statement_end` treat the rest of the file as one statement → a single misleading error |
+| L1-F6 | P2 | 1 | read | Silent shadowing. |
+| L1-F7 | P3 | 1 | read | `@custom-variant` names are not validated (utility names are: `:438-446`): an empty name or one with spaces/colons is accepted and unusable. |
+| L1-F8 | P2 | 1 | read | A single-token `--x: initial` is lost at build output. |
+| L1-F9 | P2 | 1 | read | `@custom-variant x (@media (min-width: -1px))` becomes an always-true variant |
+| L1-F10 | P3 | 1 | read | Non-finite number text is accepted. |
+| L1-F11 | P3 | 1 | read | Out-of-range percentages accepted |
+| L1-F12 | P2 | 1 | read | Unbounded recursion |
+| L1-F13 | P3 | 1 | read | Capability-table text has embedded runs of spaces |
+| L1-F14 | P3 | 1 | read | `StyleError::line_column` panics on a range that is not a char boundary of the source passed (public fields, public fn); and it counts *chars*, whereas LSP posi |
+| L1-F15 | P3 | 1 | read | `DeclarationSet::from_sources` documents "one entry per declaration" but does not check it; `tokens::declaration_set` guards it, a hand call does not. |
+| L1-F16 | P3 | 1 | read | Design-token import writes JSON string values raw into `app.css` (`--x: {value};`): a value containing `;`, `}`, `*/`, or a newline corrupts or injects into the |
+| L1-F17 | P3 | 1 | read | must be checked in L7 for any path where token values or families arrive at run time |
+| L1-F18 | P3 | 1 | read | `font-[900x]` silently becomes a font *family* when the weight parse fails; `_` is always a space in arbitrary values, so a family with an underscore cannot be |
+| L1-F19 | — | 1 | — | The vendored theme's SHA-256 is recorded (`VENDORED.md`) but nothing verifies it. |
+| L1-F20 | — | 1 | — | Output ordering is deterministic (all maps `BTreeMap`/`BTreeSet`; groups in first-appearance order) — L1.8 is structurally held. Token resolution has a cycle bo |
+| L1-F21 | P2 | 4 | ✅ | A token whose value is another token skips the build-time type check. |
+| L1-F22 | P3 | 4 | ✅ | Design-token import merges colliding names without a warning. |
+
+## L2 — Syntax and build
+
+43 rows: P1 4, P2 19, P3 18, — 2. Source: `layer-solidity/L2-syntax-build.md`.
+
+| ID | Sev | Iter | Status | Finding |
+|---|---|---|---|---|
+| L2-F1 | P1 | 1 | ✅ | `.rsx` compiler panics |
+| L2-F2 | P1 | 1 | ✅ | `pub mod child;` in a `.rsx` file produces invalid Rust |
+| L2-F3 | P1 | 1 | ✅ | `rustnative fmt` deletes comments inside markup. |
+| L2-F4 | P2 | 1 | ✅ | The `.rsx` compiler rewrites string literals |
+| L2-F5 | P2 | 1 | read | Scanner and parser can disagree |
+| L2-F6 | P2 | 1 | read | No recursion bound |
+| L2-F7 | P2 | 1 | read | Hygiene: internal bindings are call-site-visible. |
+| L2-F8 | P2 | 1 | read | `rustnative.toml` errors are silently ignored by the style macros and `compile_styles` |
+| L2-F9 | P2 | 1 | read | Provenance/capability check can skip declarations |
+| L2-F10 | P2 | 1 | read | Host vs target confusion in `embed_resources` |
+| L2-F11 | P2 | 1 | read | Wrong rebuild trigger for the icon |
+| L2-F12 | P2 | 1 | ✅ | i18n subset gaps that fail confusingly |
+| L2-F13 | P1 | 1 | ✅ | Unlisted languages silently get English plural rules |
+| L2-F14 | P2 | 1 | read | No per-locale category completeness check |
+| L2-F15 | P2 | 1 | read | No bidi isolation of placeables |
+| L2-F16 | P3 | 1 | read | Locale fallback is case-sensitive on the full tag and script-unaware: `pt-br` misses `pt-BR`; `zh-Hant-TW` falls to `zh` (Simplified) before the source. Decimal |
+| L2-F17 | P2 | 1 | read | Generated message functions can fail to compile |
+| L2-F18 | P2 | 1 | read | Android `versionCode` is not monotonic with versions |
+| L2-F19 | P2 | 1 | read | Android manifest sets `android:allowBackup="true"` with no `dataExtractionRules`/`fullBackupContent`: persisted state and the SQLite stores are included in clou |
+| L2-F20 | P3 | 1 | read | Silent value mangling: `rc`/manifest versions map unparsable or > 65535 parts to 0 (`1.70000.0` → `1.0.0.0`); ICO accepts any bytes after the PNG signature (IHD |
+| L2-F21 | P2 | 1 | read | Build output written with ignored errors |
+| L2-F22 | P3 | 1 | read | `embed_assets` embeds and serves every file including dotfiles (`.env`, `.DS_Store`); `content_type` lacks `wasm` (streaming instantiation requires `application |
+| L2-F23 | P2 | 1 | read | `sdk::tests::the_override_is_used_when_it_points_at_a_real_file` calls `unsafe { set_var/remove_var }` claiming no other reader — but `cargo test` runs tests on |
+| L2-F24 | P3 | 1 | read | Compile-time costs: `element_spec` rebuilds the whole element table (24 elements × ~25 `AttrSpec` vectors) on every lookup, several lookups per element; style m |
+| L2-F25 | P3 | 1 | read | Absolute build-machine paths are written into generated code: `#[path = "/abs/…"]` (`rsx_file.rs:379-381`), `include_str!`/`include_bytes!` of absolute paths (m |
+| L2-F26 | P3 | 1 | read | Proc-macro2 `span-locations` keeps a thread-local source map that grows with every `TokenStream::from_str`; no call to `proc_macro2::extra::invalidate_current_t |
+| L2-F27 | — | 1 | — | *Refuted:* the formatter keeps `margin=-4` intact (span join works). |
+| L2-F28 | — | 1 | — | Duplicate attributes are refused; non-literal `class=` is a compile error with a reason; unknown attributes suggest the nearest; emitted paths are absolute (`:: |
+| L2-RP1 | P3 | 2 | read | `compile_rsx` ignores a failed write of the generated Rust. |
+| L2-RP2 | P3 | 2 | read | The build helpers default a missing `CARGO_MANIFEST_DIR`/`OUT_DIR` to the empty path. |
+| L2-RP3 | P3 | 2 | read | The `rustnative-macros` style-vocabulary cache is keyed by path and mtime. A long-lived macro server (rust-analyzer) keeps a stale vocabulary across two edits m |
+| L2-F29 | P2 | 4 | ✅ | Term references are never checked, and terms do not fall back across locales. |
+| L2-F30 | P2 | 4 | ✅ | Term expansion costs exponential time and memory. |
+| L2-F31 | P3 | 4 | read | The generated `messages.rs` writes `.ftl` content into Rust without encoding it for that context. |
+| L2-F32 | P3 | 4 | read | `compile_styles` does not watch a style file that does not exist yet. |
+| L2-F33 | P3 | 4 | read | An empty `[style] targets` turns off every capability check. |
+| L2-F34 | P2 | 5 | ✅ | A left shift by an identifier is a compile error in any `.rsx` file. |
+| L2-F35 | P3 | 5 | ✅ | A deleted or renamed `.rsx` file keeps compiling from stale output. |
+| L2-F36 | P3 | 5 | ✅ | The `mod` rewrite writes file-system paths into Rust string literals unescaped. |
+| L2-F37 | P3 | 5 | ✅ | A function-pointer type replaces the enclosing function's context. |
+| L2-F38 | P3 | 5 | ✅ | Attribute expressions are not evaluated in the order written. |
+| L2-F39 | P3 | 5 | ✅ | The scanner overflows the stack on deeply nested plain Rust. |
+| L2-F40 | P3 | 5 | ✅ | The "needs a context" error points at the root element when the component is inside an `if`, `match`, `for`, or fragment. |
+
+## L3 — Core runtime
+
+61 rows: P0 1, P1 10, P2 34, P3 13, — 3. Source: `layer-solidity/L3-core.md` and its continuation files.
+
+| ID | Sev | Iter | Status | Finding |
+|---|---|---|---|---|
+| L3-F1 | P0 | 1 | ✅ | The diff cannot see several node fields, so native objects go stale. |
+| L3-F2 | P1 | 1 | ✅ | After an uncontained render panic, the tree is permanently broken. |
+| L3-F3 | P1 | 1 | read | Containment gaps. |
+| L3-F4 | P1 | 1 | read | State written in reaction to `Lifecycle::Terminating`/`Suspending` is never flushed by `lifecycle()` |
+| L3-F5 | P1 | 1 | read | Crash reports contain the whole UI tree with every text-input value |
+| L3-F6 | P2 | 1 | read | Every panic writes a crash report — including contained ones. |
+| L3-F7 | P2 | 1 | ✅ | `rsx!` and the builder disagree on out-of-range values |
+| L3-F8 | P2 | 1 | ✅ | Stack depth |
+| L3-F9 | P2 | 1 | ✅ | Index-based moves |
+| L3-F10 | P2 | 1 | read | Persisted-state keys depend on `std::any::type_name` |
+| L3-F11 | P2 | 1 | read | The "framework bug" assertion is reachable |
+| L3-F12 | P2 | 1 | read | Events reach disabled/hidden nodes |
+| L3-F13 | P2 | 1 | read | composed |
+| L3-F14 | P3 | 1 | read | `render_pass` stops after 3 passes silently when the tree has not settled (provider/consumer oscillation) — no diagnostic. `apply_queued_window_commands` loops |
+| L3-F15 | P3 | 1 | read | `NodeId` derives `Serialize/Deserialize` although "a `NodeId` means something only on the thread that made it"; any persisted/transmitted `NodeId` aliases a dif |
+| L3-F16 | — | 1 | — | Interning removes hash-collision risk by construction; allocators fail loudly on exhaustion; `Tabs::new` clamps; duplicate node keys are a `RenderError`, not a |
+| L3-F17 | P1 | 1 | read | A transient read error destroys saved state. |
+| L3-F18 | P2 | 1 | read | Schema change silently resets state |
+| L3-F19 | P1 | 1 | fixed (268034b) | The inspector's token is written to a shared temp directory |
+| L3-F20 | P2 | 1 | read | Inspection is honoured by release builds |
+| L3-F21 | P2 | 1 | read | Panics inside spawned tasks vanish. |
+| L3-F22 | P2 | 1 | read | A self-waking local task freezes the UI thread |
+| L3-F23 | P2 | 1 | read | CPU work runs on the async workers |
+| L3-F24 | P2 | 1 | read | No back-pressure on task results |
+| L3-F25 | P2 | 1 | read | The backend waker runs while the scheduler's mutex is held |
+| L3-F26 | P2 | 1 | read | Grid placement from data can exhaust memory |
+| L3-F27 | P3 | 1 | read | Layout measures each child subtree 2–4 times per ancestor level (`preferred_height` in the sum pass and again per child; `child_width` computed twice) with no p |
+| L3-F28 | P3 | 1 | read | `ComponentContext::deferred` panics if a key is reused with another type (a user-triggerable panic, not a `RenderError`); `RenderError` messages name opaque `Co |
+| L3-F29 | — | 1 | — | `Constraints` keeps `min ≤ max` and non-negative bounds in its constructors *and* through `serde(from)`; `FileStateStore` writes temp → `fsync` → rename → direc |
+| L3-F30 | P1 | 1 | read | Every render pays O(whole tree), measured. |
+| L3-F31 | P2 | 1 | read | The stack cost is documented (≈ 0.58 KiB per level: 579 KiB at depth 1 000) and the page concludes "well under the default 1 MiB main-thread stack on Windows" — |
+| L3-F32 | P2 | 1 | read | Failure traces never reach the compact form |
+| L3-F33 | P1 | 1 | read | Wire keys address any component |
+| L3-F34 | P2 | 1 | read | Server-rendered trees can instantiate host content |
+| L3-F35 | P2 | 1 | read | Grant path checks are lexical |
+| L3-F36 | P2 | 1 | read | The HTTP contract has no timeout, size limit, redirect policy, or header validation |
+| L3-F37 | P1 | 1 | read | `FileDocuments::write` is not atomic |
+| L3-F38 | P2 | 1 | read | A saved navigation stack can crash the application at restore |
+| L3-F39 | P2 | 1 | read | Deep links reach every route |
+| L3-F40 | P2 | 1 | read | `Store` freezes after a panic inside `update` |
+| L3-F41 | P2 | 1 | read | Session recordings leak what redaction is meant to hide |
+| L3-F42 | P2 | 1 | read | Representable-invalid controls reach backends |
+| L3-F43 | P2 | 1 | read | Virtual lists are O(item count), not O(visible) |
+| L3-F44 | P2 | 1 | read | Release builds change behaviour from environment variables |
+| L3-F45 | P3 | 1 | read | Spring easing accepts zero damping (never settles → frames forever) and inherits `Scalar`'s ±∞ (L0-F1) → `NaN` progress → element snaps to 0; `Transform2D::inve |
+| L3-F46 | P3 | 1 | read | Accessibility relationships (`labelled_by`, `described_by`, `controls`) are scoped to the declaring component, so a field in a child component cannot be labelle |
+| L3-F47 | P3 | 1 | read | Shortcut labels are Windows-only (`Ctrl`, `Win`) on every host; `Shortcut::matches` compares the produced character, so on a Cyrillic or Arabic layout `Ctrl+C` |
+| L3-F48 | — | 1 | — | `ImageData::rgba` validates dimensions with checked multiplication; the surfaces queue is bounded (256, drop-oldest); wire command names are leaked to `'static` |
+| L3-RP1 | P3 | 2 | read | The inspectable-store registry is pruned only when it is read. |
+| L3-RP2 | P2 | 3 | ✅ | The UI thread's task pool has no per-pass budget, so a task that yields by waking itself freezes the window for good. |
+| L3-RP3 | P3 | 3 | read | The wire command-name table saturates for good. |
+| L3-RP4 | P2 | 4 | ✅ | Every window with the same root component type shares one persisted-state key space, so one window's saved state overwrites another's. |
+| L3-RP5 | P3 | 4 | ✅ | Concurrent `FileStateStore::save` calls on one key share one temporary file. |
+| L3-RP6 | P3 | 4 | ✅ | `HostExecutor` keeps a timer entry for every poll of every sleep, including dropped ones, until its deadline. |
+| L3-RP7 | P1 | 5 | ✅ | Fixed sizes are left out of main-axis space sharing and out of a container's natural size, so "fixed sidebar or header plus fill content" overflows on every backend. |
+| L3-RP8 | P2 | 5 | ✅ | A menu-bar command ignores focus, so it runs on a different component than its shortcut and its displayed state. |
+| L3-RP9 | P2 | 5 | ✅ | An RTL locale with a Unicode `-u-` extension is laid out left to right. |
+| L3-RP10 | P2 | 5 | ✅ | Wire round trips lose input interest. |
+| L3-RP11 | P2 | 5 | ✅ | A remote flag removed upstream is never forgotten. |
+| L3-RP12 | P3 | 5 | ✅ | `perf::percentile` is not the nearest rank it claims. |
+| L3-RP13 | P3 | 5 | read | A development panic dialog names the `.rsx` file with the Rust column. |
+
+## L4 — Reference and verification
+
+22 rows: P1 2, P2 12, P3 7, — 1. Source: `layer-solidity/L4-reference.md`.
+
+| ID | Sev | Iter | Status | Finding |
+|---|---|---|---|---|
+| L4-F1 | P1 | 1 | read | Headless rebuilds its realized tree from the full snapshot, not by applying diff ops. |
+| L4-F2 | P1 | 1 | read | `terminate_and_relaunch` / `kill_and_restore` drop the app gracefully |
+| L4-F3 | P2 | 1 | read | `click()` on a checkbox/toggle/radio/control node does nothing, silently. |
+| L4-F4 | P2 | 1 | read | `settle` stops after 1000 iterations silently |
+| L4-F5 | P2 | 1 | read | `range_changes` rebuilds the virtual-list `ExtentCache` from estimates on every settle |
+| L4-F6 | P2 | 1 | read | The `lifecycle()` result is discarded, and `realize` ignores snapshot errors |
+| L4-F7 | P2 | 1 | read | `preview_goldens` writes a missing golden and passes |
+| L4-F8 | P2 | 1 | read | The conformance driver is narrow. |
+| L4-F9 | P2 | 1 | read | Equivalence suites test one typical value per name. |
+| L4-F10 | P2 | 1 | read | Style equivalence is checked inside core only. |
+| L4-F11 | P2 | 1 | read | Layout conformance uses one reference screen with headless metrics. |
+| L4-F12 | P3 | 1 | read | The cancellation property covers only `effects.spawn` after `sleep`. |
+| L4-F13 | P2 | 1 | read | Browser tests skip silently unless `RUSTNATIVE_BROWSER_REQUIRED` is set, and CI never sets it |
+| L4-F14 | P3 | 1 | read | The web-testing `StaticServer` parses `Content-Length` with `unwrap_or(0)` and reads lines without bound (test-only). `Connection.events` grows without bound ac |
+| L4-F15 | P3 | 1 | read | The wire round-trip test excludes canvas, class, style, input, transition, and spread from its generator, so the fields most likely to change shape are the ones |
+| L4-F16 | — | 1 | — | `doc_parity` enforces two-syntax and two-spelling docs per section (with explicit exemptions). `doc_claims` requires performance words to cite `budgets/`. `ever |
+| L4-F17 | P2 | 4 | ✅ | The shared suite `scrolling_renders_nothing` passes on a backend whose scrolling does not work. |
+| L4-F18 | P3 | 4 | read | The tmux check "a resize is followed" cannot fail when the app ignores the resize. |
+| L4-F19 | P2 | 5 | ✅ | The "no Content Security Policy" browser assertions cannot fail. |
+| L4-F20 | P3 | 5 | ✅ | The missing-docs guard checks the attribute's text, not the lint level in effect. |
+| L4-F21 | P3 | 5 | ✅ | Headless exhaustive mode is silently dropped after `kill_and_restore` and `relaunch_with_deep_link`. |
+| L4-F22 | P3 | 5 | ✅ | `tools/linux-session.sh` leaks its Xvfb or Weston server. |
+
+## L5 — Shared platform groups
+
+24 rows: P1 2, P2 10, P3 9, — 3. Source: `layer-solidity/L5-groups.md`.
+
+| ID | Sev | Iter | Status | Finding |
+|---|---|---|---|---|
+| L5-F1 | P2 | 1 | read | `AppIdentity.id` is never validated |
+| L5-F2 | P3 | 1 | read | `wants_terminal()` treats any argv `--tui` as the switch. |
+| L5-F3 | P3 | 1 | read | Android `install_crash_capture` discards its result (`let _ =`). Linux capture is panic-only: there is no native-signal or abort capture, while Windows writes m |
+| L5-F4 | P3 | 1 | read | `the_default_services_cover_every_contract_the_host_offers` asserts only 7 of the 13 to 15 services (share, work, push, commerce, printing, serial, and locale a |
+| L5-F5 | P1 | 1 | read | Version parsing accepts garbage silently, which feeds downgrade and freeze decisions. |
+| L5-F6 | P2 | 1 | read | The model payload's installed version defaults to `"0"` on any read error |
+| L5-F7 | P2 | 1 | read | `write_atomically` does not fsync |
+| L5-F8 | P2 | 1 | read | One pinned key, with no rotation and no revocation. |
+| L5-F9 | P3 | 1 | read | The model `name` from the manifest is joined into a path unvalidated |
+| L5-F10 | P3 | 1 | read | `bucket()` maps a corrupt `installation-id` to bucket 0, so that installation always gets every rollout first. `pin()` stores the version, but `check` only test |
+| L5-F11 | — | 1 | — | The signature is verified over the exact published bytes before parsing, so no re-serialization ambiguity exists. App-id binding and expiry refusal are both pre |
+| L5-F12 | P1 | 1 | ✅ | Ellipse and path fills iterate over their whole bounds before clipping. |
+| L5-F13 | P2 | 1 | ✅ | `StrokeRect` builds its whole perimeter in a `BTreeMap` before clipping |
+| L5-F14 | P3 | 1 | read | "Rectangles never overlap" is not what the code guarantees. |
+| L5-F15 | P3 | 1 | read | `GridRect::union` and `intersect` subtract without saturation (`right - x`), so a debug build can overflow on extreme rectangles. `Region::row_spans` allocates |
+| L5-F16 | P2 | 1 | read | Drawn-host focus is plain preorder with no scope |
+| L5-F17 | — | 1 | — | Damage coalescing is bounded (`MAX_RECTS` = 16) and loses nothing (tested). Grid rounding has a single, documented rule. Alpha and premultiplied images are hand |
+| L5-F18 | P2 | 1 | read | `[thread = any]` is documented as "serialized by the handle table" but returns `BUSY` under contention. |
+| L5-F19 | P2 | 1 | read | Identifiers are not checked against target-language keywords. |
+| L5-F20 | P3 | 1 | read | Event handlers cannot read the instance. |
+| L5-F21 | — | 1 | — | Every FFI entry runs inside `catch_unwind` and returns a status. Handles are 64-bit and never reused (no ABA). Thread affinity is checked on every owner-only ca |
+| L5-F22 | P2 | 4 | ✅ | Any rectangle wider than 2³¹ grid units is not drawn in release builds and panics in debug builds. |
+| L5-F23 | P2 | 4 | ✅ | Every generated app panics at start when any command-line argument is not valid UTF-8. |
+| L5-F24 | P3 | 4 | ✅ | Interop doc comments go into generated code unescaped. |
+
+## L6 — Native backends
+
+75 rows: P1 6, P2 37, P3 30, — 2. Source: `layer-solidity/L6-backends.md`.
+
+| ID | Sev | Iter | Status | Finding |
+|---|---|---|---|---|
+| L6-F1 | P1 | 1 | ✅ | A *caught* panic hands the terminal back while the app keeps running. |
+| L6-F2 | P1 | 1 | read | After a contained panic, the TUI loops on the broken tree |
+| L6-F3 | P2 | 1 | read | `frame()` runs outside every panic boundary. |
+| L6-F4 | P2 | 1 | read | A bracketed paste with no end marker swallows all later input. |
+| L6-F5 | P2 | 1 | read | WinHTTP header injection. |
+| L6-F6 | P2 | 1 | read | The crash directory is derived from an unvalidated id and falls back to the shared temp dir. |
+| L6-F7 | P2 | 1 | read | The Windows updater uses the signed `version` as a directory name and calls `remove_dir_all` on it. |
+| L6-F8 | P3 | 1 | read | mitigates L3-F22 in the TUI only |
+| L6-F9 | P3 | 1 | read | Linux Secret Service items are found by `{application: <id>, name}` attributes. Secret Service has no per-application isolation, so any process on the session c |
+| L6-F11 | P2 | 1 | read | Keyboard shortcuts break on non-Latin layouts on GTK but not on Windows. |
+| L6-F10 | — | 1 | — | Terminal output cannot carry an injected escape: controls are their own grapheme clusters (UAX #29 GB4/GB5) with width 0, and `Grid::print` drops zero-width clu |
+| L6-F12 | P1 | 2 | read | Whether a panic is survivable depends on the input device. |
+| L6-F13 | P2 | 2 | read | 4 of 13 Windows callbacks have no panic boundary |
+| L6-F14 | P3 | 2 | read | Any same-session process can inject a deep link |
+| L6-F15 | — | 2 | — | GTK already implements L6.6. |
+| L6-F16 | P1 | 2 | fixed (fd3a789) | On Windows, `SystemService::open_url` runs whatever it is given. |
+| L6-F17 | P2 | 2 | read | Reading the clipboard trusts another process to have NUL-terminated its text. |
+| L6-F18 | P2 | 2 | read | The "isolated worker" can read every file the user can and talk to the network. |
+| L6-F19 | P2 | 2 | read | Image decoding allocates whatever the file declares. |
+| L6-F20 | P3 | 2 | read | Service honesty (U18, U20, U28). |
+| L6-F21 | P1 | 2 | ✅ | Writing a text field re-enters the window procedure while the runtime is mutably borrowed, so two `&mut Runtime` coexist. |
+| L6-F22 | P2 | 2 | read | Characters outside the BMP are dropped from custom text targets. |
+| L6-F23 | P3 | 2 | read | Loop details. |
+| L6-F24 | P2 | 2 | read | Drag and drop: no panic boundary, and an unbounded read of the source's text. |
+| L6-F25 | P3 | 2 | read | Input and UIA details. |
+| L6-F26 | P2 | 2 | read | Every background or border color ever painted leaks one GDI brush for the life of the process. |
+| L6-F27 | P3 | 2 | read | Rendering details. |
+| L6-F28 | P2 | 2 | read | The framework has no masked (password) text input. |
+| L6-F29 | P3 | 2 | read | Windows details. |
+| L6-F30 | P2 | 2 | read | GTK has no shutdown or logout path that saves state. |
+| L6-F31 | P2 | 2 | read | `native_surface` hands out raw handles that another thread can outlive. |
+| L6-F32 | P3 | 2 | read | GTK details. |
+| L6-F33 | P2 | 2 | read | Certificate pinning breaks every request with a body on Android. |
+| L6-F34 | P3 | 2 | read | Android details. |
+| L6-F35 | P3 | 2 | read | A duplicate node key fails differently on each backend. |
+| L6-F36 | P2 | 3 | read | Android's drop data and home-screen widgets use U+0001 as an in-band field separator in text other apps or users supply. |
+| L6-F37 | P2 | 3 | ✅ | GTK keys its control-measure cache with `format!("{control:?}")`, and an image's `Debug` prints every pixel. |
+| L6-F38 | P2 | 3 | read | `Event::WindowCloseRequested` says "the window remains open until the application actually removes it", but every desktop backend closes it anyway. |
+| L6-F39 | P2 | 3 | read | Any app on the device can switch on inspection in a release build. |
+| L6-F40 | P3 | 3 | ✅ | The terminal backend's per-frame work grows faster than the tree. |
+| L6-F41 | P3 | 3 | read | Input details that differ from the other backends. |
+| L6-F42 | P3 | 3 | read | Things that only grow. |
+| L6-F43 | P3 | 3 | read | Rendering and accessibility details. |
+| L6-F44 | P3 | 3 | read | Embedded content skips `UrlPolicy`. |
+| L6-F45 | P3 | 3 | read | Unix terminal teardown leaves a window for a stray write. |
+| L6-F46 | P3 | 3 | read | The public TUI test harness can pass a test that should fail. |
+| L6-F47 | P2 | 3 | ✅ | The Android device suite passes when a run stalls twice. |
+| L6-F48 | P3 | 3 | read | Device-suite details |
+| L6-F49 | P2 | 4 | ✅ | The kitty keyboard protocol is never switched on, even on a terminal that answers the probe. |
+| L6-F50 | P2 | 4 | ✅ | Each stop and continue writes the enter sequences twice, so the title and kitty-flag stacks gain an entry per cycle. |
+| L6-F51 | P3 | 4 | read | A Secret Service prompt blocks the GTK main thread for up to 300 s. |
+| L6-F52 | P3 | 4 | read | Portal requests can wait forever. |
+| L6-F53 | P3 | 4 | read | On the Windows console, a focus change during a paste corrupts the pasted text. |
+| L6-F54 | P1 | 4 | read | Leaking an `ExternalLoop` (or the `embed` root) in safe code leaves windows holding a dangling `&mut Application`. |
+| L6-F55 | P2 | 4 | read | Windows notifications stop working after the blocking thread that created their window retires. |
+| L6-F56 | P2 | 4 | read | Any same-user process can squat on, hang, or intercept the single-instance channel. |
+| L6-F57 | P2 | 4 | read | Any Android app can forge a widget, notification, tile, or shortcut action. |
+| L6-F58 | P2 | 4 | read | Shared items reach the app unfiltered ("Dirty Stream"). |
+| L6-F59 | P2 | 4 | read | Android self-update reports success and never installs. |
+| L6-F60 | P3 | 4 | read | Unpinned WinHTTP requests follow cross-host redirects with the caller's headers. |
+| L6-F61 | P2 | 5 | ✅ | In the terminal, a child of an `Overflow::Visible` container inside a scroll container ignores the scroll viewport, so clicks on what is visible go to a control scrolled out of view. |
+| L6-F62 | P2 | 5 | ✅ | Terminal label text, text-field and select underline fills, and the caret use the node's rectangle, not its clip. |
+| L6-F63 | P2 | 5 | ✅ | A terminal list box with a selection cannot be wheel-scrolled. |
+| L6-F64 | P3 | 5 | ✅ | Tabs take zero cells in the terminal. |
+| L6-F65 | P3 | 5 | read | Terminal scroll containers draw their scroll bar over the content's last column |
+| L6-F66 | P3 | 5 | read | A custom text target cannot place the IME candidate window. |
+| L6-F67 | P2 | 5 | read | Android `finishComposingText` throws away the word being composed. |
+| L6-F68 | P2 | 5 | read | After process death, an Android secondary window's task comes back as the primary window. |
+| L6-F69 | P2 | 5 | read | An Android native surface is destroyed with no event. |
+| L6-F70 | P2 | 5 | read | The Windows canvas keeps the DPI it was created at. |
+| L6-F71 | P2 | 5 | read | The Windows tray icon is gone for good after Explorer restarts. |
+| L6-F72 | P3 | 5 | read | Android PendingIntents alias and notification ids repeat. |
+| L6-F73 | P3 | 5 | read | Android virtual accessibility ids are list positions |
+| L6-F74 | P3 | 5 | read | IME delivery differs across backends. |
+| L6-F75 | P3 | 5 | read | Smaller Windows and GTK details. |
+
+## L7 — Web
+
+33 rows: P1 3, P2 14, P3 15, — 1. Source: `layer-solidity/L7-web.md`.
+
+| ID | Sev | Iter | Status | Finding |
+|---|---|---|---|---|
+| L7-F1 | P1 | 1 | read | Link and form URLs are never scheme-checked. |
+| L7-F2 | P2 | 1 | read | A font family containing a comma is emitted raw into the stylesheet. |
+| L7-F3 | P3 | 1 | read | Attribute names are never validated. |
+| L7-F4 | P2 | 1 | read | The client-subset translator has scenario-only differential tests. |
+| L7-F5 | — | 1 | — | One escaper covers text and attribute values; `json_for_script` escapes `<`, `>`, `&`, U+2028, and U+2029. Inline `<style>` neutralises `</` and carries a nonce |
+| L7-F6 | P1 | 2 | ✅ | The offline call queue replays `/_fn/` POSTs without idempotency, without expiry, and under whoever is signed in later. |
+| L7-F7 | P2 | 2 | read | The service worker caches personalised pages that the server marked `no-store`. |
+| L7-F8 | P2 | 2 | read | Server-interactive mode ships the root component's inspector state to every browser. |
+| L7-F9 | P3 | 2 | read | Web runtime details. |
+| L7-F10 | P3 | 2 | read | Translator and image details. |
+| L7-F11 | P1 | 3 | ✅ | Form and query decoding is quadratic in the number of fields, and it runs on the server's async workers. |
+| L7-F12 | P2 | 3 | ✅ | The client subset compiles ordinary Rust into JavaScript that means something else, and it raises no error. |
+| L7-F13 | P2 | 3 | read | The server's responsive-image store never evicts anything. |
+| L7-F14 | P2 | 3 | read | The WebAssembly subtree's service bridge corrupts bytes. |
+| L7-F15 | P3 | 3 | read | Native client components never unsubscribe from topics. |
+| L7-F16 | P3 | 3 | read | Browser runtime details. |
+| L7-F17 | P3 | 3 | read | Render and translator details. |
+| L7-F18 | P3 | 3 | read | Doc comments with mojibake. |
+| L7-F19 | P2 | 4 | ✅ | Streamed pages can give islands each other's state and module. |
+| L7-F20 | P2 | 4 | ✅ | Hoisted statements change evaluation order in compiled client code. |
+| L7-F21 | P2 | 4 | ✅ | `move` closures capture by reference in compiled client code. |
+| L7-F22 | P3 | 4 | ✅ | Three more numeric divergences. |
+| L7-F23 | P3 | 4 | read | `sw.js` differs from process to process, so every restart looks like a new build. |
+| L7-F24 | P3 | 4 | read | Precached pages are never served offline. |
+| L7-F25 | P2 | 5 | ✅ | A form submitted without JavaScript sends only text inputs, checkboxes, and buttons. |
+| L7-F26 | P2 | 5 | ✅ | All radios of one component form one browser radio group. |
+| L7-F27 | P2 | 5 | ✅ | Going back to a history entry the runtime did not create leaves the previous page on screen. |
+| L7-F28 | P2 | 5 | ✅ | Converting a whole-number float to an integer wraps in JS where Rust saturates. |
+| L7-F29 | P3 | 5 | ✅ | Struct-update syntax evaluates `..base` before the explicit fields. |
+| L7-F30 | P3 | 5 | ✅ | Horizontal virtual lists never advance under `dir=rtl`. |
+| L7-F31 | P3 | 5 | ✅ | Moving a keyed item up loses keyboard focus. |
+| L7-F32 | P3 | 5 | ✅ | Clicking a checkbox's or radio's label text sends `Click` to the parent container. |
+| L7-F33 | P3 | 5 | read | The browser sends `Composition` events for native text inputs |
+
+## L8 — Application layer
+
+18 rows: P1 2, P2 7, P3 8, — 1. Source: `layer-solidity/L8-app.md`.
+
+| ID | Sev | Iter | Status | Finding |
+|---|---|---|---|---|
+| L8-F1 | P2 | 1 | read | A truncated disk-cache write breaks an image permanently. |
+| L8-F2 | P2 | 1 | read | Image memory and disk are bounded by time only. |
+| L8-F3 | P3 | 1 | read | Disk-cache keys are 64-bit FNV of the URL. |
+| L8-F4 | P3 | 1 | read | `chart.rs` has no `is_finite` or NaN handling. A NaN or infinite data point flows into layout and drawing as is; together with L5-F12, an infinite value makes t |
+| L8-F5 | — | 1 | — | `Retry` retries only idempotent requests and only on transport failure, with bounded attempts. Query back-off saturates (`checked_shl`, `saturating_mul`). Image |
+| L8-F6 | P1 | 2 | ✅ | `VersionedStore` destroys data on a rollback, and silently nulls any value that is not JSON. |
+| L8-F7 | P2 | 2 | read | A load error empties the offline mutation queue and persisted tables, and the next write makes it permanent. |
+| L8-F8 | P2 | 2 | read | The native offline mutation queue has the same replay flaws as the web one (L7-F6). |
+| L8-F9 | P2 | 2 | read | Autosave overwrites changes made outside the application. |
+| L8-F10 | P3 | 2 | read | L8-F4 is partly refuted. |
+| L8-F11 | P1 | 3 | ✅ | Sorting a `DataTable` column that mixes numbers and text panics in `render`. |
+| L8-F12 | P2 | 3 | ✅ | `BearerAuth` sends the access token to whatever URL a request names, and endpoint parameters are spliced into the path unescaped. |
+| L8-F13 | P2 | 3 | ✅ | An invalidation that arrives while a fetch for the key is in flight is lost. |
+| L8-F14 | P3 | 3 | ✅ | `ListSelection::set_count` clamps `focused` and `selected` but not `anchor`. |
+| L8-F15 | P3 | 3 | read | Component details. |
+| L8-F16 | P3 | 3 | read | Data-layer details. |
+| L8-F17 | P3 | 5 | ✅ | The chart's screen-reader text invents values. |
+| L8-F18 | P3 | 5 | read | `Toast` matches an expiring timer to its message by text |
+
+## L9 — Server and distributed
+
+57 rows: P0 2, P1 9, P2 19, P3 22, — 5. Source: `layer-solidity/L9-server.md`.
+
+| ID | Sev | Iter | Status | Finding |
+|---|---|---|---|---|
+| L9-F1 | P0 | 1 | ✅ | Live sessions can be hijacked by guessing their id. |
+| L9-F2 | P0 | 1 | ✅ | The resume snapshot is client-supplied and trusted. |
+| L9-F3 | P1 | 1 | read | Live events bypass disabled and hidden state. |
+| L9-F4 | P2 | 1 | read | The Live socket is unauthenticated, with only coarse resource bounds. |
+| L9-F5 | P3 | 1 | read | `Cookie` `Display` writes `name=value` without validating either. A value containing `;` adds attributes (`; Domain=…`), though `HeaderValue` blocks CR/LF. The |
+| L9-F6 | — | 1 | — | HTTP security is strong by default. |
+| L9-F7 | P1 | 2 | read | The MQTT broker has no authentication, no authorization, and no transport security. |
+| L9-F8 | P2 | 2 | fixed (3485eb2; see L9-F43) | The server has no header-read timeout, no connection limit, and no handler or render deadline. |
+| L9-F9 | P2 | 2 | read | A cached "public" route can serve one visitor's personalised page to everyone. |
+| L9-F10 | P2 | 2 | fixed (4e916b8) | MQTT reads allocate whatever length the client declares |
+| L9-F11 | — | 2 | — | Admin routes are behind `.authorized::<P, Pol>()`, with table and column names from the model and bound values. Path and form extraction parse defensively, and |
+| L9-F12 | P1 | 2 | read | One peer can poison every replica's clock forever. |
+| L9-F13 | P3 | 2 | read | Durable and DB details. `db::open` ignores a failed `journal_mode=WAL` (`let _ =`, U4). `schema.rs` formats table names into `PRAGMA table_info("{name}")` (deve |
+| L9-F14 | — | 2 | — | The durable workflow design is sound |
+| L9-F15 | P1 | 2 | ✅ | Push requests go to whatever URL the subscriber supplied, with the server's credentials attached. |
+| L9-F16 | P2 | 2 | fixed (20fc4fa, 5633bfa) | The local deployment's control API is open to any web page. |
+| L9-F17 | P2 | 2 | read | Row policies can be bypassed through their own `columns` argument. |
+| L9-F18 | P2 | 2 | read | The job queue is unsafe with more than one worker, and one panicking job stops the queue. |
+| L9-F19 | P3 | 2 | read | Cron semantics differ from cron. |
+| L9-F20 | P3 | 2 | read | `RUSTNATIVE_DEV` changes a release server. |
+| L9-F21 | P3 | 2 | read | Silent defaults in the auth and config paths. |
+| L9-F22 | P3 | 2 | read | OAuth and OIDC are half done. |
+| L9-F23 | P3 | 2 | read | Serverless and proxy edge cases. |
+| L9-F24 | P3 | 2 | read | `query!` checks against a different schema than the one that runs (U21). |
+| L9-F25 | P3 | 2 | read | API-tooling details. |
+| L9-F26 | — | 2 | — | Password hashing is Argon2id in PHC form with a random salt. Bearer verification is constant-time HMAC-SHA256 with expiry. OAuth uses PKCE S256 and a constant-t |
+| L9-F27 | P1 | 2 | ✅ | Sync has no authorization and trusts the client's conflict metadata. |
+| L9-F28 | P2 | 2 | ✅ | A sync server restart makes every client blind. |
+| L9-F29 | P1 | 2 | read | Long-running operations are readable and cancellable by anyone who can count. |
+| L9-F30 | P2 | 2 | read | Actor storage turns read errors into empty state. |
+| L9-F31 | P2 | 2 | read | One panicking or undecodable event stalls the event queue for good. |
+| L9-F32 | P2 | 2 | read | The OTLP exporter buffers without bound. |
+| L9-F33 | P3 | 2 | read | Telemetry carries URLs and raw paths. |
+| L9-F34 | P3 | 2 | read | Sync and device details. |
+| L9-F35 | P3 | 2 | read | The edge actor adapter accepts any message for any actor id from any requester, and offers no authentication hook. `LocalActorSystem::ask` can lose a message th |
+| L9-F36 | — | 2 | — | `supervise` catches panics and follows the policy's backoff. The edge alarm is taken once. Consent for telemetry defaults to off, and nothing leaves without it |
+| L9-F37 | P1 | 2 | ✅ | The MQTT broker silently drops "exactly once" messages once a client reuses a packet id. |
+| L9-F38 | P2 | 2 | read | A partially prerendered shell is cached by path, from the first visitor's props, without bound. |
+| L9-F39 | P2 | 2 | read | A failed saga compensation is never retried. |
+| L9-F40 | P3 | 2 | read | Database layer details. |
+| L9-F41 | P3 | 2 | read | Pipeline and admin details. |
+| L9-F42 | P3 | 2 | read | MQTT and CRDT details. |
+| L9-F43 | P1 | 3 | ✅ | Idle keep-alive connections hold `max_connections` slots forever, so 1 024 idle sockets lock out the server. |
+| L9-F44 | P2 | 3 | read | An MQTT client that asks for keep-alive 0 holds a broker slot for 24 hours. |
+| L9-F45 | P3 | 3 | read | The inspector's pre-token deadline is per line, and blank lines are skipped, so 16 unauthenticated clients hold every inspector slot. |
+| L9-F46 | P3 | 3 | read | Listener and URL policy details. |
+| L9-F47 | P2 | 4 | ✅ | An MQTT client that reconnects while its old connection is still open is disconnected, loses its subscriptions, and has its will published while it is online. |
+| L9-F48 | P3 | 4 | ✅ | Resuming a Live session while the old socket is still attached disconnects both. |
+| L9-F49 | P2 | 4 | read | The durable queues never delete finished rows and have no index on the claim predicate, so every claim scans the whole history. |
+| L9-F50 | P3 | 4 | read | An `OrSet` replica that starts fresh re-issues dots that were already removed. |
+| L9-F51 | P1 | 5 | ✅ | Two runners of one `LocalEngine` execute the same step twice, and the loser compensates the work and marks a successful execution failed. |
+| L9-F52 | P2 | 5 | ✅ | A step's failure is not journaled, so a workflow that handles a step error re-runs the step on every replay and then diverges. |
+| L9-F53 | P2 | 5 | ✅ | A workflow waiting for a signal is replayed from the top on every tick. |
+| L9-F54 | P2 | 5 | ✅ | The HTTP rate limiter is keyed by the full IPv6 address, so one client has 2⁶⁴ buckets. |
+| L9-F55 | P3 | 5 | read | `TracedHttp::within` stores the parent span on the shared service, not per request |
+| L9-F56 | P3 | 5 | read | `fire_alarms` deletes by actor id only |
+| L9-F57 | P3 | 5 | read | `query!` cannot select a column named with a Rust keyword. |
+
+## L10 — Tooling
+
+29 rows: P1 3, P2 9, P3 16, — 1. Source: `layer-solidity/L10-L11-cli-ci.md`.
+
+| ID | Sev | Iter | Status | Finding |
+|---|---|---|---|---|
+| L10-F1 | P1 | 1 | read | `rustnative fmt` deletes the user's comments and rewrites files non-atomically. |
+| L10-F2 | P2 | 1 | read | The LSP measures columns in Unicode scalars, not UTF-16 code units. |
+| L10-F3 | P3 | 1 | read | `serve_static_on` serves one connection at a time (one slow client stalls the preview server). Paths are not percent-decoded, so an exported file whose name con |
+| L10-F5 | P3 | 1 | read | The PFX password reaches `signtool` as a command-line argument |
+| L10-F4 | — | 1 | — | Dev, preview, and emulator servers bind loopback by default. The static server refuses `..`, `\`, and `:`. Request heads are capped at 64 KiB. The dev error pag |
+| L10-F6 | P1 | 2 | read | The generated sign-up makes the first account to register an administrator. |
+| L10-F7 | P2 | 2 | read | The commerce kit's routes are keyed by a buyer named in the path and are public. |
+| L10-F8 | P3 | 2 | read | CLI details. |
+| L10-F9 | P1 | 3 | ✅ | `rustnative db rollback <db> --to <name>` with a name that is not applied reverses every migration and exits 0. |
+| L10-F10 | P2 | 3 | ✅ | The `.rsx` LSP proxy loses edits for good once a document stops lowering. |
+| L10-F11 | P2 | 3 | ✅ | `rustnative tokens import` replaces a style file it cannot read with only the tokens block. |
+| L10-F12 | P2 | 3 | read | `rustnative update keygen` writes the update-signing secret key world-readable, and overwrites an existing key. |
+| L10-F13 | P2 | 3 | read | `rustnative dev --remote` sends the token and every rebuilt executable in cleartext, and the agent serves one connection at a time with no timeout. |
+| L10-F14 | P3 | 3 | ✅ | The `upgrade` codemod rewrites look-alike types and skips macro bodies, and reports neither. |
+| L10-F15 | P3 | 3 | ✅ | `rustnative doctor` fails on every machine that is not Windows. |
+| L10-F16 | P3 | 3 | read | Packaging details. |
+| L10-F17 | P3 | 3 | read | The local Lambda and WAGI emulators diverge from their hosts in ways that hide bugs. |
+| L10-F18 | P3 | 3 | read | Dev loop, generators, and `db`. |
+| L10-F19 | P3 | 3 | read | Smaller CLI details. |
+| L10-F20 | P2 | 4 | ✅ | `rustnative package tui` ships packages that cannot start, for every app made from the project template. |
+| L10-F21 | P3 | 4 | ✅ | `db migrate` and `db rollback` silently create a database at a mistyped path and exit 0. |
+| L10-F22 | P3 | 4 | read | `rustnative build --pgo` passes paths through `RUSTFLAGS` and drops the project's own rustflags. |
+| L10-F23 | P3 | 4 | read | Smaller CLI details. |
+| L10-F24 | P2 | 5 | ✅ | `rustnative compliance` reports accessibility "passed" when every accessibility test fails. |
+| L10-F25 | P2 | 5 | ✅ | `rustnative test`, `run`, `build`, `check`, and `dev` delete every stdout line that is valid JSON. |
+| L10-F26 | P3 | 5 | ✅ | `rustnative i18n lint` checks only the direct literal form. |
+| L10-F27 | P3 | 5 | ✅ | `rustnative doctor` reports Android ready when the build will fail. |
+| L10-F28 | P3 | 5 | ✅ | `rustnative add` corrupts a CRLF `Cargo.toml`. |
+| L10-F29 | P3 | 5 | read | The dev loop and the LSP ignore `[style] file`. |
+
+## L11 — Project, CI, and release
+
+6 rows: P1 1, P2 2, P3 2, — 1. Source: `layer-solidity/L10-L11-cli-ci.md`.
+
+| ID | Sev | Iter | Status | Finding |
+|---|---|---|---|---|
+| L11-F1 | P1 | 1 | read | No dynamic-analysis job. |
+| L11-F2 | P2 | 1 | read | Skip-if-absent instruments are never required in CI |
+| L11-F3 | P2 | 1 | read | `rust-toolchain.toml` says `channel = "stable"` (unpinned), and CI uses `dtolnay/rust-toolchain@stable`. A new stable release can change lints and break `-D war |
+| L11-F4 | P3 | 1 | read | Third-party actions are pinned by mutable tags (`actions/checkout@v4`, `Swatinem/rust-cache@v2`, `taiki-e/install-action@cargo-deny`, `dtolnay/rust-toolchain@st |
+| L11-F5 | P3 | 1 | read | `windows-cross-wine` is disabled. macOS runs `cargo check` only (TUI tests "owed to a Mac"). Real-cursor hover and two Android signing tests are `--skip`ped on |
+| L11-F6 | — | 1 | — | `-D warnings` applies to rustc and rustdoc. Clippy runs with `--all-features` on Linux and Windows. An MSRV job exists. `cargo deny` (licenses, sources, yanked) |
+
