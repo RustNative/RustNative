@@ -161,7 +161,7 @@ fn the_portable_zip_is_reproducible_and_its_checksums_verify() {
     // archive beside it.
     let text = String::from_utf8_lossy(&first).into_owned();
     let sums_at = text.find("SHA256SUMS").expect("the archive names its checksum file");
-    let sums = &text[sums_at + "SHA256SUMS".len()..];
+    let (_, sums) = text.split_at(sums_at + "SHA256SUMS".len());
     let line = sums.lines().next().unwrap_or_default();
     let (hash, name) = line.split_once("  ").expect("`<hash>  <name>`");
     assert_eq!(name.trim_end_matches(char::from(0)).trim(), "packaged.exe", "{line}");

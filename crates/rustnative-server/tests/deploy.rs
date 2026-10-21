@@ -247,7 +247,7 @@ async fn the_control_api_needs_this_run_s_token() {
     assert_eq!(control.handle(wrong, None).await.status(), http::StatusCode::UNAUTHORIZED);
     let status = to_control("GET", "/status", &host, None).body(Bytes::new()).unwrap();
     assert_eq!(control.handle(status, None).await.status(), http::StatusCode::UNAUTHORIZED);
-    assert!(adapter.status().revisions.is_empty());
+    assert_eq!(adapter.status().revisions, Vec::new());
 }
 
 /// DNS rebinding: a page whose name now resolves to 127.0.0.1 still sends
