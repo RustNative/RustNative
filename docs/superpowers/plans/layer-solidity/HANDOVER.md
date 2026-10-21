@@ -1,5 +1,8 @@
 # Layer-solidity evidence loop: handover (stopped after iteration 5, 2026-10-21)
 
+> [!IMPORTANT]
+> **Before acting on any finding, read the "⚠ READ BEFORE ACTING ON ANY FINDING: patch or redesign" block at the top of [`../2026-10-15-layer-solidity.md`](../2026-10-15-layer-solidity.md). It is binding.** The codebase needs targeted redesigns, not a ground-up rearchitecture and not only patches. **Any part may be redesigned when that block's criteria hold; its six named areas are examples, not a limit.** Never downgrade a redesign to a patch to keep a diff small.
+
 The loop was stopped on request after iteration 5, before its second termination condition held. This file is enough to resume it in a new conversation.
 
 ## Where everything is

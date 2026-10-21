@@ -2,6 +2,35 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
+> [!IMPORTANT]
+> ## ⚠ READ BEFORE ACTING ON ANY FINDING: patch or redesign
+>
+> **This instruction binds every person and every AI agent that implements, plans, or reviews work from this plan. Do not skip it, summarise it away, or treat it as optional background.** If you are an AI agent, restate this rule in your own plan before you change any code, and apply it to every finding you touch.
+>
+> **The verdict (2026-10-21, after five iterations and 373 recorded defects):** RustNative does **not** need a ground-up rearchitecture. Its layering, component tree, diff-ops model, and backend split held up across every pass. But it needs **more than patching**: where the same defect keeps recurring because the design invites it, the fix is a **targeted redesign** of that part, not another per-instance patch.
+>
+> **Redesign is authorised for any part of the codebase that needs it.** The six areas below are examples the loop identified, **not a complete or exclusive list.** Any crate, module, public API, persisted format, protocol, or test instrument may be redesigned when the criteria below are met, including parts this plan currently assigns a patch-sized task.
+>
+> **Examples of targeted redesigns already justified by the evidence:**
+> 1. **Peer trust and ownership** (U24, U29): every registry keyed by an id records its owner; every internal control message carries a per-run token or arrives on a non-exported channel. Evidence: L9-F1/F2 (P0), L9-F27, L9-F29, L9-F7, L6-F14, L6-F56, L6-F57, L6-F59.
+> 2. **Durable execution and queues** (U30, U33): leases, compare-and-set state changes, retention, and an idempotency key, owner, and expiry on every deferred write. Evidence: L9-F18, F31, F49, F51–F53; L7-F6; L8-F8.
+> 3. **The Rust-to-JavaScript translator** (webgen): type-directed translation, and an evaluation-order-preserving intermediate step. Evidence: L7-F12, F20–F22, F28, F29.
+> 4. **The test instruments** (U21, U36, U38): drivers report outcomes, run the product's own path, and every oracle is validated against an injected real failure. Evidence: L4-F1, L4-F17, L4-F19, L6-F47, L10-F24.
+> 5. **Windows re-entry and lifetimes** (U31, U5): one guarded entry point and closure-scoped APIs instead of guards whose soundness depends on `Drop`. Evidence: L6-F21, L6-F54.
+> 6. **Layout planning versus placement** (U38): space sharing and placement come from one function. Evidence: L3-RP7.
+>
+> **Redesign instead of patching when any of these holds:**
+> - the same defect shape appears at two or more sites in the part, or a universal indicator's "Proven by" list names the part more than once;
+> - the patch would add the same check at every call site, where a type, module boundary, or single function could make the bad state unrepresentable (E5, the `illegal-states-unrepresentable` discipline);
+> - correctness depends on callers remembering a rule (dropping a guard, holding a lock, passing a token, escaping a string);
+> - two code paths compute the same thing (plan and act, server and client, backend and backend, display and invocation) and can disagree;
+> - the part's tests cannot witness the behaviour they name, so a patch could not be verified;
+> - the patch would leave a documented contract false, or need the documentation weakened to match.
+>
+> **Patch when none of them holds**: a local missing bound, encoder, timeout, error mapping, or CLI edge case whose fix lives in one place, gated by its indicator.
+>
+> **How a redesign lands:** the reproducing tests go red first; the redesign is its own task (record it in Part D with the findings it closes and why a patch was not enough); breaking public-API or format changes are allowed when the redesign needs them, with a migration note, a semver bump, and frozen fixtures for the old format. **Never downgrade a redesign to a patch to keep a diff small, and never close a finding whose shape is still reachable elsewhere in the same part.**
+
 **Goal:** Make every layer of RustNative a layer that can be built on safely: each one has an explicit, bounded, measured, and machine-enforced set of solidity indicators, and none of them can silently regress.
 
 **Architecture:** One fixed ten-question method (Part A) applied to a universal indicator set shared by every crate (Part B) and to layer-specific indicators for each of the twelve layers, bottom-up in dependency order (Part C). **Confirmed defects are fixed first (Part D, wave 0)**, then measurement infrastructure lands, because nothing can be enforced that is not measured (wave 1); layer work follows in dependency order (waves 2–9). Part E is the loop record: Q10 turned the ten questions into a loop over a file-level coverage ledger, and it ends only when every file is read and a full pass finds nothing new.
@@ -1043,6 +1072,9 @@ $env:RUSTDOCFLAGS='-D warnings'; cargo doc --workspace --no-deps; Remove-Item En
 plus the crate's own tests, plus the Linux gate when a non-Windows `cfg` path changed (`wsl -d Ubuntu -- bash /mnt/e/Users/HP/Documents/Projects/rustnative-tools/gate-linux.sh`), plus `docs/api/framework.json` regeneration when public API changed.
 
 ## Wave 0 — Confirmed P0/P1 defects (before any instrument work)
+
+> [!IMPORTANT]
+> **Apply the "⚠ READ BEFORE ACTING ON ANY FINDING: patch or redesign" block at the top of this plan to every task in every wave.** A task written here as a patch becomes a targeted redesign when that block's criteria hold, for any part of the codebase, not only the six areas it names.
 
 These were found and, where marked ✅, reproduced during the loop. They come before wave 1 because each one is either a security hole, or data loss that users hit today, or a bug that makes the instruments lie. For each, the fix lands **with the test that reproduces it** (red first), and the same commit adds the indicator named in the findings file. The order is severity, then dependency.
 
@@ -2368,6 +2400,8 @@ The loop was stopped on request after iteration 5, before condition (b) held. Th
 | L9-F43 | P1 | 3 | ✅ open | Idle keep-alive connections hold `max_connections` slots forever, so 1 024 idle sockets lock out the server. |
 | L9-F51 | P1 | 5 | ✅ open | Two runners of one `LocalEngine` execute the same step twice, and the loser compensates the work and marks a successful execution failed. |
 | L9-F7 | P1 | 2 | open | The MQTT broker has no authentication, no authorization, and no transport security. |
+
+**Remediation strategy:** targeted redesign where the criteria in the "READ BEFORE ACTING ON ANY FINDING" block at the top of this plan hold, patches elsewhere. That block is binding, and its six areas are examples, not a limit: any part may be redesigned when the criteria hold.
 
 **To resume the loop:** run iteration 6 as a fresh pass over every layer with U38 as a new lens (HANDOVER.md has the procedure), confirm the Windows and Android findings on devices, measure L6-F26 on Windows, and fix the Wave 0 tasks red-test first, rerunning each finding's scratch program before and after its fix.
 
