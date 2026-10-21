@@ -299,6 +299,7 @@ The file-by-file loop (Part E) found the same defect *shapes* in several unrelat
   - L7-F11 ✅: form and query decoding is quadratic in the field count and runs on the async workers.
   - L6-F40 ✅: TUI paint is quadratic in rows; L6-F37 ✅: a cache key that prints every pixel of an image.
   - L3-RP2 ✅: the UI task pool runs a self-waking task forever inside one pass.
+  - L2-F30 ✅: a 77-byte Fluent term expands to 400 MB; L3-RP6 ✅: dropped sleeps keep timer entries that every pass scans; L9-F49: every job claim scans the queue's whole history.
 - **Why:** these are freezes, aborts, and denial of service reachable from data, not from code.
 - **Bound:** every loop or allocation whose trip count derives from input is bounded either by the visible output (clip first) or by a documented limit that returns an error. A cooperative scheduler polls each task at most once per pass.
 - **Instrument:** fuzz targets with time and memory caps (libFuzzer `-timeout=1 -rss_limit_mb=512`), and per-command micro-benchmarks at 10⁹-sized inputs.
@@ -352,6 +353,7 @@ The file-by-file loop (Part E) found the same defect *shapes* in several unrelat
   - L5-F19: target-language keywords.
   - L6-F36: Android drop data and widgets use U+0001 as an in-band separator inside text other apps supply.
   - L8-F12 ✅: endpoint parameters are spliced into the URL path unescaped.
+  - L2-F31, L5-F24 ✅: translator comments and IDL docs are written into generated Rust, C, and C# unescaped; L10-F22: paths go through space-separated `RUSTFLAGS`; L10-F23: `crash show` prints peer text to the terminal unfiltered.
   - By contrast, HTML text and attribute values, script JSON, terminal cells, and OSC payloads are correct.
 - **Why:** escaping right in one context says nothing about the next.
 - **Bound:** every sink (URL attribute, CSS value, CSS identifier, attribute name, header, cookie, generated identifier, shell argument, terminal) accepts only a typed value from that context's validator.
@@ -394,6 +396,7 @@ These shapes recurred across layers in iteration 2, session 3. Each has the same
   - L3-F19: the inspector's random token is right, but it is written to a shared temp directory, so any local user can read it.
   - L6-F14: `WM_COPYDATA` deep links are accepted from any same-session process.
   - L6-F39: any Android app can switch on inspection in a release build with an intent.
+  - L6-F56, L6-F57, L6-F59: the Windows single-instance mutex and window class, and Android's surface-action, window, and update-status extras, are framework control messages that any same-user process or installed app can send, accepted because their fields look right. The bound covers every internal control intent and IPC message: it carries an unguessable per-run token or arrives on a non-exported component.
 - **Why:** "only reachable locally" is not authentication. Every process of every user on the machine, and every browser page that can reach `localhost`, is a caller.
 - **Bound:** every listener (TCP, pipe, D-Bus name, window message) names its authentication in one table. A listener without a token, a peer-credential check, or an OS ACL, or whose secret sits where other users can read it, is a failure.
 - **Instrument:** a source test over `bind`/`listen`/`own_name`/window-message sites against that table, plus a test per listener that an unauthenticated call is refused.
@@ -462,6 +465,31 @@ L9-F1, L9-F27, L9-F29, and L10-F7 share one shape: a registry keyed by an id (a 
 - **Instrument:** a test per credential-bearing client that sends a request to another origin, and to an `http:` URL, and asserts the credential is absent; a file-mode test for every secret the CLI writes.
 - **Enforcement:** E2 → E4.
 
+## Cross-cutting indicators found in iteration 4 (U36–U37)
+
+### U36. Every oracle has a positive witness
+
+- **Proven by:**
+  - L4-F17 ✅: the shared suite `scrolling_renders_nothing` passes on a backend whose scroll is a no-op.
+  - L4-F18: the tmux "a resize is followed" check greps for text already on screen.
+  - L6-F47 ✅: the Android device suite passes when a run stalls or is cut off, because the verdict counts failures and never requires the completion record.
+  - L6-F46: `TuiHarness::settle` gives up silently after 100 rounds.
+- **Why:** a check that only asserts the absence of a failure is also satisfied by an action that never happened. Such a gate stays green while the thing it guards is broken.
+- **Bound:** every check of the form "X did not happen after A" also asserts that A took effect, and every run-level verdict requires the run's completion record and its exit status.
+- **Instrument:** a mutation test that replaces each driver action (scroll, resize, click, key) with a no-op and asserts at least one suite fails, and a truncated-log test per CI verdict script.
+- **Enforcement:** E2 → E4.
+
+### U37. Every check also covers the indirect form
+
+- **Proven by:**
+  - L1-F21 ✅: the build-time token type check accepts any token whose value is another token, unchecked for existence, kind, or cycles.
+  - L2-F29 ✅: Fluent variable references are checked, term references are not, and terms do not fall back across locales.
+  - L1-F22 ✅: the token importer's alias map is overwritten on a name collision.
+- **Why:** a validator that inspects only the direct form is bypassed by one level of indirection, which is the normal way design systems and translations are written.
+- **Bound:** every validator resolves references (tokens, terms, aliases) to their final value before checking, and rejects dangling references and cycles.
+- **Instrument:** for each validator, a test that the same error is raised when the value arrives through a reference.
+- **Enforcement:** E3 → E4.
+
 ## Universal bounds summary (for quick reference)
 
 | Indicator | Bound | Target grade/rung |
@@ -485,6 +513,8 @@ L9-F1, L9-F27, L9-F29, and L10-F7 share one shape: a registry keyed by an id (a 
 | U17 teardown | a test per exit path per backend | M4/E4 |
 | U34 slot pools | every capped pool has a handshake deadline and an idle timeout; fill-and-wait test per listener | M4/E4 |
 | U35 credentials | attached only to their own origin over TLS or loopback; stored owner-only | M4/E4 |
+| U36 positive witness | every negative oracle also asserts its action took effect; verdicts require a completion record | M4/E4 |
+| U37 indirect forms | validators resolve references first; dangling references and cycles refused | M4/E4 |
 
 # Part C — The layers, bottom-up
 
@@ -2181,6 +2211,41 @@ Iteration 3 read the 158 source files that were only `skimmed` (L7, L10, L6, the
 4. **Re-run the reproductions after fixes land:** each ✅ finding's scratch program, once its task merges, must fail before the fix and pass after it.
 
 After iteration 4, the same two conditions are checked again.
+
+### Iteration 4 (2026-10-21): result
+
+Iteration 4 was a fresh Q1–Q10 pass over every layer, run as eight parallel reviews (L0–L2, L3, L4–L5 with the CI scripts, Windows and Android, GTK and the terminal, L7, L8 with L10, and L9), each reading its layer's findings first so that only new defects were reported. P0/P1 candidates and the reviewers' main claims were checked against the code before recording. The findings are in each layer's "Iteration 4" section. The scratch programs are in `rustnative-tools/layer-solidity/verify14/`.
+
+| Measure | Value |
+|---|---|
+| New P1 | 1: L6-F54 |
+| New P2 | 20: L1-F21 ✅; L2-F29 ✅, F30 ✅; L3-RP4 ✅; L4-F17 ✅; L5-F22 ✅, F23 ✅; L6-F49 ✅, F50 ✅, F55, F56, F57, F58, F59; L7-F19 ✅, F20 ✅, F21 ✅; L9-F47 ✅, F49; L10-F20 ✅ |
+| New P3 | 20: L1-F22 ✅; L2-F31, F32, F33; L3-RP5 ✅, RP6 ✅; L4-F18; L5-F24 ✅; L6-F51, F52, F53, F60; L7-F22 ✅, F23, F24; L9-F48 ✅, F50; L10-F21 ✅, F22, F23 |
+| Extended | L6-F47 (adb failures and the missing completion record), L9-F45 (invalid-JSON lines and no write timeout) |
+| Layers with nothing new | L8 (`rustnative-components`, `rustnative-data`) and L0 (`rustnative-types`) |
+| New universal indicators | 2: U36 (every oracle has a positive witness) and U37 (every check covers the indirect form). U22, U26, and U29 gained proving findings |
+| New layer indicators | 16: L1.19; L2.24–L2.25; L3.8.10, L3.4.14; L4.8; L5.9; L6.9–L6.11; L7.12–L7.14; L9.19–L9.20; L10.13 |
+| Fix checks | 20fc4fa and 5633bfa (control API) are complete. 3485eb2 still carries L9-F43 |
+| Partly covered this pass | `rustnative-markup` `lower.rs`, `rsx_file.rs`, `rsx_scan.rs`, `parse.rs` were compared against existing findings only; iteration 5 reads them in full |
+
+| ID | Sev | Finding |
+|---|---|---|
+| L6-F54 | **P1** | Leaking an `ExternalLoop` or embed root with safe `mem::forget` leaves Windows windows holding a dangling `&mut Application` (use after free on the next loop). |
+
+**Is this enough, or must the questions be asked again?**
+- (a) **holds**: every source row is `read`.
+- (b) **fails**: iteration 4 found 1 new P1, 20 P2s, 20 P3s, 2 universal indicators, and 16 layer indicators. The rate is falling (iteration 3 found 4 P1s), but every layer except L0 and L8 still yielded something.
+
+**Wave 0 additions** (same red-test-first procedure as tasks 0.1–0.10):
+- **Task 0.29:** `start_external` and `embed` take a closure (`with_external(&mut app, |host_loop| …)`) or own the `Application`, so no safe code can outlive the borrow; a test `mem::forget`s every public guard type (L6-F54; L6.11, U5).
+
+### Iteration 5 queue
+
+1. A fresh Q1–Q10 pass over every layer, with U36 and U37 as new lenses, again as parallel reviews that read the findings files first.
+2. Read `rustnative-markup`'s `lower.rs`, `rsx_file.rs`, `rsx_scan.rs`, and `parse.rs` in full.
+3. Owed measurement: L6-F26 on Windows (Task 6.4). Windows and Android findings from iteration 4 (L6-F54–F60) are confirmed by reading only and need a device run.
+
+After iteration 5, the same two conditions are checked again.
 
 ### Standing triggers
 

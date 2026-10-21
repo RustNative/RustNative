@@ -43,3 +43,16 @@ Read in full: `lib.rs` (76), `sheet.rs` (511), `value.rs` (549), `model.rs` (725
 
 - New *kind* of indicator surfaced: **semantic equivalence across realizations of the same declaration** (F1/F2) — not "does each backend apply the property" (L1.2) but "do all backends agree on *which* declaration wins". Added to the method as aspect 15, *cross-realization equivalence*, re-asked for every later layer that has more than one realization (layout, text, accessibility, input, events).
 - New *kind*: **"silent acceptance"** — inputs that are neither valid nor rejected (F4, F6, F9, F10). Re-asked in every later parser and API as Q1f: *what invalid input is accepted without a diagnostic?*
+
+## Iteration 4 (2026-10-21)
+
+A fresh Q1–Q10 pass over L1. The scratch crate `verify14/l0-l2` is outside the repository. `rustnative-types` was re-read in full with nothing new, and the `string_slice` changes from `21b30b4` hold at every boundary.
+
+| ID | Sev | Finding | Evidence |
+|---|---|---|---|
+| L1-F21 ✅ | P2 (correctness) | **A token whose value is another token skips the build-time type check.** `check_token` refuses a token of the wrong kind, but accepts any token whose value is itself a reference (`\|\| value.token().is_some()`), and `theme_token` never checks that reference: it may not exist, may be the wrong kind, or may be a cycle. With `@theme { --color-brand: var(--spacing); }`, `bg-brand` compiles and sets a length on `background-color` at run time; a dangling reference or a self-cycle compiles and silently does nothing. Writing `--color-brand: 4px` directly is refused. Reproduced: `wrong kind: bg-brand compiles = true, runtime value = Some(Some(Length(Rem(Fixed(250)))))`; `dangling … Some(None)`; `cycle … Some(None)`; the direct form is refused. | `style/src/vocabulary.rs:146-169, 434`; `token_table.rs:96-117` |
+| L1-F22 ✅ | P3 | **Design-token import merges colliding names without a warning.** `slug` maps every non-ASCII-alphanumeric character to `-`, so a Japanese or Cyrillic key becomes `--color-`, and `Primary`/`primary` or `blue 500`/`blue-500` collide. Both declarations are written and the later wins, and the alias map is overwritten the same way. Reproduced: `--color-primary` twice and `--color-` twice, `warnings = []`. | `style/src/design_tokens.rs:98-104, 200-212` |
+
+### Indicators added (iteration 4)
+
+- **L1.19 Every check also covers the indirect form** (F21, F22, L2-F29): each validator has a test that the same error is raised when the value arrives through a token reference or an alias, and a reference graph is checked for existence, kind, and cycles at build time.

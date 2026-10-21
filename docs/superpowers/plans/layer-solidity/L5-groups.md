@@ -60,3 +60,17 @@ Read in full:
 - **L5.6 Drawn-host focus parity** (F16): `FocusModel` honours focus scopes (modal or overlay) and keeps focus near a removed node. A cross-backend test compares Tab order on the TUI against Windows and GTK for the same tree.
 - **L5.7 IDL rejects what any target cannot compile** (F19): a reserved-word table per target language, and a generator round-trip test that compiles every generated binding for an IDL fuzz corpus (C with `cc`, Rust with `rustc`, C# with `csc` where available).
 - **L5.8 Contention semantics** (F18): `[thread = any]` calls block (with a bounded wait) rather than return `BUSY`; a stress test runs 8 threads × 10 000 calls with zero `BUSY` results.
+
+## Iteration 4 (2026-10-21)
+
+A fresh Q1–Q10 pass over L5. The scratch crate `verify14/l4-l5` is outside the repository. Re-read with nothing new beyond L5-F5–F10, F18, and F20: all of `update/src/lib.rs` (envelope, expiry, model compatibility, bucket and pin, `write_atomically`), the `interop` IDL parser, `HandleTable`/`OwnerTable`, and C# UTF-8 marshalling.
+
+| ID | Sev | Finding | Evidence |
+|---|---|---|---|
+| L5-F22 ✅ | P2 (correctness) | **Any rectangle wider than 2³¹ grid units is not drawn in release builds and panics in debug builds.** `State::covered` computes `floor_unit(x1 - 0.5) + 1`; `floor_unit` clamps to `i32::MAX`, so the `+ 1` overflows. In release it wraps to `i32::MIN`, and the degenerate fallback picks a one-unit rectangle at `i32::MAX`, off screen. `FillRect`, `FillRoundedRect`, `StrokeRect`, `PushClip`, and `HitRegion` all use it, so a full-width rule drawn as `fill_rect(0, 0, f32::MAX, h)` draws nothing, and a "no clip" `push_clip(huge)` hides everything inside it. `f32::MAX` and `inf` are common "unbounded" idioms, and `Scalar` admits `inf` (L0-F1). A different site from L5-F15. Reproduced: `fill_rect x=0 width=1e12: 0 visible cells filled (expect 10)`, `16x16 fill inside a 1e12 clip: 0 cells (expect 2)`; debug: `attempt to add with overflow` at `raster.rs:261`. | `drawlist/src/raster.rs:255-276, 300-307, 366-385` |
+| L5-F23 ✅ | P2 (availability, U3) | **Every generated app panics at start when any command-line argument is not valid UTF-8.** `wants_terminal()` iterates `std::env::args()`, which panics on a non-Unicode argument, and the project template calls it first in `run()`. On Linux, opening a file with a Latin-1 name through "Open with" crashes the app before a window appears. Reproduced with the same expression and `caf\xE9.txt`: `called Result::unwrap() on an Err value: "caf\xE9.txt"`. | `host/src/lib.rs:220`; `rustnative/src/project/templates.rs:81, 236` |
+| L5-F24 ✅ | P3 (U26) | **Interop doc comments go into generated code unescaped.** The C header writes each doc line as `/* {line} */`, so a doc containing `*/` (a glob such as `src/**/*.rs`) ends the comment and the rest becomes C code; C# puts docs into `<summary>` without XML escaping, so `&` and `<` produce malformed doc XML (CS1570). Reproduced: `cc -fsyntax-only` fails with `expected identifier or '(' before '.' token`. | `interop/src/generate.rs:77-81, 199-203` |
+
+### Indicators added (iteration 4)
+
+- **L5.9 Coordinates saturate end to end** (F22): every float-to-grid conversion and every `+ 1` on a converted value uses saturating arithmetic, and a raster test draws rectangles and clips at `f32::MAX` and `inf` and asserts the visible cells are filled.

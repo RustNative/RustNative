@@ -32,3 +32,18 @@ Read in full: headless `src/*` (all files); conformance `src/{lib,suites,host,re
 - **L4.5 Boundary-value equivalence** (F9): for every attribute and property, cases include min, max, below-min, above-max, zero, negative, `nan`/`inf` (where the type allows), empty, and very long values.
 - **L4.6 Cross-realization equivalence** (F10): the style cases are realized through the Web backend's CSS in a browser and through headless; computed geometry and colour must match.
 - **L4.7 Mandatory instruments in CI** (F13): CI sets `RUSTNATIVE_BROWSER_REQUIRED=1` (and the equivalent for every other skip-if-absent harness: Node, Xvfb, emulator). A job whose required instrument is missing fails.
+
+## Iteration 4 (2026-10-21)
+
+A fresh Q1–Q10 pass over L4 and the CI scripts. The scratch crate `verify14/l4-l5` is outside the repository. Re-read with nothing new: headless `click`, `type_text`, `press`, `scroll`, `settle`, `relaunch_fresh`, `golden.rs`, and the new `RecordingSystem`; conformance `host.rs`; web-testing `goto`, `eval`, `wait_until`, `click`, `set_offline_everywhere`, and `find_browser`; `tools/linux-session.sh`, `tools/android-env.sh`, and the `tests` and `ssh` modes of `tools/tui-session.sh`.
+
+| ID | Sev | Finding | Evidence |
+|---|---|---|---|
+| L4-F17 ✅ | P2 (instrument, U18, U21) | **The shared suite `scrolling_renders_nothing` passes on a backend whose scrolling does not work.** It scrolls twice and asserts only that the component did not re-render; it never checks that the viewport moved. `Driver::scroll` returns `()`, and no driver checks the outcome: Windows posts `WM_MOUSEWHEEL` and does not read the position back, the terminal driver sends wheel events at cell coordinates clamped with `unwrap_or(0)`, and GTK sets an adjustment that clamps silently. So a broken wheel route on any backend stays green. The other four suites have positive checks. Reproduced: `scrolling_renders_nothing PASSED on a host whose scroll is a no-op`. | `conformance/src/suites.rs:197-207`; `host.rs:18-19`; `windows/src/native/guarantees_integration.rs:45-60`; `tui/tests/conformance.rs:40-52` |
+| L4-F18 | P3 (instrument) | **The tmux check "a resize is followed" cannot fail when the app ignores the resize.** After `resize-window`, whose errors go to `/dev/null`, it greps for the `2 of 4 done` text that was already on screen; tmux keeps old pane content when a window grows. The cooked-mode check reads `/tmp/rustnative-tui-stty.txt`, a fixed name never deleted first, so a stale file from an earlier run can satisfy it. | `tools/tui-session.sh:57-59, 66-68` |
+
+L6-F47 is wider than recorded: `tools/android-device-test.sh` uses the exit code only to test for 124, so an adb failure partway through (the emulator dies, `device offline`) gets no retry and no failure, and the `awk` verdict ignores the `INSTRUMENTATION_RESULT` and `INSTRUMENTATION_CODE` lines that end every complete run, so a truncated run is never told apart from a complete one (`tools/android-device-test.sh:53-55, 72-85`; `RnInstrumentation.java:40-45`).
+
+### Indicators added (iteration 4)
+
+- **L4.8 Every oracle has a positive witness** (F17, F18, L6-F47): a check of the form "X did not happen after action A" also asserts that A took effect (the viewport moved, the pane resized, the run printed its completion record). A mutation test replaces each driver action with a no-op and asserts at least one suite fails.
