@@ -266,6 +266,8 @@ The file-by-file loop (Part E) found the same defect *shapes* in several unrelat
   - L1: `opacity: nan` becomes 0.
   - L2: a malformed `rustnative.toml` is ignored.
   - L3-F18: a schema mismatch reads as absent.
+  - L10-F9 ✅: a `db rollback --to` name that matches no applied migration reverses every migration.
+  - L10-F11 ✅: `tokens import` reads an unreadable style file as empty and overwrites it.
 - **Why:** a default looks like valid data, so the next write turns a temporary fault into permanent loss, or into a security decision such as a downgrade.
 - **Bound:** 0 sites where an `Err` from I/O, parsing, or decoding is mapped to a domain default (`unwrap_or_default`, `.ok().flatten()`, `unwrap_or(0)`) on a path that later writes, decides, or persists. Every such site either propagates the error or records it as a distinct state (`Unknown`/`Corrupt`/`Quarantined`).
 - **Instrument:** a review-enforced lint list (`clippy::disallowed_methods` for `Result::ok` and `unwrap_or_default` in `persistence/`, `services/`, `update/`, `data/`), plus fault-injection stores and decoders that fail exactly once (an M5 test per persisted format).
@@ -294,8 +296,11 @@ The file-by-file loop (Part E) found the same defect *shapes* in several unrelat
   - L3-F8 ✅: stack overflow at depth 2 000–4 000.
   - L9-F4: Live frames and sessions per client.
   - L8-F2: image bytes and dimensions.
+  - L7-F11 ✅: form and query decoding is quadratic in the field count and runs on the async workers.
+  - L6-F40 ✅: TUI paint is quadratic in rows; L6-F37 ✅: a cache key that prints every pixel of an image.
+  - L3-RP2 ✅: the UI task pool runs a self-waking task forever inside one pass.
 - **Why:** these are freezes, aborts, and denial of service reachable from data, not from code.
-- **Bound:** every loop or allocation whose trip count derives from input is bounded either by the visible output (clip first) or by a documented limit that returns an error.
+- **Bound:** every loop or allocation whose trip count derives from input is bounded either by the visible output (clip first) or by a documented limit that returns an error. A cooperative scheduler polls each task at most once per pass.
 - **Instrument:** fuzz targets with time and memory caps (libFuzzer `-timeout=1 -rss_limit_mb=512`), and per-command micro-benchmarks at 10⁹-sized inputs.
 - **Enforcement:** E0 → E4.
 
@@ -345,6 +350,8 @@ The file-by-file loop (Part E) found the same defect *shapes* in several unrelat
   - L6-F5: HTTP header CR/LF.
   - L9-F5: cookie attributes.
   - L5-F19: target-language keywords.
+  - L6-F36: Android drop data and widgets use U+0001 as an in-band separator inside text other apps supply.
+  - L8-F12 ✅: endpoint parameters are spliced into the URL path unescaped.
   - By contrast, HTML text and attribute values, script JSON, terminal cells, and OSC payloads are correct.
 - **Why:** escaping right in one context says nothing about the next.
 - **Bound:** every sink (URL attribute, CSS value, CSS identifier, attribute name, header, cookie, generated identifier, shell argument, terminal) accepts only a typed value from that context's validator.
@@ -386,6 +393,7 @@ These shapes recurred across layers in iteration 2, session 3. Each has the same
   - L9-F16: the local deployment's control API turns CSRF off and makes every route public, so any web page can drive it.
   - L3-F19: the inspector's random token is right, but it is written to a shared temp directory, so any local user can read it.
   - L6-F14: `WM_COPYDATA` deep links are accepted from any same-session process.
+  - L6-F39: any Android app can switch on inspection in a release build with an intent.
 - **Why:** "only reachable locally" is not authentication. Every process of every user on the machine, and every browser page that can reach `localhost`, is a caller.
 - **Bound:** every listener (TCP, pipe, D-Bus name, window message) names its authentication in one table. A listener without a token, a peer-credential check, or an OS ACL, or whose secret sits where other users can read it, is a failure.
 - **Instrument:** a source test over `bind`/`listen`/`own_name`/window-message sites against that table, plus a test per listener that an unauthenticated call is refused.
@@ -410,7 +418,7 @@ These shapes recurred across layers in iteration 2, session 3. Each has the same
 
 ### U32. Every process-wide cache keyed by data has an eviction bound
 
-- **Proven by:** L6-F26 (Windows GDI brushes per colour), L6-F29 (fonts), L6-F32 (GTK CSS providers and D-Bus subscriptions), L9-F38 (prerendered shells per path), L3-RP1 (the inspectable-store registry).
+- **Proven by:** L6-F26 (Windows GDI brushes per colour), L6-F29 (fonts), L6-F32 (GTK CSS providers and D-Bus subscriptions), L9-F38 (prerendered shells per path), L3-RP1 (the inspectable-store registry), L7-F13 (the responsive-image store), L6-F37 ✅ (measure and theme caches keyed by `Debug` output), and L3-RP3 (the wire command-name table, which is capped but never frees a slot).
 - **Why:** U8 asks for an owner. A cache keyed by colours, paths, or ids that the data chooses has no natural owner, so it needs a capacity.
 - **Bound:** every `static` or thread-local map or set has a capacity or a documented key-space bound. The soak harness (Task 1.7) varies the key every frame and asserts a plateau.
 - **Instrument:** a source test listing every process-wide collection, and the soak run.
@@ -418,7 +426,7 @@ These shapes recurred across layers in iteration 2, session 3. Each has the same
 
 ### U33. Deferred and offline writes carry an idempotency key, an owner, and an expiry
 
-- **Proven by:** L7-F6 (the service worker replays `/_fn` calls twice, days later, under the next user's session), L8-F8 (the data layer's offline queue).
+- **Proven by:** L7-F6 ✅ (the service worker replays `/_fn` calls twice, days later, under the next user's session; reproduced in Chromium), L8-F8 (the data layer's offline queue).
 - **Why:** a write sent later must still mean what it meant when the user acted: once, by that principal, while it is still relevant.
 - **Bound:** every queued write records a key the server deduplicates, the principal it was queued under (dropped if the session changed), and an expiry.
 - **Instrument:** a test that loses a response after the server applied the call and asserts one effect; a test that signs in as another user before replay and asserts nothing is sent.
@@ -427,6 +435,32 @@ These shapes recurred across layers in iteration 2, session 3. Each has the same
 ### U24 extension: id registries record their owner
 
 L9-F1, L9-F27, L9-F29, and L10-F7 share one shape: a registry keyed by an id (a Live session, a sync document, an operation, an order) that any caller holding the id can read or act on. Every such registry stores the principal that created each entry and checks it on every access. An id is never a capability unless it is unguessable *and* the design documents that it is one.
+
+## Cross-cutting indicators found in iteration 3 (U34–U35)
+
+### U34. Every bounded slot pool reclaims idle holders
+
+- **Proven by:**
+  - L9-F43 ✅: idle keep-alive connections hold the server's `max_connections` slots forever, so 1 024 quiet sockets lock every other client out. The cap itself was the fix for L9-F8.
+  - L9-F44: an MQTT client with keep-alive 0 holds a broker slot for 24 hours.
+  - L9-F45: the inspector's pre-token deadline is per line, so 16 trickling clients hold every slot.
+  - L10-F13: the `dev --remote` agent serves one connection at a time with no timeout.
+- **Why:** a cap without reclaim turns a resource limit into the denial of service it was meant to stop. The attacker no longer needs a flood, only patience.
+- **Bound:** every pool that caps connections, sessions, or subscriptions pairs the cap with a total handshake deadline and an idle timeout. No holder keeps a slot longer than the larger of the two without sending traffic the protocol counts as activity.
+- **Instrument:** one slot-pool test per listener. Fill the pool with holders that complete one request and go quiet, then assert that a new client is served within the idle timeout.
+- **Enforcement:** E2 → E4.
+
+### U35. Credentials are bound to their origin and their transport
+
+- **Proven by:**
+  - L8-F12 ✅: `BearerAuth` attaches the access token to any absolute or `http:` URL a request names.
+  - L9-F15 ✅: the WNS access token is sent to a client-supplied channel URI.
+  - L10-F13: `dev --remote` sends its token and every rebuilt executable in cleartext.
+  - L10-F12: `update keygen` writes the signing key world-readable.
+- **Why:** a token is a capability for one service. Sending it anywhere else, or over a channel anyone can read, hands that capability to whoever runs the other end.
+- **Bound:** every credential records the origin (scheme, host, port) it belongs to. It is attached only to requests for that origin over TLS, or over loopback for development, and it is stored readable only by its owner.
+- **Instrument:** a test per credential-bearing client that sends a request to another origin, and to an `http:` URL, and asserts the credential is absent; a file-mode test for every secret the CLI writes.
+- **Enforcement:** E2 → E4.
 
 ## Universal bounds summary (for quick reference)
 
@@ -449,6 +483,8 @@ L9-F1, L9-F27, L9-F29, and L10-F7 share one shape: a registry keyed by an id (a 
 | U15 diagnosability | no `String` errors in public API | M4/E4–E5 |
 | U16 trust boundaries | size + depth + time limits, fuzzed | M5/E4 |
 | U17 teardown | a test per exit path per backend | M4/E4 |
+| U34 slot pools | every capped pool has a handshake deadline and an idle timeout; fill-and-wait test per listener | M4/E4 |
+| U35 credentials | attached only to their own origin over TLS or loopback; stored owner-only | M4/E4 |
 
 # Part C — The layers, bottom-up
 
@@ -2084,7 +2120,7 @@ Session 3 worked the queue in risk order: the L9 remainder, the L6 remainder, L7
 - **Task 0.17:** sync authorizes every read and write per document, and the server assigns `base` and `stamp` (L9-F27; U24).
 - **Task 0.18:** operations record their owner and check it on every access (L9-F29; U24 extension).
 - **Task 0.19:** the MQTT broker releases a QoS 2 id on `PUBREL`, and a test cycles 65 536 publishes from one client (L9-F37; L9.16).
-- **Task 0.20:** `open_url` on every backend takes a `SafeUrl` (http, https, mailto, and declared schemes), as the TUI already does (L6-F16; U26, U28).
+- **Task 0.20:** `open_url` on every backend takes a `SafeUrl` (http, https, mailto, and declared schemes), as the TUI already does (L6-F16; U26, U28). **Done** in `fd3a789`: every backend's `open_url` calls `UrlPolicy::check`; confirmed in iteration 3.
 - **Task 0.21:** Windows gets one re-entry guard: re-entrant calls are queued, and programmatic sets are muted (L6-F21; U31).
 - **Task 0.22:** offline calls carry an idempotency key, an owner, and an expiry, and sign-out clears the queue and the page cache (L7-F6, L7-F7; U33).
 - **Task 0.23:** on rollback, `VersionedStore` leaves data of an unknown newer version untouched, and it refuses values it cannot encode instead of storing `null` (L8-F6; U20, U25).
@@ -2101,6 +2137,50 @@ Session 3 worked the queue in risk order: the L9 remainder, the L6 remainder, L7
 3. **Re-pass every layer with U29–U33 as lenses**, as session 3 did for L0–L5 with U20–U28.
 
 After iteration 3, the same two conditions are checked again.
+
+### Iteration 3 (2026-10-21): result
+
+Iteration 3 read the 158 source files that were only `skimmed` (L7, L10, L6, then L8), ran the two measurements that reading could not settle, and re-passed every layer with U29–U33 as lenses. The findings are in each layer's file: L7-F11–F18, L10-F9–F19, L6-F36–F48, L8-F11–F16, L9-F43–F46, and L3-RP2–RP3. The scratch programs `verify12` and `verify13` are outside the repository, in `rustnative-tools/layer-solidity/`.
+
+| Measure | Value |
+|---|---|
+| Ledger | 730 rows (208 284 lines), all touched: 608 `read` (176 737 lines) and 122 `skimmed` (31 547 lines), every one of them a test. The 9 rows added are the files the merged fixes created (`core/src/secret.rs`, `core/src/services/url_policy.rs`, `server/src/listen.rs`, `sync/src/listen.rs`, and 5 tests), and the line counts were refreshed from the working tree |
+| Source rows | every `src` row is `read`. 35 in-crate modules compiled only under `#[cfg(test)]` (GTK and Windows `*_integration.rs`, `harness.rs`, `test_support.rs`, `graphics/tests.rs`, `fake_bus.rs`, `capability_tests.rs`) were relabelled `test`. The TUI `harness.rs` (public) and Android `device_tests/` (behind the `device-tests` feature) ship, so they were read in full; that read found L6-F46–F48 |
+| New P1 | 4 (table below) |
+| New P2 | 16: L7-F12 ✅, F13, F14; L10-F10 ✅, F11 ✅, F12, F13; L6-F36, F37 ✅, F38, F39, F47 ✅; L8-F12 ✅, F13 ✅; L9-F44; L3-RP2 ✅ |
+| New P3 | 24: L7-F15–F18; L10-F14 ✅, F15 ✅, F16–F19; L6-F40 ✅, F41–F46, F48; L8-F14 ✅, F15, F16; L9-F45, F46; L3-RP3 |
+| Reproduced by running code | verify12 (CLI `db rollback`, `tokens import`, `upgrade`, `doctor`; LSP drift; form decoding; idle keep-alive slots; the service-worker replay in Chromium), verify13 (TUI paint and virtual realize scaling, `Debug` cache keys, `BearerAuth`, the invalidation race, `DataTable` sort, `ListSelection` anchor, the UI task pool, the Android device-suite verdict) |
+| Measurements owed from the queue | L7-F6 ✅: a call queued offline under `user=alice` was delivered under `user=bob`. L6-F16: fixed in `fd3a789`; every backend's `open_url` checks `UrlPolicy`, and the TUI and core tests pass. L6-F26 (GDI handles) needs Windows and stays with Task 6.4 |
+| Fixed since iteration 2 | L6-F16 (fd3a789), L9-F8 (3485eb2, which introduced L9-F43), L9-F10 (4e916b8), L9-F16 (20fc4fa, 5633bfa), L3-F19 (268034b) |
+| New universal indicators | 2 (U34, U35). U20, U22, U26, U29, U32, and U33 gained proving findings |
+| New layer indicators | 14: L7.8–L7.11, L10.10–L10.12, L6.7–L6.8, L8.7–L8.9, L9.18, L3.4.13 |
+| U29–U33 re-pass | L0–L5: L3-RP2 (P2) and L3-RP3 (P3); the inspector token is now private. L9: L9-F43 (P1), F44, F45, F46. L6–L8 and L10: their open U29–U33 items (L6-F14, L6-F21, L7-F6, L8-F8) are unchanged, and the new items are recorded in each layer's iteration-3 section |
+
+| ID | Sev | Finding |
+|---|---|---|
+| L7-F11 ✅ | **P1** | Form and query decoding is quadratic in the field count and runs on the server's async workers, so one large form stalls a worker. |
+| L10-F9 ✅ | **P1** | `rustnative db rollback --to <name>` with a name that is not applied reverses every migration and exits 0. |
+| L8-F11 ✅ | **P1** | Sorting a `DataTable` column that mixes numbers and text panics in `render`: the comparator is not a total order. |
+| L9-F43 ✅ | **P1** | Idle keep-alive connections hold the server's connection slots forever, so 1 024 quiet sockets lock every other client out (a regression from 3485eb2). |
+
+**Is this enough, or must the questions be asked again?**
+- (a) **holds**: every source row is `read`, and only tests remain `skimmed`.
+- (b) **fails**: iteration 3 found 4 new P1s, 2 new universal indicators, and 14 layer indicators, and the U29–U33 re-pass of L0–L5 still found a P2 (L3-RP2).
+
+**Wave 0 additions** (same red-test-first procedure as tasks 0.1–0.10):
+- **Task 0.25:** the server and the deploy splitter set an idle keep-alive timeout and a total header deadline, and a fill-and-wait test holds every slot with quiet keep-alive connections and asserts a new client is served (L9-F43; U34). The MQTT broker caps keep-alive (L9-F44).
+- **Task 0.26:** form and query decoding is linear and bounded by field count and size, and a 10⁵-field body is refused within a fixed time (L7-F11; U22).
+- **Task 0.27:** `db rollback --to` refuses a name that is not an applied migration and exits non-zero; `--to` with no match reverses nothing (L10-F9; U20).
+- **Task 0.28:** `DataTable` sorts with a total order over mixed cells (numbers before text, then by value), and a property test sorts arbitrary mixed columns without panicking (L8-F11; L8.7).
+
+### Iteration 4 queue
+
+1. **A full Q1–Q10 pass over every layer** with U34 and U35 as new lenses. Condition (a) now holds, so this pass decides (b).
+2. **Skimmed tests:** for each of the 126 `skimmed` test files, check that the tests named by the Wave 0 tasks exist or are owed, and read in full any test the findings files cite as evidence.
+3. **Owed measurement:** L6-F26 on Windows (Task 6.4), driven from a timer with a hard timeout.
+4. **Re-run the reproductions after fixes land:** each ✅ finding's scratch program, once its task merges, must fail before the fix and pass after it.
+
+After iteration 4, the same two conditions are checked again.
 
 ### Standing triggers
 
