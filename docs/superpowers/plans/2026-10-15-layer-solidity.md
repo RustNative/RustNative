@@ -299,7 +299,7 @@ The file-by-file loop (Part E) found the same defect *shapes* in several unrelat
   - L7-F11 ✅: form and query decoding is quadratic in the field count and runs on the async workers.
   - L6-F40 ✅: TUI paint is quadratic in rows; L6-F37 ✅: a cache key that prints every pixel of an image.
   - L3-RP2 ✅: the UI task pool runs a self-waking task forever inside one pass.
-  - L2-F30 ✅: a 77-byte Fluent term expands to 400 MB; L3-RP6 ✅: dropped sleeps keep timer entries that every pass scans; L9-F49: every job claim scans the queue's whole history.
+  - L2-F30 ✅: a 77-byte Fluent term expands to 400 MB; L3-RP6 ✅: dropped sleeps keep timer entries that every pass scans; L9-F49: every job claim scans the queue's whole history; L9-F53 ✅: a signal-waiting workflow replays its whole journal on every tick.
 - **Why:** these are freezes, aborts, and denial of service reachable from data, not from code.
 - **Bound:** every loop or allocation whose trip count derives from input is bounded either by the visible output (clip first) or by a documented limit that returns an error. A cooperative scheduler polls each task at most once per pass.
 - **Instrument:** fuzz targets with time and memory caps (libFuzzer `-timeout=1 -rss_limit_mb=512`), and per-command micro-benchmarks at 10⁹-sized inputs.
@@ -404,7 +404,7 @@ These shapes recurred across layers in iteration 2, session 3. Each has the same
 
 ### U30. Queues make progress past poison items, and work is leased
 
-- **Proven by:** L9-F18 and L9-F31 (job and outbox queues stall or loop on one failing item), L9-F39 (a failed saga compensation is never retried), L8-F8 (the data layer's offline mutation queue).
+- **Proven by:** L9-F18 and L9-F31 (job and outbox queues stall or loop on one failing item), L9-F39 (a failed saga compensation is never retried), L8-F8 (the data layer's offline mutation queue), L9-F51 ✅ (two workflow runners execute a step twice, then the loser compensates and fails the execution: durable state changes must be compare-and-set on the state they read).
 - **Why:** one bad item must not stop every item behind it, and a crashed worker must not hold an item forever.
 - **Bound:** every queue has a retry limit, a dead-letter place, and a lease with an expiry. A test enqueues a poison item followed by a good one and asserts that the good one completes.
 - **Instrument:** one queue conformance suite, run against every queue in L8 and L9.
@@ -490,6 +490,21 @@ L9-F1, L9-F27, L9-F29, and L10-F7 share one shape: a registry keyed by an id (a 
 - **Instrument:** for each validator, a test that the same error is raised when the value arrives through a reference.
 - **Enforcement:** E3 → E4.
 
+## Cross-cutting indicator found in iteration 5 (U38)
+
+### U38. What is planned, shown, or declared is computed by the same function that acts
+
+- **Proven by:**
+  - L3-RP7 ✅: layout shares space using preferred sizes that ignore `Fixed`, then places with `Fixed`, so "fixed header plus fill body" overflows on every backend.
+  - L3-RP8 ✅: a menu shows the focused declarer's command state but invokes the first declarer.
+  - L7-F19 ✅: a streamed shell takes island indices from the first render and the island specs from the last.
+  - L10-F20 ✅: a terminal package declares dependencies and a launch line from the command's idea of the app kind, not from the binary.
+  - L6-F61 ✅: the terminal paints with one visibility rule and hit-tests with another.
+- **Why:** when the preview and the action are computed separately, they drift apart, and the user acts on what the preview promised.
+- **Bound:** every value computed for planning, display, or declaration comes from the function the action uses, or a test asserts the two agree on generated inputs.
+- **Instrument:** paired property tests (sharing pass vs placement, `command_state` vs invocation, shell indices vs specs, declared dependencies vs `DT_NEEDED`, painted node vs hit-tested node).
+- **Enforcement:** E3 → E4.
+
 ## Universal bounds summary (for quick reference)
 
 | Indicator | Bound | Target grade/rung |
@@ -515,6 +530,7 @@ L9-F1, L9-F27, L9-F29, and L10-F7 share one shape: a registry keyed by an id (a 
 | U35 credentials | attached only to their own origin over TLS or loopback; stored owner-only | M4/E4 |
 | U36 positive witness | every negative oracle also asserts its action took effect; verdicts require a completion record | M4/E4 |
 | U37 indirect forms | validators resolve references first; dangling references and cycles refused | M4/E4 |
+| U38 plan equals act | preview, display, and declaration share the acting function or a paired test | M4/E4 |
 
 # Part C — The layers, bottom-up
 

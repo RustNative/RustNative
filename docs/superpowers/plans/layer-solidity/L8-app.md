@@ -62,3 +62,12 @@ Every L8 source row is now `read`. Repros live in `rustnative-tools/layer-solidi
 - **L8.7 Comparators are total orders** (F11): every comparator in the framework gets a property test over generated mixed inputs that checks antisymmetry and transitivity, and runs on CI under the standard library's order check.
 - **L8.8 Credentials follow origins** (F12): an interceptor that adds credentials checks the request's origin against the client's configured origins and refuses `http:` unless the configuration allows it. A test sends a request to a foreign host and asserts no `Authorization` header.
 - **L8.9 Invalidation is versioned** (F13): every cached key carries a generation that `invalidate` bumps and `settle_fetch` compares. A virtual-time test interleaves a slow fetch, a mutation, and the settle in every order and asserts the final state equals the server's.
+
+## Iteration 5 (2026-10-21)
+
+A fresh pass over L8, run through the TUI and headless harnesses with edge data. `RadioGroup` and `CommandPalette` roles, `Dialog` described-by, and chart key-navigation bounds are correct. The output is in `verify15/l8-l10/chart-a11y.txt`, outside the repository.
+
+| ID | Sev | Finding | Evidence |
+|---|---|---|---|
+| L8-F17 ✅ | P3 (accessibility honesty, U20) | **The chart's screen-reader text invents values.** `announcement` uses `.unwrap_or(0.0)` for a point that does not exist, so after End then ArrowDown onto a shorter series the live region announces `Returns, Mar: 0`, a value not in the data; `summary` folds an empty series from `(f64::MAX, f64::MIN)` and announces a 309-digit range. Reproduced for both. | `components/src/chart.rs:311, 330-334` |
+| L8-F18 | P3 | **`Toast` matches an expiring timer to its message by text**, so a dismissed toast's old timer closes a newly shown toast with the same text early, and repeating the text does not extend it. | `components/src/widgets.rs:670-675` |
