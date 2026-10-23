@@ -6,7 +6,7 @@ Build a Rust-first application framework that lets developers write the applicat
 
 The long-term target platforms are:
 
-- Windows
+- Windows, natively on both x86_64 and ARM64
 - macOS
 - Linux
 - Android
@@ -26,7 +26,10 @@ same shape — native host objects, native text measurement, native input,
 native accessibility, native services, its own toolchain and packaging — and
 the order they are built in follows what the core contracts are ready for and
 what hardware the project can verify on, not which platform is considered more
-important.
+important. The same holds one level down: a target's processor architectures
+are part of the target, each built natively and verified on its own hardware,
+so Windows on ARM64 is Windows rather than an x64 build running under the
+host's emulator.
 
 The framework follows the philosophy of driving real native host controls from a portable application runtime, but that runtime is Rust rather than a scripting language and its boundary to the host is compiled rather than serialized:
 
@@ -48,7 +51,7 @@ Application
 
 That application model has two authoring surfaces, not one. A tree can be written with the builder API or in markup — directly, as an expression anywhere in a `.rsx` source file, or inside the `rsx!` macro in an ordinary `.rs` file — and the two are spellings of the same tree rather than two frameworks bolted together: the markup form expands to the builder form at compile time and adds nothing to the runtime. Both are supported natively, both reach the entire API, and neither is treated as the primary one (2.9).
 
-Styling is arranged the same way. One resolved style model sits under the tree — theme tokens, component defaults, per-node overrides, state variants — and it has two spellings: typed style properties, and a utility-class vocabulary written in the styling language the largest population of UI developers already uses. The classes are compiled to those same properties at build time, so no cascade, no selector, and no class string reaches a backend, and a style a backend cannot realize is a diagnostic rather than a silent omission (2.14). The vocabulary is not cut down to what every host shares, either: each host realizes as much of it as it can, and where the targets an application declares differ, the class string says so — a guarded style applies where the host realizes it and is left out, by the developer's own choice, where it does not.
+Styling is arranged the same way. One resolved style model sits under the tree — theme tokens, component defaults, per-node overrides, state variants — and it has two spellings: typed style properties, and a utility-class vocabulary written in the styling language the largest population of UI developers already uses — Tailwind CSS v4, taken whole rather than in part, kept current with upstream, and proven against upstream's own output rather than claimed. The classes are compiled to those same properties at build time, so no cascade, no selector, and no class string reaches a backend, and a style a backend cannot realize is a diagnostic rather than a silent omission (2.14). The vocabulary is not cut down to what every host shares, either: each host realizes as much of it as it can, and where the targets an application declares differ, the class string says so — a guarded style applies where the host realizes it and is left out, by the developer's own choice, where it does not.
 
 The framework must not become a lowest-common-denominator abstraction that hides the unique capabilities of each operating system. Portable semantics should be consistent, while platform-specific capabilities remain available through explicit capability APIs and native escape hatches.
 
@@ -78,7 +81,7 @@ The framework should use native host controls and platform services wherever a n
 What the host *is* differs per target, and that difference is the point:
 
 ```text
-Windows   HWND + common controls
+Windows   WinUI 3 controls in Win32 windows (WinUI 2 where WinUI 3 cannot run)
 macOS     NSView + AppKit controls
 Linux     the chosen toolkit's native widgets
 Android   the android.view.View hierarchy
@@ -89,9 +92,9 @@ Terminal  the terminal's own cell grid and input protocols
 Embedded  the display and input the device actually has
 ```
 
-The Windows backend, for example, creates real Win32 `HWND`s. Every other backend should realize the tree in its own host's terms rather than painting a facsimile of an operating-system UI.
+The Windows backend, for example, realizes the tree as WinUI 3 controls — the host's current control set, the one its own first-party applications are built with — inside real Win32 windows, and as WinUI 2 controls in the same windows wherever the Windows App SDK runtime that carries WinUI 3 cannot run. Every other backend should realize the tree in its own host's terms rather than painting a facsimile of an operating-system UI.
 
-The rule is about controls, and it reaches exactly as far as "wherever a native equivalent exists". A button, a text field, a list, or a menu has a native equivalent, and it is realized as that control and keeps what the host gives it — its shape, its focus visuals, its text editing, its accessibility. A plain container, a card, a divider, or a background has none: it is a box the framework owns, and a backend may decorate it with whatever drawing and composition services its host offers, which is how every layer-backed host already works. One rule therefore governs every visual capability a backend adds: **decorate the box around a control, never the control.** A backend never captures a native control's output into a bitmap to rotate, scale, blur, or shadow it, because that breaks its input method, caret, focus, selection, and accessibility — the things the control exists to provide — and a style that would need it is answered as unavailable for native controls (2.14).
+The rule is about controls, and it reaches exactly as far as "wherever a native equivalent exists". A button, a text field, a list, or a menu has a native equivalent, and it is realized as that control and keeps what the host gives it — its shape, its focus visuals, its text editing, its accessibility. A plain container, a card, a divider, or a background has none: it is a box the framework owns, and a backend may decorate it with whatever drawing and composition services its host offers, which is how every layer-backed host already works. One rule therefore governs every visual capability a backend adds: **decorate the box around a control, never the control.** A backend never captures a native control's output into a bitmap to rotate, scale, blur, or shadow it, because that breaks its input method, caret, focus, selection, and accessibility — the things the control exists to provide — and a style that would need it is answered as unavailable for native controls (2.14). The line is drawn at capture and redraw, not at transformation: where the host's own control framework transforms, clips, or fades a control while keeping it live — as XAML does through an element's render transform and its composition visual, with hit-testing, focus, caret, and UI Automation following the control — that is the host realizing the style on its own control, and a backend may use it. Replacing a control's template is the opposite case: a re-templated control is a redrawn one, so a backend sets only the properties and theme resources the control's own template reads, and never supplies a template of its own.
 
 ### 2.3 A target is first-class or it is not a target
 
@@ -136,6 +139,8 @@ The framework must also explicitly account for each host's constraints, and desi
 - **mobile**: process lifecycle and reclaim, configuration changes, and permission prompts;
 - **tablet**: everything mobile owes, plus windows the person resizes and arranges while the application runs, a hardware keyboard, a trackpad, and a precision pen as ordinary input rather than accessories, and a software keyboard that moves;
 - **embedded**: constrained memory, fixed displays, and the absence of a general-purpose OS.
+
+**Architectures.** A target names its processor architectures, and each one is native. Windows is `x86_64` and `ARM64`; macOS is `arm64` and `x86_64` in one universal binary; Android is the ABIs its devices run. An x64 binary running under the host's emulator on an ARM64 device is not the ARM64 target: it is slower, costs battery, cannot load into a native ARM64 process, and verifies nothing about the ARM64 build. So every crate a target links builds for every architecture the target names, `cfg(target_arch)` appears only where an architecture genuinely differs — never to tell one host from itself — and an architecture is supported only once it runs on its own hardware (2.13).
 
 ### 2.4 Platform-independent core, platform-specific adapters
 
@@ -231,7 +236,7 @@ The project does not currently have a macOS machine, an iPhone, or an iPad, so M
 Two rules keep that honest, and they apply to every platform the project cannot exercise on the machine in front of it:
 
 - a backend advertises a `Capability` only once it actually realizes it, never because the plan says it will (the Windows backend already asserts this about itself);
-- `BUILD_STATUS.md` states what was verified and on what. Work reasoned through but not run is recorded as exactly that, and a platform is called supported only after it runs on real hardware.
+- `BUILD_STATUS.md` states what was verified and on what — the host version, the control set where a backend has more than one, and the architecture. Work reasoned through but not run is recorded as exactly that, and a platform is called supported only after it runs on real hardware.
 
 ### 2.14 One style model, two spellings
 
@@ -249,21 +254,22 @@ Milestone 21 established that a node's visual style is *resolved* in the core �
 
 A **declaration** is a property and a value in the vocabulary the web platform made universal — lengths, colours, the arithmetic and colour functions over them, and references to named tokens. It is the shared value language of both spellings, and it is deliberately the *declaration* half of that platform's styling model and not the other half: there are no selectors, no specificity, no cascade, and no inheritance beyond the text properties that inherit everywhere. A style belongs to the node that declares it, which is what keeps resolution deterministic (Milestone 21). Where a style does depend on the tree — a node's position among its siblings, the children its parent styles, the state of a named ancestor — it says so through a typed relationship the core resolves, never through a selector matched against the tree.
 
-Five rules follow, and they are the whole of the principle:
+Six rules follow, and they are the whole of the principle:
 
 - **Vocabulary equality.** Every utility class resolves to style properties reachable from both syntaxes, and every style property has a spelling in the utility vocabulary or is documented as having none. A class that does not resolve is a compile error naming the property it was looking for, rather than a class silently dropped — which is how utility vocabularies normally fail.
 - **No second engine.** The utility layer is a compile-time front end, the way markup is (2.9). It introduces no runtime type, no matching step, no style storage, and no capability of its own: `rustnative expand` shows the style properties a class string became, and an equivalence suite asserts that the two spellings resolve to equal values.
 - **Tokens are references, not constants.** A token-valued declaration resolves through the theme at style-resolution time, so a theme change, a colour-scheme change, or a user's own palette is a re-resolution rather than a rebuild; values declared fixed are folded at build time and stated to be fixed. This is also the boundary 2.2 needs — semantic tokens may map to host appearance, while absolute brand values are applied as given.
 - **Capability honesty, per property.** Rounded corners, shadows, gradients, and transforms exist on some hosts and not others, and a terminal cell has neither a radius nor a shadow. Each backend declares, per style property, whether it realizes it, approximates it, or cannot express it, and an application that declares one its target cannot realize is told at build time (2.5, 2.13). A backend never silently ignores a style, and never abandons a native control to owner-drawing in order to satisfy one — that trade is exactly what 2.2 exists to refuse. Honesty works in both directions: the vocabulary is not cut down to what the narrowest host can do, because that would hide what the richer ones offer (section 1). A property belongs in the vocabulary when a host can realize it; every backend answers it; and where an application's declared targets answer differently, a **guard** — a capability or target variant, in both spellings — applies the declaration only where it is realized. An unguarded declaration that a declared target cannot realize still fails the build, so a difference between hosts is always written where it was chosen, never discovered on one of them.
 - **Relationships, not matchers.** A style may depend on another node only through a closed set of typed relationships that the core resolves by a bounded lookup — the node's position among its siblings, its parent, a named ancestor group, an earlier sibling, a container's resolved size. Each is a condition like any other: `rustnative expand` prints it, the headless backend resolves it, and every backend realizes the result. An arbitrary selector is a search over the tree, which is the second engine the second rule refuses, and it is not admitted as a variant. The one place host styling with no typed equivalent may ever enter is an explicit, single-host passthrough outside the equivalence suite (Milestone 68), and the framework is complete without it.
+- **Compatibility is complete and proven.** The utility vocabulary is Tailwind CSS v4's at a pinned upstream release, and it is taken whole: every utility, variant, modifier, and directive upstream ships at that release is either compiled through the five rules above or refused by name, with the reason and the spelling that replaces it, in a published coverage table that leaves nothing out. What upstream spells as a selector is almost always a fact the framework already holds as typed data — the node's own interaction, accessibility, or form state, the environment, or a typed relationship — and it is compiled from that fact; what remains is refused rather than matched. Compatibility is checked rather than claimed: a corpus generated from upstream's own compiler at the pin holds, for every class, the declarations upstream emits, and the declarations this framework compiles the class to must equal them. Upstream's toolchain runs only to regenerate that corpus when the pin moves, on a maintainer's machine; it is never a dependency of any build (Milestone 73).
 
 The vocabulary therefore has three ranges, and every property belongs to exactly one:
 
 ```text
 portable range    what every backend realizes or approximates; no guard needed
                   (Milestones 21, 58 — with the shadow the one exception: it
-                  predates the extended range, and the Windows backend cannot
-                  realize it)
+                  predates the extended range, and a terminal cannot realize
+                  it)
 extended range    typed properties some hosts realize and others do not; each
                   backend answers, the headless backend realizes all of it, and
                   a guard marks where it applies (Milestone 67)
@@ -272,7 +278,7 @@ host passthrough  host styling with no typed equivalent, on one host, opaque
                   not required for the framework to be complete (Milestone 68)
 ```
 
-Relationships sit across the ranges rather than in one: the core resolves them into ordinary properties before a backend is reached, so a relationship is as portable as the properties it sets. The structural ones need nothing but the tree the reconciler already holds (Milestone 67); the ones that make a node's style depend on another node's state or size need a dependency index and are optional (Milestone 68).
+Relationships sit across the ranges rather than in one: the core resolves them into ordinary properties before a backend is reached, so a relationship is as portable as the properties it sets. The structural ones need nothing but the tree the reconciler already holds (Milestone 67); the ones that make a node's style depend on another node's state or size need a dependency index, which Milestone 68 builds and bounds.
 
 Units follow 2.11 rather than the web's: the core keeps one geometry model in logical pixels, `rem` is that model's root text size scaled by the host's text setting, and a backend whose host addresses space differently — points, density-independent pixels, character cells — converts at its own boundary with a documented mapping and rounding rule.
 
@@ -280,7 +286,7 @@ Units follow 2.11 rather than the web's: the core keeps one geometry model in lo
 
 # 3. Completed milestones
 
-The following milestones are implemented in the current codebase. The backends built so far are Windows/Win32, Linux (GTK 4), Android, and the Web, with the headless reference backend; macOS, iOS, iPadOS, terminals, and embedded targets are planned (section 8), and what each built backend still owes is recorded in `BUILD_STATUS.md` and `docs/conformance/new-backend-checklist.md`.
+The following milestones are implemented in the current codebase. The backends built so far are Windows, Linux (GTK 4), Android, and the Web, with the headless reference backend. The Windows milestones below built the backend's Win32 shell — windows, the message loop, input, DPI, services, packaging — and realized the tree in it with the common controls, on x86_64; the control sets the Windows backend ships inside that shell, WinUI 3 by default and WinUI 2 as its fallback, are Milestone 71, and its native ARM64 build is Milestone 72; macOS, iOS, iPadOS, terminals, and embedded targets are planned (section 8), and what each built backend still owes is recorded in `BUILD_STATUS.md` and `docs/conformance/new-backend-checklist.md`.
 
 (Sections 4 and 5 — the stages these milestones were planned in — were folded into this section when they were completed; the numbers of the sections after them are kept, because the rest of the repository refers to them.)
 
@@ -1028,7 +1034,8 @@ given twice where it differs — for a native control and for a box the
 framework owns — because 2.2's rule is to decorate the box, never the control:
 a backend may realize a shadow or a gradient on a container through its host's
 drawing and composition services while answering the same property as
-unavailable on a native button. A backend that realizes the extended range on
+unavailable on a native button. A backend with more than one control set — the
+Windows backend's WinUI 3 and WinUI 2 — answers once per set as well. A backend that realizes the extended range on
 neither is still complete; one that realizes it by owner-drawing a control is
 not.
 
@@ -1061,9 +1068,245 @@ onward, and they are part of this definition rather than separate work:
   host has a store, and updates gated by the native-input fingerprint — rather
   than a release process invented for that backend.
 
+The Windows backend is one backend with two control sets and two architectures, and neither pair makes a second backend. Its shell — Win32 top-level windows, the message loop, per-monitor scale, the shell's dialogs, tray, jump list, and single-instance handoff, and the canvas and native-surface paths — is shared. Inside each window the tree is realized as WinUI 3 controls by default, and as WinUI 2 controls where the Windows App SDK runtime cannot run (Milestone 71), and every part of it is built, tested, and shipped natively for x86_64 and for ARM64 (Milestone 72). Each control set keeps its own capability table, style table, conformance column, and budgets, as iOS and iPadOS do on their shared toolkit; the two architectures share all of those and differ in what is measured and where it is verified. Milestones 71 and 72 are placed here, ahead of the other backends, because they are the Windows backend's own; numbers are identities, not an order.
+
 Three of these — macOS, iOS, and iPadOS — cannot be verified on the project's current hardware (2.13). They remain fully planned, and each is finished when it runs on its own Apple hardware, not before: a Mac for macOS, an iPhone for iOS, an iPad for iPadOS. An iPad running the iOS backend does not verify iPadOS, and a Mac running an iPad application does not verify macOS.
 
 The three Apple targets share code only through platform-group crates (Milestone 39, `C65`), never by one backend depending on another: an **Apple** group (the Objective-C runtime bindings and the host's memory-management convention, Core Text measurement, accessibility role mapping, the Apple toolchain driver) for all three, and inside it a **UIKit** group (the view and control realization, scenes, `UITextInput`, `UIAccessibility`, the touch and gesture bridge) for iOS and iPadOS. Each backend keeps its own capability table, style table, unit mapping, conformance column, budgets, and verification. Milestones 36 and 70 share a toolkit and ship as one universal bundle, so they are planned to be built together, as one track with two targets; neither is finished by the other's tests. (Milestone 70 is numbered after the production-parity milestones because it was specified after them; it sits beside Milestone 36 because that is where it belongs.)
+
+## Milestone 71 — Windows control sets: WinUI 3, with WinUI 2 as its fallback
+
+WinUI 3 is the host's current control set. It is what the host's own
+first-party applications are built with, what its design language is expressed
+in, and therefore what Milestone 41's fidelity conformance measures a Windows
+application against. Its controls are native Windows controls in every sense
+2.2 cares about — the host draws them and gives them their focus visuals, text
+editing, input methods, and UI Automation — and the host composes the whole
+tree through one visual layer, so the extended style range reaches it without
+the airspace limits of child windows. It ships in the Windows App SDK, a
+runtime that lives outside the operating system, and that is the one reason a
+fallback exists: where that runtime cannot be loaded, WinUI 2 — the control
+library over the operating system's own XAML — gives the same family of
+controls, in the same windows, with nothing to install.
+
+Satisfies: `D-FP-2`, `D-WIN-3`; with Milestone 41, `D-FP-1` on Windows.
+
+- **one shell, two XAML hosts**: each window root is a Win32 top-level window
+  the backend owns, and the tree is realized inside it through the host's XAML
+  island — `Microsoft.UI.Xaml.Hosting.DesktopWindowXamlSource` for WinUI 3 and
+  `Windows.UI.Xaml.Hosting.DesktopWindowXamlSource` for WinUI 2. Hosting both
+  the same way keeps everything the shell owns — window lifecycle and
+  placement, multiple windows, single-instance handoff and deep links, the
+  tray and jump list, embedding into a caller's window (Milestone 40), and the
+  scheduler's wake-ups — one implementation rather than two. The shell's loop
+  hands each message to the island first, so Tab traversal, keyboard
+  accelerators, access keys, and input-method messages reach XAML, and the
+  scheduler posts its wakes to the thread's `DispatcherQueue`;
+- **the choice is made once, at launch, and never by `cfg`**: both control
+  sets are compiled into one binary, as iOS and iPadOS are (Milestone 70).
+  `rustnative.toml` declares the sets a project ships, `[windows] control_sets
+  = ["winui3", "winui2"]` by default. At launch the backend loads the Windows
+  App SDK runtime — carried inside the application, or the framework package
+  through the host's bootstrapper — and realizes in WinUI 3 if it loads; if it
+  does not and WinUI 2 is declared, it realizes in WinUI 2 and records why in
+  the diagnostics channel and the inspection protocol (Milestone 44), never
+  silently; if neither can run, launch fails with a message naming what is
+  missing and the command or package that supplies it. No window switches
+  control set while the application runs, and a process never mixes the two.
+  A project that declares only `winui3` links no WinUI 2 code, and an
+  application embedding into a host that already runs one of the two XAML
+  frameworks on that thread realizes in that one;
+- **realization**: one native control per node kind, chosen from the control
+  set's own controls — `TextBlock` for a label, `Button`, `TextBox` (and
+  `PasswordBox` for Milestone 61's secure entry) for text input, `ScrollView`
+  for a scrolling container (the host's scroller, with its own inertia,
+  rubber-banding, and anchoring), `TabView` for a tab bar with every tab's
+  content kept mounted, `MenuBar` and `MenuFlyout` bound to the command model
+  (Milestone 39), `ContentDialog` for in-application modal content, and the
+  shell's common item dialogs for files under both sets. A container the
+  framework owns is a XAML panel whose children are placed at the geometry the
+  portable layout engine computed (2.11): XAML's own layout pass runs over
+  fixed sizes and positions and decides nothing, so one subtree never has two
+  layout engines — the rule Web milestone C states for the browser, applied
+  here. Virtual lists keep Milestone 28's identity and recycling over XAML
+  elements rather than handing items to a host repeater whose identity is not
+  ours; a canvas is a `SwapChainPanel` drawn by Direct2D and DirectWrite from
+  its draw list, recovered on device loss as before; a native surface is a
+  `SwapChainPanel`, with a child-window surface kept for graphics APIs that
+  need a window handle and answered with that window's airspace limits;
+  embedded web content is the `WebView2` control (Milestone 48);
+- **measurement** through XAML's own measure on prototype elements per control
+  kind, and DirectWrite text layout for labels, cached until font, theme, or
+  scale changes — so a control is measured at the size the host draws it, as
+  on Linux and Android;
+- **style without re-templating** (2.2): resolved style is applied as the
+  controls' own properties and the lightweight-styling theme resources their
+  templates read — the per-state brushes a button's template already looks up,
+  for example — and a control's template is never replaced. Tokens map to
+  theme resources, so a theme or colour-scheme change re-resolves on the
+  realized controls (2.10); the accent colour, light and dark scheme, and
+  contrast themes come from the host, and a contrast theme's own resources win
+  over brand values, as the host's fidelity rules require. Each set has its own
+  table — `rustnative_style::WINDOWS_WINUI3` and `WINDOWS_WINUI2` — answered
+  for native controls and for framework-owned boxes. Because XAML transforms,
+  clips, and fades a live control without capturing it, both tables realize
+  transforms, opacity, and per-corner radius on native controls as well as on
+  boxes (Milestone 67);
+- **the unit mapping**: one logical pixel is one XAML effective pixel; XAML
+  applies the island's rasterization scale, which follows the window's monitor
+  (Milestone 69); `rem` follows the host's text-scaling setting; and positions
+  round to the device-pixel grid half away from zero with XAML's layout
+  rounding on, held by the same 150 % conformance case the shell's scaling
+  uses;
+- **input** through XAML's routed events: pointer (mouse, touch, and pen with
+  pressure, tilt, and barrel button), wheel, keys and characters, XAML drag and
+  drop, and input methods in XAML's text controls and through the host's
+  text-services API for the framework's custom text targets; focus through
+  XAML's focus manager mapped onto the portable focus model, with directional
+  focus for Milestone 61's non-pointer navigation and keyboard accelerators
+  generated from the command model, so a menu's shortcut is the shortcut that
+  works;
+- **accessibility** through XAML's own UI Automation peers for every control,
+  given the portable model's names, descriptions, relationships, heading
+  levels, live settings, position in set, and automation ids through
+  `AutomationProperties`; custom peers only where the model has no host
+  control — a canvas's virtual elements and framework-owned boxes with a role.
+  Hand-written providers are therefore the exception rather than the rule
+  (Milestone 26), and both sets are verified with Narrator;
+- **animation** from Milestone 27's timeline, applied to element properties on
+  frames paced by the host's rendering event, with reduced motion read from
+  the host's animation setting and tracked live;
+- **materials** (Milestone 60): Mica and Acrylic window and surface backdrops
+  through the host's system-backdrop APIs under WinUI 3, honouring the
+  transparency-effects setting; WinUI 2 answers each material through its own
+  table;
+- **services, per set where they differ**: app notifications with their
+  actions routed back as events under WinUI 3 and the shell's notification
+  path under WinUI 2; everything else — clipboard, files, URLs, secure storage,
+  state store, tray, jump list, taskbar progress — from the shared shell;
+- **the runtime, pinned and packaged**: the Windows App SDK is pinned to a
+  stated release of its current stable line (the 2.x line; 2.4 as of
+  2026-08), recorded in `VENDORED.md` with its hashes, and moved deliberately
+  with the release train (Milestone 59). The Rust bindings are generated from
+  the SDK's metadata at the pin and committed, so a build needs no package
+  client and no network; the runtime's redistributables are fetched by
+  `rustnative doctor --install` against the pinned hashes, with the offline
+  mirror of Milestone 65. The MSIX declares a dependency on the runtime's
+  framework package, which the store and the host's installer provide; the
+  zip carries the runtime inside it, so it runs on a machine with nothing
+  installed. WinUI 2 needs nothing beyond the operating system and its control
+  library, packaged the same two ways. The runtime counts toward artifact size
+  and its bootstrap toward cold start in `budgets/windows.toml` (Milestone 42);
+- **supported hosts, stated per set**: WinUI 3 on the Windows versions the
+  pinned Windows App SDK supports, WinUI 2 on Windows 10 version 1903 and
+  later; both appear in the supported-host matrix of each release (Milestone
+  59), and `doctor` checks them;
+- **embedding in both directions** (Milestone 40): our tree into a caller's
+  window, inside an island the backend creates, and into a caller's XAML tree
+  as one element; a foreign XAML element, or a foreign window with its
+  airspace stated, adopted as a leaf;
+- **the common-controls realization as the reference, not a third set**: the
+  common controls are where this backend was built and verified (Milestones
+  1–32), and they remain the reference both XAML realizations are measured
+  against — the same screens, conformance cases, and budgets — until each
+  passes section 8. Then the common-controls realization is removed, and what
+  it proved stays as tests that run against the XAML realizations;
+- **its own checklist columns, inspection, loop, and budgets**: one
+  conformance column per control set, capabilities advertised per set and only
+  once realized (2.13), the inspection protocol reporting the active set and
+  why it was chosen, the developer loop under both, and budgets keyed by set
+  and architecture (Milestone 72).
+
+**Done when** both control sets pass section 8 on real Windows sessions — every
+node kind realized as the set's own control, measured, styled without a
+replaced template, and read back from the realized elements; Narrator passes
+recorded under each; the fallback taken and reported when the runtime is
+absent, and launch refused with a named remedy when no declared set can run; a
+theme, scheme, contrast, and text-scale change re-resolving on the realized
+controls with no tree rebuild; a WinUI 3 tree embedded in an existing Win32
+application and in an existing XAML application; both packaging shapes
+installing and running on a clean machine; and the common-controls realization
+removed with its tests carried over.
+
+**Depends on** Milestones 39 (mappers and the command model), 40 (embedding),
+41 (fidelity conformance), 58 (the capability tables and unit mapping), and the
+scaling half of Milestone 69; Milestone 72 runs both sets on ARM64.
+
+## Milestone 72 — Windows on ARM64
+
+ARM64 Windows devices are ordinary hardware, and Rust's `aarch64-pc-windows-msvc`
+has been a Tier 1 target since Rust 1.91. An x64 build runs on those devices
+under the host's emulator, which is exactly why it must not be taken as support
+(2.3): it runs slower, costs battery, cannot be loaded by a native ARM64 host
+process, and proves nothing about the ARM64 build. The Windows backend is
+therefore built, tested, packaged, updated, and verified natively for
+`x86_64-pc-windows-msvc` and `aarch64-pc-windows-msvc`, as one backend.
+
+Satisfies: `D-FP-1` and `D-FP-2` on ARM64 hardware.
+
+- **every Windows crate on both architectures**: the shell, both control sets,
+  the canvas and surface paths, the terminal backend's console path, the server
+  and its deployment tooling, the interop bindings, and the CLI itself, with
+  `cfg(target_arch)` confined to the places an architecture genuinely differs
+  — vector intrinsics, which always keep a portable path, and crash-context
+  records — and never used to tell Windows from Windows;
+- **the unsafe surface checked per architecture**: every FFI structure layout,
+  callback signature, and alignment assumption in the ownership modules is
+  asserted by tests that run on both architectures, and Milestone 65's
+  sanitizer runs cover both;
+- **the toolchain**: `rustnative build|run|check|test|bench|package windows
+  --arch x64|arm64|all`, defaulting to the machine's own architecture, with
+  either architecture cross-built from the other through the MSVC build tools
+  for both and the Windows SDK's per-architecture libraries. `doctor` reports
+  both compilers, both library sets, and the per-architecture runtime
+  redistributables; `rust-toolchain.toml` carries both targets; and the MSRV
+  check runs for both, at the workspace MSRV or Rust 1.91 for ARM64, whichever
+  is later;
+- **packaging per architecture, delivered as one**: an MSIX per architecture,
+  combined into one bundle from which the host installs the native package; a
+  zip per architecture with the architecture in its name; the Windows App SDK
+  runtime, the WinUI 2 library, and WebView2 carried or depended on per
+  architecture;
+- **updates that never cross architectures**: the update manifests and
+  `.appinstaller` feeds of Milestone 50 carry a payload per architecture, the
+  native-input fingerprint of Milestone 59 includes the architecture, so an
+  update built for one is refused on the other, and an x64 installation found
+  on an ARM64 device is moved to the native build by its next update rather
+  than left emulated;
+- **library-only mode and embedding across architectures** (Milestone 40): a
+  host process loads only libraries it can run, so the library-only DLL ships
+  per architecture and as an ARM64X build — one file that loads natively into
+  ARM64 processes and into x64-compatible processes on ARM64 devices — for
+  hosts that may be either; the generated bindings are architecture-neutral;
+  and an adopted foreign control or native module of the wrong architecture is
+  a named diagnostic, not a crash;
+- **crash reports, profiles, and builds per architecture**: minidumps
+  symbolicated per architecture (Milestone 51), profile-guided builds from a
+  startup run on each (Milestone 42), and the reproducibility check run on each
+  (Milestone 65);
+- **budgets per architecture**: `budgets/windows.toml` keyed by architecture and
+  control set, with a low-end ARM64 device profile beside the low-end x64 one,
+  because the low end decides;
+- **CI on native ARM64**: GitHub's ARM64 Windows runners run the whole Windows
+  gate — tests, conformance, budgets, packaging — not a cross-compile check
+  alone;
+- **verification on ARM64 hardware** (2.13): the CI runners are ARM64 hardware
+  and verify what they run; the manual passes — Narrator, touch, pen, input
+  methods, and the first-hour target of Milestone 43 — need an interactive
+  ARM64 Windows device, and until one is used they are recorded in
+  `BUILD_STATUS.md` as unverified on ARM64.
+
+**Done when** every Windows crate builds, tests, and passes both control sets'
+conformance columns natively on ARM64; `rustnative package windows --arch all`
+produces a bundle the host installs natively on each architecture; an update is
+refused across architectures and an emulated installation is moved to the
+native build; the ARM64X library is loaded by an ARM64 host and an
+x64-compatible one; the budgets are met on both architectures' low-end
+profiles; and `BUILD_STATUS.md` names the ARM64 hardware each result came from.
+
+**Depends on** Milestone 71 (the control sets it runs), Milestones 32, 50, and
+59 (packaging, updates, and the fingerprint), Milestone 42 (budgets), and
+Milestone 65 (sanitizers and reproducibility).
 
 ## Milestone 33 — macOS backend
 
@@ -1661,13 +1904,17 @@ Maintain:
   capability table; for every guard, the declaration it applies on each backend
   and the build failure an unguarded one produces for each declared target; and
   for every typed relationship, the core's resolution asserted against what each
-  backend realizes — the browser's generated rule included;
+  backend realizes — the browser's generated rule included; and the upstream
+  conformance corpus, asserting that every class compiles to the declarations
+  upstream's own compiler emits for it at the pinned Tailwind CSS release
+  (Milestone 73);
 - reconciliation tests;
 - layout tests;
 - scheduler tests;
 - lifecycle tests;
 - component-tree tests;
-- platform integration tests, run against each backend's real host;
+- platform integration tests, run against each backend's real host — on
+  Windows under each control set and on each architecture;
 - browser tests for the Web backend, and a rendered-output equivalence test
   across its three deployment modes;
 - synthetic-terminal tests for the terminal backend, asserting the cell grid;
@@ -1822,15 +2069,17 @@ Tier 0 — the markup syntax, the style spellings, portable-surface
   everything that costs once now and once per backend afterwards
         ↓
 platform backends, each finished by section 8's definition
-  macOS · Linux · Android · iOS · iPadOS · Embedded · Terminal
+  Windows control sets and ARM64 (71, 72) · macOS · Linux · Android ·
+  iOS · iPadOS · Embedded · Terminal
         ↓
 Web backend, milestones A–K
   client-side → server-rendered → serverless
         ↓
-Tier 2 — the application layer (46–48, 54, 60, 62, 63, 67, 69)
+Tier 2 — the application layer (46–48, 54, 60, 62, 63, 67–69, 73)
   localization · state, resilience, data · components and tokens ·
   responsiveness under load · the visual pipeline · media, capture,
   and files · trust and compliance · the extended style range ·
+  relational styling and container queries · Tailwind CSS complete ·
   Windows scale and composition
         ↓
 Tier 3 — the server model, deployment and updates, operations, the
@@ -1841,14 +2090,14 @@ Tier 3 — the server model, deployment and updates, operations, the
 one application, every target, the same semantics
 
 optional, at any point after its dependencies, on demand rather than
-on schedule (68)
-  relational and container-relative styling · host style passthrough
+on schedule (the passthrough part of 68)
+  host style passthrough
 ```
 
-Milestone 68 is outside the sequence on purpose. The framework is complete
-without it: every target, every tier, and the differentiation argument of
-section 11 stand whether or not it is built, and section 11 records what would
-make it worth building.
+Host style passthrough is outside the sequence on purpose. The framework is
+complete without it: every target, every tier, and the differentiation argument
+of section 11 stand whether or not it is built, and Milestone 68 records what
+would make it worth building.
 
 Tier 1 (Milestones 41–45, 59, 61, and 65) — guarantees and conformance suites,
 budgets, the developer loop, inspection, test infrastructure, the toolchain and
@@ -1891,13 +2140,13 @@ Tier 1   Milestones 41–45, 59,      continuous; gates each backend's completio
          61, 65
         ↓                           (folded into section 8's definition of done)
 Tier 2   Milestones 46–48, 54,      before any public release
-         60, 62, 63, 67, 69
+         60, 62, 63, 67–69, 73
         ↓
 Tier 3   Milestones 49–52, 55–57,   with and after the Web track
          64, 66
 
-Optional Milestone 68               on demand; the framework is complete
-                                    without it
+Optional Milestone 68's host        on demand; the framework is complete
+         passthrough                without it
 ```
 
 One rule binds the order, and it is the reason Tier 0 exists at all:
@@ -1911,10 +2160,10 @@ a conditional — applied to schedule instead of to structure.
 Tier 1 is not a phase. It advances continuously the way section 9 does, and
 section 8's definition of a complete backend now includes passing it.
 
-The optional band is not a tier either. A milestone is placed there when the
-analysis shows a real capability that the framework's existing mechanisms
-already cover in another form, so that building it is worth doing only once
-applications ask for it. It is held to the same rule as everything else —
+The optional band is not a tier either. Work is placed there when the analysis
+shows a real capability that sits outside a guarantee the framework makes — host
+passthrough sits outside the equivalence suite by definition — so that building
+it is worth doing only once applications ask for it. It is held to the same rule as everything else —
 nothing it adds may be a per-backend obligation that a backend could be found
 missing — and no other milestone depends on it.
 
@@ -2211,7 +2460,7 @@ A small, exactly specified subset of the web's value syntax, owned by a
 - **colour functions** — `rgb()`, `hsl()`, `oklch()`, and `color-mix()`, the
   last two because the v4 default palette and its opacity modifiers are defined
   in them — evaluated at build time and converted per backend: 8-bit sRGB for
-  GDI, the terminal's own depth, the host's colour type elsewhere, with
+  Windows, the terminal's own depth, the host's colour type elsewhere, with
   out-of-gamut values clipped by one documented rule rather than per backend;
 - **custom properties as token references** (`var(--color-primary)`), which is the
   representation 2.14's third rule needs: a declaration that still points at a
@@ -2231,7 +2480,10 @@ vocabulary is not invented here. The compatibility target is **Tailwind CSS
 v4**, named explicitly because a compatibility claim without a version is not
 one, and chosen because its configuration is itself CSS — a theme block of
 custom properties — which is the half of the styling language this framework
-already needs:
+already needs. The target is the whole vocabulary, not a subset of it (2.14's
+sixth rule): this milestone lands the utilities of the portable range and the
+mechanism under them, Milestones 67 and 68 widen it, and Milestone 73 completes
+it against the current upstream release. This milestone's part:
 
 - **utilities**: one class, one set of declarations. Spacing is computed rather
   than tabulated (`p-13` is as valid as `p-4`), colours come from the theme's
@@ -2281,9 +2533,11 @@ written in the subset of the v4 directives that survive without a cascade:
   plugins or a JavaScript configuration file. This framework's build is Cargo
   and a build script; a Node toolchain is not a dependency it will acquire for
   styling, and a plugin ecosystem built on selectors could not be honoured
-  anyway. The browser reset shipped by the upstream project is likewise not
-  applicable: a native backend has no browser defaults to reset, and its
-  starting point is the theme.
+  anyway. The browser reset shipped by the upstream project likewise has no
+  subject on a native backend, which has no browser defaults to reset and
+  starts from the theme; Milestone 73 accepts the directive that imports it,
+  so an upstream style file compiles unchanged, and says what it lowers to on
+  each host.
 
 ### What each backend owes
 
@@ -2311,16 +2565,23 @@ range uses. What lies past it is specified, and placed where its cost belongs:
   lists. Milestone 67, Tier 2;
 - **container-relative variants** (`@container`), which depend on a parent's
   resolved size and therefore on a second pass after layout. The layout model
-  can answer them (`C22-1`); the ordering work is Milestone 68's, and optional;
+  can answer them (`C22-1`); the ordering work is Milestone 68's;
 - **relational variants** — a style keyed to an ancestor's or sibling's state.
   Written as a matcher they are selector matching under another name and need
   the machinery 2.14 refuses; written as an explicit, typed relationship
   between nodes they are a bounded lookup the core can resolve. Milestone 68
-  specifies them that way, and optionally;
+  specifies them that way;
+- **the rest of the upstream vocabulary** — the variants on a node's own
+  accessibility, form, and disclosure state, the media features the
+  environment answers, `starting:`, `not-*:`, the `!` modifier, arbitrary
+  properties over typed properties, the remaining style-file directives, and the
+  conformance corpus and coverage table that prove the whole. Milestone 73;
 - **arbitrary raw properties** with no typed equivalent, which would break
   vocabulary equality in the direction that matters. They are never part of
   the vocabulary; Milestone 68's host passthrough is the one optional, explicit,
-  single-host form they may take.
+  single-host form they may take. An arbitrary property over a property the
+  vocabulary does type is not one of these: it is an ordinary declaration
+  (Milestone 73).
 
 ### Shared with Milestone 53
 
@@ -2630,7 +2891,8 @@ Satisfies: `X-L0-1`, `X-L0-3`, `W-RS-1`, `W-RS-2`, `W-SL-1`, `W-ED-2`,
 `M-BR-2`, `D-WS-1`, `E-GUI-4`, `W-SH-1`, `M-OB-4`; concepts `C42-4`, `C62-1`,
 `C62-2`, `C83-2`.
 
-- **a budget file per target**, holding declared numbers rather than
+- **a budget file per target**, keyed by architecture and control set where a
+  target has more than one, holding declared numbers rather than
   aspirations: cold start, resident memory, artifact size, frame-time
   distribution including the worst case, input latency, per-route client
   payload, per-request cold start, edge CPU time per route, embedded RAM and
@@ -2911,7 +3173,9 @@ halves of `C59-1`, `C63-1`, `C63-2`, `C64-1`, `C64-2`, `C90-1`.
 - **the release train** (`C93`): one platform version covering the crates, the
   CLI, the templates, and the capability-package index, reported by
   `rustnative describe`; a published supported-host matrix per version —
-  operating-system versions, device APIs, browser baselines, toolchain and
+  operating-system versions and architectures, the host runtimes a backend
+  depends on (the Windows App SDK, at its pin), device APIs, browser baselines,
+  the Tailwind CSS release the utility vocabulary is pinned to, toolchain and
   MSRV — checked by `doctor`; `rustnative add` resolving the version compatible
   with the project's platform version rather than the newest published one; and
   `rustnative upgrade` moving the whole train, running the codemods, and
@@ -3529,13 +3793,17 @@ continued.
   because they keep working when a backend gains a property. `ios:` and
   `ipados:` are distinct targets compiled into one universal binary, which is
   the clearest case for deciding a guard per backend rather than per compiler
-  target (below);
+  target (below). There is no variant per control set and none per
+  architecture: a difference between WinUI 3 and WinUI 2 is a capability
+  question, answered by the table of the set the window was realized in, and an
+  architecture never changes a style;
 - **both spellings**: a guard is a field of the same `Condition` every other
   variant lowers to, so the typed spelling states it as directly as the class
   does (a conditional style on `Condition::supports(StyleProperty::Shadow)`),
   and the equivalence suite covers guards like any other condition;
 - **decided per backend, once**: a guard is evaluated against the capability
-  table of the backend the tree is being realized on — not against the
+  table of the backend the tree is being realized on — and, on Windows, of the
+  control set that backend chose at launch — not against the
   operating system being compiled for, because one binary can render a page for
   the browser and drive a native window, and one bundle can run on an iPhone
   through the iOS backend and on an iPad through the iPadOS one — at
@@ -3544,7 +3812,8 @@ continued.
 - **declared targets**: `rustnative.toml` lists them (`[style] targets =
   ["windows", "linux", "web"]`), defaulting to every backend the project
   depends on. The build checks each unguarded declaration against every
-  declared target's table, not only the target being compiled, and a failure
+  declared target's table, not only the target being compiled — for `windows`,
+  the table of every control set the project declares — and a failure
   names the class, the property, the target, that target's reason, and the
   guard that would resolve it. Adding a target surfaces every unguarded use at
   once, which is the point;
@@ -3574,15 +3843,15 @@ owns (section 8).
 
 | Family | Properties and utilities | Expected answers |
 |---|---|---|
-| Borders | width and per-side width (`border-2`, `border-t-4`), style (`border-dashed`, `border-dotted`), per-corner radius (`rounded-tl-lg`) | browser and GTK CSS realize; Windows approximates on containers (GDI pens, per-corner radius as a region without anti-aliasing) while native controls keep their system border; a terminal approximates style with box-drawing characters where its font has them |
-| Backgrounds | linear, radial, and conic gradients (`bg-linear-to-r`, `from-*`, `via-*`, `to-*`), images, size, and position | browser and GTK CSS realize; Windows realizes a linear gradient on a container (`GradientFill`) and answers radial and conic as unavailable unless Milestone 69 changes it; a terminal answers unavailable |
-| Transforms | translate, scale, rotate, origin | the browser realizes; Linux answers from what GTK paints; Windows realizes translation by moving the window without relayout, as Milestone 27 already does, and answers scale and rotate as unavailable; a terminal answers unavailable |
-| Effects | filters (`blur-*`, `brightness-*`, …), backdrop filters (`backdrop-*`), blend modes | the browser realizes; Linux answers from GTK; Windows answers unavailable, since blending a box with what lies behind it needs composition (Milestone 69) |
+| Borders | width and per-side width (`border-2`, `border-t-4`), style (`border-dashed`, `border-dotted`), per-corner radius (`rounded-tl-lg`) | browser and GTK CSS realize; WinUI 3 and WinUI 2 realize per-side width and per-corner radius on boxes and native controls through the elements' own border properties, and dashed and dotted strokes on boxes, answering them unavailable on native controls; a terminal approximates style with box-drawing characters where its font has them |
+| Backgrounds | linear, radial, and conic gradients (`bg-linear-to-r`, `from-*`, `via-*`, `to-*`), images, size, and position | browser and GTK CSS realize; WinUI 3 and WinUI 2 realize linear and radial gradients and images as XAML brushes, on boxes and as a native control's background resource, and answer conic as unavailable; a terminal answers unavailable |
+| Transforms | translate, scale, rotate, origin | the browser realizes; Linux answers from what GTK paints; WinUI 3 and WinUI 2 realize all four on boxes and on native controls alike through the element's render transform, which keeps the control live — hit-testing, focus, caret, and UI Automation follow it (2.2); a terminal answers unavailable |
+| Effects | filters (`blur-*`, `brightness-*`, …), backdrop filters (`backdrop-*`), blend modes | the browser realizes; Linux answers from GTK; WinUI 3 realizes backdrop blur and tint on boxes through the host's acrylic and backdrop brushes and filters on a box's own background through composition effects, WinUI 2 answers each per its table, and both answer filters on a native control's content as unavailable, because filtering a control's pixels is capture |
 | Motion | `transition-*`, `duration-*`, `ease-*`, `delay-*`, `animate-*`, and `@keyframes` in `app.css` | every backend that runs frames, through Milestone 27's timeline; the browser as CSS transitions generated from the same model, with a spring approximated by a `linear()` easing; a terminal at its own frame rate; a property the timeline cannot animate is unavailable under `transition-[…]` |
-| Text | `tracking-*`, `leading-*`, decoration (`underline`, `line-through`), case (`uppercase`, …), alignment (`text-center`, …), `truncate`, `line-clamp-*` | browser and GTK CSS realize; Windows realizes decoration through the font, alignment and single-line truncation through the control's own styles, and case by transforming the string locale-aware before it reaches the control, approximates a line clamp, and answers letter spacing and line height as unavailable on native controls |
+| Text | `tracking-*`, `leading-*`, decoration (`underline`, `line-through`), case (`uppercase`, …), alignment (`text-center`, …), `truncate`, `line-clamp-*` | browser and GTK CSS realize; WinUI 3 and WinUI 2 realize letter spacing, line height, decoration, alignment, single-line truncation, and a line clamp through the text elements' own properties, case by transforming the string locale-aware before it reaches the control, and on an editable control exactly what that control exposes |
 | Layout extras | `aspect-*`, `z-*` | every backend: the shared layout engine computes them and the backend applies geometry and stacking order |
-| Interaction | `cursor-*`, `pointer-events-none`, `select-none`, `select-text`, `outline-*`, `ring-*` | cursor and pointer events wherever there is a pointer; an outline or ring is approximated on Windows containers, and a native control keeps the system focus visual |
-| Control parts | `placeholder:`, `caret-*`, `selection:`, `accent-*` | properties of a native control rather than relationships; the browser realizes; Linux answers from GTK; Windows answers most as unavailable because the common controls do not expose them — the clearest case for a guard |
+| Interaction | `cursor-*`, `pointer-events-none`, `select-none`, `select-text`, `outline-*`, `ring-*` | cursor and pointer events wherever there is a pointer; an outline or ring is realized on boxes, and a native control keeps the host's focus visual, whose colour and thickness WinUI exposes as properties of the control and realizes there |
+| Control parts | `placeholder:`, `caret-*`, `selection:`, `accent-*` | properties of a native control rather than relationships; the browser realizes; Linux answers from GTK; WinUI 3 and WinUI 2 realize placeholder colour, selection highlight, and accent through the controls' own properties and resources, and the caret where the control exposes it |
 
 ### Structural variants
 
@@ -3608,14 +3877,15 @@ reconciler already holds:
 
 ### What bounds the payoff, stated so it is not discovered
 
-The extended range shows unevenly, and the plan says where. The Windows backend
-realizes the tree as GDI-styled child windows and never owner-draws a control
-(2.2), so most of the transform and effect rows answer unavailable there; in
-practice the range shows in the browser, on Linux, in the headless backend, and
-on the layer-backed hosts still to come (macOS, iOS, iPadOS, Android), while Windows
-shows each guard's fallback. The guards make that difference honest; they do
-not make it equal. Milestone 69 is what can move Windows' answers, and this
-milestone neither waits for it nor depends on it.
+The extended range shows unevenly, and the plan says where. It shows in the
+browser, on Linux, on Windows under WinUI 3, in the headless backend, and on the
+layer-backed hosts still to come (macOS, iOS, iPadOS, Android); WinUI 2 shows
+most of it, with each difference in its own table; and the terminal shows each
+guard's fallback. That reach on Windows is one of the reasons its control set is
+WinUI 3 (Milestone 71): GDI-styled child windows could carry almost none of the
+transform and effect rows without owner-drawing a control, while XAML composes
+its whole tree and transforms a live control without capturing it. The guards
+make the remaining differences honest; they do not make them equal.
 
 The cost is ongoing as well as initial. Every property here is an answer owed by
 every backend — properties times backends, including backends not yet built —
@@ -3628,8 +3898,9 @@ it (2026-10-14).
 **Done when** every family above exists in both spellings with an equivalence
 case per property; every shipped backend's table answers every new property, for
 native controls and for framework-owned boxes, and the Windows and Linux answers
-are read back from the native objects; the headless backend realizes all of
-them; capability, complement, exact, and target variants work in both spellings
+are read back from the realized controls and elements; the headless backend realizes all of
+them; the Windows answers are given per control set; capability, complement,
+exact, and target variants work in both spellings
 and resolve per backend inside one binary that serves a page and opens a window;
 an unguarded declaration fails the build for each declared target that cannot
 realize it, naming the target and the reason; approximations are listed by the
@@ -3642,23 +3913,341 @@ declared target receives.
 
 **Depends on** Milestone 58 (the vocabulary and the capability tables),
 Milestone 27 (timelines), Milestone 45 (the headless reference), Web milestone C
-(the browser's mapping), and, for its Windows half, the scaling in Milestone 69.
-It does not depend on Milestone 69's composition, or on Milestone 68.
+(the browser's mapping), and, for its Windows half, Milestone 71's control sets
+and the scaling in Milestone 69. It does not depend on Milestone 68.
+
+## Milestone 68 — Relational styling, container queries, and host passthrough
+
+Relationships on another node's state and on a container's size are part of the
+utility vocabulary a developer arrives with, and the vocabulary is not complete
+without them (2.14's sixth rule). They carry a real and permanent cost, so this
+milestone builds them the one way the rules admit — as typed relationships the
+core resolves by a bounded lookup — and bounds that cost with a test. Host
+passthrough, the milestone's last part, is different in kind: it sits outside
+the equivalence suite by definition, so it alone stays optional and is taken up
+on demand.
+
+Satisfies: `X-L3-21`, `X-L3-22`.
+
+### Why it is built, and what it costs
+
+A developer arriving with the utility vocabulary writes `group-hover:` on a card,
+`peer-invalid:` on a form hint, `has-checked:` on a list row, and `@container`
+on a sidebar within the first day, and a framework that answers each with a
+compile error is not compatible with the vocabulary it names. In a document
+styled by selectors those variants are how a hovered card restyles its contents,
+because a document has no state of its own to pass down. A component here does
+have typed state — the card already knows it is hovered and can hand that to its
+children as a prop or through the environment (`C15`) — and that route stays the
+one the component library prefers wherever typed state reads more clearly. The
+variants make the common cases spellable in the class string, as upstream does,
+and they compile to the same typed relationships rather than to a matcher.
+
+The cost is the one new mechanism they need, a dependency index in the core:
+every node's style able to depend on another node's state, an invalidation path
+that must stay bounded, and a place performance and correctness bugs collect,
+kept for as long as the framework exists. It is accepted on three conditions,
+each a test rather than a promise: every relationship is a bounded walk or a
+direct lookup, never a search; a state change re-resolves only the nodes whose
+conditions name the node that changed, asserted by Milestone 41's
+over-invalidation suite; and container conditions settle in at most one
+relayout.
+
+### Relationships on another node's state
+
+- **groups**: `group` and `group/name` mark a node; `group-hover:`,
+  `group-focus:`, `group-active:`, and `group-disabled:` resolve by walking up to
+  the nearest group of that name — a bounded walk over ancestors, never a search;
+- **peers**: `peer` and `peer/name` on an earlier sibling; `peer-checked:`,
+  `peer-invalid:`, `peer-focus:`, and their kin are found through the parent.
+  Earlier siblings only, as in the upstream vocabulary, so every dependency
+  points one way;
+- **`in-*`**: `in-focus:`, `in-hover:`, and their kin — upstream's unnamed
+  group, resolved by the same bounded walk to the nearest ancestor in that
+  state;
+- **`has-*`**: a node styled by its direct children's interaction or form state
+  (`has-checked:`, `has-focus:`) — the reverse dependency, limited to direct
+  children and to those states so it stays a lookup rather than a query;
+- **the dependency index**: a state change re-resolves only the nodes whose
+  conditions name the node that changed, through the same transient path a
+  node's own hover takes, so a group hover restyles its descendants without a
+  render (2.10);
+- **in the browser**: the CSS rule generated from the relationship
+  (`.group:hover` and its descendant), held by the equivalence suite against the
+  core's resolution (Web milestone C).
+
+### Relationships on a container's size
+
+- `@container` marks a query container; `@sm:`, `@md:`, and `@min-[…]:` decide
+  by its resolved inline size, through the container size classes Milestone 39
+  already reports;
+- **one pass, no cycles**: as in the browser, a query container's inline size
+  may not depend on its children, so the order is layout, then resolution of the
+  container conditions, then at most one relayout of the affected subtrees. A
+  container whose inline size would depend on its content is refused as a query
+  container and reported by the layout diagnostics (Milestone 44);
+- **in the browser**: real container queries over `container-type:
+  inline-size`, under the same containment.
+
+### Generated content
+
+`before:` and `after:` as decorative child nodes the reconciler inserts, hidden
+from the accessibility tree, carrying `content-[…]` text, and keyed from their
+parent so identity and reuse hold (2.7). Low in value — a component can add the
+node itself — and listed so the vocabulary's coverage is stated in full.
+
+### Host passthrough
+
+- **what it is**: host styling with no typed equivalent, for one host — an
+  arbitrary property or selector written only under a target variant that names
+  a host which speaks a styling language of its own (`web:[mask-type:alpha]`;
+  GTK's CSS would be the second);
+- **its rules**: opaque to resolution — the core carries it as an uninterpreted
+  value to that backend alone; outside the equivalence suite, and stated to be;
+  printed by `rustnative expand` as passthrough, unverified; never followed by
+  another backend; emitted into the generated stylesheet rather than inline, so
+  the content security policy is unchanged; and counted per project by a lint;
+- **why it would exist**: as 2.6's escape hatch for style — a last resort for a
+  property the typed range has not yet taken in. Adding the property to
+  Milestone 67's range is always the preferred route, and every passthrough use
+  is a place the equivalence suite cannot reach.
+
+### When host passthrough is taken up
+
+Host passthrough is taken up when its trigger is met and recorded: a
+passthrough need for a property the typed range cannot take in soon enough. The
+framework is complete without it, and nothing else in this plan depends on it.
+
+**Done when** groups, peers, `has-*`, `in-*`, and container conditions exist in
+both spellings with equivalence cases; the core's resolution and every shipped
+backend's realization agree, the browser's generated rule included; the
+dependency index's invalidation is bounded and asserted by the over-invalidation
+suite of Milestone 41; container conditions settle in one relayout; generated
+content keeps its identity across renders and stays out of the accessibility
+tree; and passthrough, if built, is reported as unverified everywhere it
+appears.
+
+**Depends on** Milestone 67 (guards and structural variants), Milestone 39
+(container size classes), Milestone 41 (invalidation conformance), Milestone 44
+(layout diagnostics), and Web milestone C.
+
+## Milestone 73 — Tailwind CSS, complete
+
+Milestone 58 adopted Tailwind CSS v4's vocabulary over the portable range,
+Milestone 67 widens it to what the richer hosts realize, and Milestone 68 adds
+the relationships. This milestone takes the rest: everything else a developer
+who writes Tailwind v4 writes — every utility, variant, modifier, and directive
+in the current upstream release — compiled, or refused by name with the
+replacement, kept current as upstream moves, and proven against upstream's own
+output (2.14's sixth rule).
+
+None of the rules is relaxed to get there. There is still no selector, no
+cascade, no matching step, no runtime class string, and no JavaScript toolchain
+in any build. What makes completeness possible under those rules is that nearly
+everything left in the vocabulary is spelled in a document as a selector but is,
+in this framework, a fact it already holds as typed data: the node's own
+accessibility state (Milestone 26), its form state (Milestone 47), its
+interaction state (Milestone 21), the environment (Milestone 39), or a typed
+relationship (Milestones 67 and 68). Each such variant compiles from that fact.
+What is left after that is refused, by name.
+
+Satisfies: `X-L3-12` and `C22-4`, carried to the whole upstream vocabulary.
+
+### The pin, kept current
+
+- **the current upstream release**: the vocabulary and the vendored default
+  theme track the newest v4 release — v4.3.1 (2026-06-12) at this writing —
+  with what arrived since the first pin taken by family like Milestone 67's:
+  the newer palettes in the default theme, and the scrollbar, zoom, and tab
+  utilities, each answered by every backend;
+- **moving the pin is one command** in the release train (Milestone 59): it
+  vendors the new release's theme, regenerates the corpus and the coverage table
+  below, and fails until every upstream addition is compiled or refused. The
+  table's diff names what upstream added, changed, and removed; a removal goes
+  through the deprecation policy with a codemod (Milestone 52), never silently;
+- **projects on the previous major version** are converted by upstream's own
+  upgrade tool, run in the developer's environment, whose v4 output `app.css`
+  accepts; a JavaScript configuration file is never read.
+
+### Proven against upstream
+
+- **the conformance corpus**: at the pin, a maintainer script runs upstream's
+  compiler over every utility and variant in upstream's documentation and test
+  fixtures, plus generated samples across the spacing scale, every colour with
+  opacity modifiers, and arbitrary values, and commits the result as data — for
+  each class, the declarations upstream emits and the selector or at-rule they
+  sit under. The script's own inputs are pinned and hashed (STANDARDS SUP), it
+  runs only when the pin moves, and no build, test, or CI job runs upstream
+  code;
+- **the assertion**: for each class, the declarations this framework compiles
+  it to equal upstream's, under one documented normalization (constant `calc()`
+  folded, colours compared in one space), and the selector or at-rule upstream
+  wraps them in maps onto the condition this framework produces — `:hover` onto
+  the hovered state, `prefers-color-scheme` onto the scheme. A mismatch is a
+  failing test naming the class;
+- **the coverage table**: generated from the vocabulary and the corpus,
+  published in the styling guide and in the machine-readable description
+  (Milestone 52). Every upstream utility, variant, modifier, and directive at
+  the pin sits in exactly one row — compiled in the portable range, compiled in
+  the extended range with each target's answer, compiled as a relationship,
+  passthrough only, or refused with the reason and the replacement — and an
+  item in no row fails the build.
+
+### The style file, as upstream writes it
+
+An upstream v4 style file compiles as written, or names each line it refuses:
+
+- **`@import "tailwindcss";`** is accepted and means the vendored framework at
+  the pin, as do the `tailwindcss/theme` and `tailwindcss/utilities` imports and
+  the `prefix(…)` and `important` import options; `tailwindcss/preflight`
+  lowers to nothing on a native host, which has no browser defaults to reset,
+  and on the Web to the reset the framework already generates from the resolved
+  style;
+- **`@source`**, including `inline()` and `not`, is accepted and has nothing to
+  do: no file is scanned, because every class is compiled where it is written,
+  and a safelist has no subject where computed class names do not exist;
+- **`@layer`**: a rule in `components` or `utilities` whose selector is exactly
+  one class, with declarations and `@apply`, is a utility definition and lowers
+  as `@utility` does; any other selector is refused, naming the typed
+  relationship that replaces it where one exists; `base` rules select elements
+  the framework does not have and are refused in favour of the theme;
+- **functional utilities**: `@utility name-*` with `--value()` and
+  `--modifier()`, and the `--theme()`, `--spacing()`, and `--alpha()`
+  functions, all evaluated at build time;
+- **`@variant`** inside a declaration block, and **`@custom-variant`** whose
+  body maps onto a condition the framework evaluates — a state, a media feature
+  below, a typed relationship — accepted; any other body refused with the
+  reason;
+- **`@media` inside `@utility` and `@custom-variant`** for the features the
+  environment answers; **`@supports`** refused in favour of `supports-[…]:`,
+  which asks the capability table rather than the browser (Milestone 67);
+  **`@container`** through Milestone 68;
+- **`@keyframes`** (Milestone 67), **`@property`** as a typed token with its
+  syntax and initial value, and **`@starting-style`** as `starting:` below;
+- **`@plugin` and `@config`** stay refused, as Milestone 58 states. The
+  official plugins have rows of their own: the typography plugin styles a
+  document's descendants by selector and is refused in favour of the component
+  library's rich-text component; the forms plugin resets controls that are
+  native here; the plugins that became core in v4 are already compiled.
+
+### Variants on the node's own state and on the environment
+
+- **accessibility state**: `aria-checked:`, `aria-expanded:`,
+  `aria-selected:`, `aria-pressed:`, `aria-disabled:`, `aria-busy:`,
+  `aria-invalid:`, `aria-required:`, `aria-readonly:`, `aria-current:`, and
+  `aria-[…]:` over the same states — the node's own accessibility state from
+  Milestone 26, which every backend already carries;
+- **data state**: `data-[state=open]:`, `data-active:`, and their kin, over a
+  node's typed named values — `with_data(name, value)` in the builder and a
+  `data-*` attribute in markup, carried in the tree, diffed like any attribute,
+  and read only by style resolution and the inspection protocol. It is a
+  portable widening of the node (2.4), in both syntaxes (2.9), and it is the
+  node's own value, never a lookup on another node;
+- **form and control state**: `checked:`, `indeterminate:`, `default:`,
+  `required:`, `optional:`, `valid:`, `invalid:`, `user-valid:` and
+  `user-invalid:` (after interaction, from the forms model's touched state),
+  `in-range:`, `out-of-range:`, `placeholder-shown:`, `read-only:`,
+  `enabled:`, and `autofill:` where the host reports it (Milestones 47 and 61);
+- **disclosure and modality**: `open:` from a node's expanded state or an open
+  dialog or popover, `inert:` from a hidden or disabled subtree, and
+  `backdrop:` as a dialog's host-drawn backdrop where the host has one;
+- **`focus-within:`** from the focus model's own focus path — a bounded walk
+  the focus model already holds — re-resolved on focus change through the
+  transient path (2.10);
+- **media features the environment answers**: `contrast-more:`,
+  `contrast-less:`, `forced-colors:` (under which a native control's own
+  contrast theme still wins), `inverted-colors:`, `portrait:`, `landscape:`,
+  `print:` on Milestone 60's capture path, `pointer-fine:`, `pointer-coarse:`,
+  `pointer-none:`, the `any-pointer-*:` forms, and `noscript:`, which applies
+  only on the Web, beside the existing `motion-safe:`, `motion-reduce:`, and
+  `dark:`;
+- **breakpoints in full**: `max-*:`, `min-[…]:`, `max-[…]:`, and stacked ranges
+  (`md:max-xl:`) over Milestone 39's size classes;
+- **`starting:`**: the values a node is created with before its transition
+  runs, lowered to an animation from those values on mount through Milestone
+  27's timeline, and skipped under reduced motion;
+- **`not-*:`**: the negation of any condition above; `not-[…]` with a
+  selector is refused;
+- **pseudo-elements**: `placeholder:`, `selection:`, `file:`, `marker:`,
+  `first-line:`, and `first-letter:` as control parts answered per backend
+  (Milestone 67), and `before:` and `after:` as generated content (Milestone
+  68).
+
+### Modifiers and the class string
+
+- **`!`**: upstream's important modifier raises a declaration above whatever the
+  cascade would let override it. There is no cascade here, but there is a
+  documented precedence — theme, component default, pushed-down and relational
+  declarations, the node's own — and `!` places a node's declaration above a
+  pushed-down or relational one and above a component library default applied
+  over its classes, printed as such by `rustnative expand`;
+- **the value forms**: negative values (`-mt-4`, `-translate-x-1/2`),
+  fractions, an opacity modifier on every colour, the line-height modifier
+  (`text-sm/6`), arbitrary values with type hints (`text-(length:--size)`), and
+  the custom-property shorthand (`bg-(--brand)`);
+- **arbitrary properties** (`[prop:value]`): over a property the vocabulary
+  types, an ordinary declaration in its range like any other; over one it does
+  not, host passthrough (Milestone 68), written only under a target variant
+  naming a styling host, and a compile error naming that rule anywhere else;
+- **conflicts are errors, not orderings**: upstream settles two classes that set
+  the same property by stylesheet order, which is invisible in the class string
+  and is the most common utility bug. Here two classes that set the same
+  property under the same condition are a compile error naming both, so
+  `p-2 p-4` cannot exist;
+- **conditional composition without computed strings**:
+  `classes!("px-4 py-2", active => "bg-primary", disabled => "opacity-50")` in
+  the builder and the same form in a markup `class={…}` — each fragment a
+  checked literal, each condition a Rust `bool` — which is what utility
+  codebases reach for a class-joining helper to do, with every class still
+  compiled where it is written (Milestone 58).
+
+### Tooling
+
+- **`rustnative fmt`** sorts every class string into upstream's canonical class
+  order — the order upstream's own formatter plugin produces, held by the
+  corpus — so a class string reads as it would in any Tailwind codebase;
+- **`rustnative lsp`** completes classes and variants, shows on hover the
+  declarations a class compiles to and the token values behind them with
+  colour swatches, and reports conflicts and refusals at the class — inside
+  `classes!`, `class="…"`, and `app.css` (Milestone 43);
+- **`rustnative import tailwind <entry.css>`** reads an existing v4 project's
+  style entry point and writes `app.css`, reporting each directive as accepted,
+  lowered, or refused with its replacement; and `rustnative expand --tailwind
+  "<classes>"` prints upstream's output from the corpus beside the framework's
+  declarations.
+
+**Done when** the coverage table places every upstream utility, variant,
+modifier, and directive at the pin in a row and CI fails on one that is not; the
+corpus assertion passes for every compiled class; the pin is the current
+upstream v4 release and moving it is one command; an unmodified upstream v4
+style file compiles or names each line it refuses; the accessibility, data,
+form, disclosure, `focus-within:`, media-feature, `starting:`, and `not-*:`
+variants work in both spellings on every shipped backend and are recorded by
+the headless backend; `!`, the value forms, arbitrary properties, conflict
+errors, and conditional composition work in both syntaxes; `rustnative fmt`
+reproduces upstream's order on the corpus; and `rustnative import tailwind`
+converts a sample upstream project.
+
+**Depends on** Milestone 58 (the vocabulary and style file), Milestone 67 (the
+extended range, guards, and control parts), Milestone 68 (relationships and
+container conditions), Milestones 26, 47, and 61 (the states its variants
+read), Milestone 27 (`starting:`), Milestone 39 (size classes and the
+environment), Milestone 60 (print), and Milestones 52 and 59 (the pin, the
+deprecation policy, and the release train).
 
 ## Milestone 69 — Windows: scale and composition
 
-The Windows backend realizes the tree as Win32 windows and common controls,
-styled through GDI (Milestone 21). That is correct for its controls and narrow
-for its boxes: a GDI child window cannot cast a shadow, blend with what lies
-behind it, or anti-alias a clipping region, so most of Milestone 67's extended
-range answers unavailable here. And the backend's unit mapping was the one
-Milestone 58 recorded — one logical pixel is one device pixel. This milestone
-takes both, in an order that matters — scale first, because it is a correctness
-obligation; composition second, because it is an option to be measured — and
-names the larger decision behind them without taking it.
+The Windows backend's geometry reaches the host in two layers: the Win32 shell's
+windows, and the XAML tree inside them (Milestone 71). Both have to be at the
+right scale before anything else about them can be right, and the XAML tree's
+visual layer is what lets the backend decorate a box — and transform, clip, and
+fade a live control — the way a layer-backed host does. This milestone takes
+both, in an order that matters: scale first, because it is a correctness
+obligation; composition second, because what it costs is measured before it is
+relied on.
 
-Satisfies: `D-WIN-1`, `D-WIN-2`, `D-WIN-3`; concept `C106` (compositing,
-shared with Milestone 60).
+Satisfies: `D-WIN-1`, `D-WIN-2`; concept `C106` (compositing, shared with
+Milestone 60).
 
 ### Scale
 
@@ -3678,59 +4267,57 @@ hairline.*
   keeps its controls, its focus, and its proportions;
 - **the unit mapping updated** to say what the backend then does, with its
   conformance case. The manifest has declared per-monitor awareness since
-  Milestone 32; this is the half that makes the declaration true.
+  Milestone 32; this is the half that makes the declaration true;
+- **one rule for both layers**: inside a window, XAML scales its own tree by the
+  island's rasterization scale (Milestone 71); the shell's windows, canvases,
+  child-window surfaces, and adopted foreign windows keep this conversion; and
+  the same 150 % conformance case holds the two to one rounding rule, so a XAML
+  control and a canvas beside it land on the same device pixel.
 
 It comes first because every length the extended range adds would otherwise be
 measured at the wrong scale on most current laptop displays: correctness before
 range.
 
-### Composition for the boxes the framework owns
+### Composition, through the control sets' visual layer
 
-- **the host's own compositor**: DirectComposition, which is to a Windows
-  window what a layer is to every macOS and iOS view — a platform service, not a
-  canvas runtime (2.3). Using it realizes the tree in the host's own terms;
-- **boxes only**: anti-aliased per-corner radius, shadows, multi-stop, radial,
-  and conic gradients, borders, and opacity fades on framework-owned containers.
-  Native controls are untouched: decorate the box, never the control (2.2);
-- **the airspace problem, stated rather than discovered**: every native child
-  window is its own surface, so a decoration cannot draw over a neighbouring
-  native control, a translucent or blurred box cannot blend over native controls
-  beneath it, and animating a box that contains native controls moves real
-  windows on every frame. Backdrop filters over native content therefore stay
-  unavailable, a shadow is clipped where a sibling control overlaps it, and the
-  capability table says both;
-- **a time-boxed prototype first, with a recorded outcome**: which extended-range
-  rows move from unavailable or approximated to realized; cold start and
-  resident memory against `budgets/windows.toml` (Milestone 42); flicker under
-  resize and scrolling; accessibility unchanged. The measurements and the
-  decision go into `BUILD_STATUS.md`. If composition is not adopted, the Windows
-  table stays as Milestone 67 answered it and nothing else changes.
-
-### The larger decision, named and not taken here
-
-WinUI 3 is the host's current control set. Its controls are native Windows
-controls as much as the common controls are, and composition runs through its
-whole tree, so it has no airspace problem at all. It is also a different
-control set, a runtime dependency with its own packaging, and in effect a
-second Windows backend. That makes it a decision about which controls the
-Windows backend realizes (`D-FP-2`: the host's current control set), not a
-styling decision, and a backend realizing the tree in it would be held to
-section 8 like any other. What would trigger it is written down so the decision
-is made on evidence: Milestone 41's fidelity conformance showing the common
-controls measurably behind the host's first-party applications, or this
-milestone's prototype showing the airspace limits leave the extended range
-unusable in ordinary layouts.
+- **the host's own compositor, as the control sets expose it**:
+  `Microsoft.UI.Composition` under WinUI 3 and `Windows.UI.Composition` under
+  WinUI 2, reached through each element's visual — to a Windows window what a
+  layer is to every macOS and iOS view: a platform service, not a canvas runtime
+  (2.3). Using it realizes the tree in the host's own terms;
+- **what it realizes**: on boxes, anti-aliased per-corner radius, shadows,
+  multi-stop linear and radial gradients, borders, backdrop materials, opacity
+  fades, and transforms; on native controls, opacity, transforms, and clipping,
+  because XAML composes a control without capturing it and keeps its
+  hit-testing, focus, caret, and UI Automation with it (2.2). A control's own
+  pixels are never filtered, blurred, or re-rendered;
+- **airspace, confined to what is still a window**: everything inside the XAML
+  tree is one composed surface, so a decoration draws over a neighbouring
+  control, a translucent box blends over the controls beneath it, and an
+  animated box moves no windows. What remains a child window — an adopted
+  foreign window (Milestone 40), or a native surface for a graphics API that
+  needs a window handle — keeps the airspace limits: nothing composes over it,
+  and it blends with nothing beneath it. The capability table answers those
+  limits for exactly those nodes;
+- **measured before it is relied on**: composition-heavy screens — shadows,
+  backdrop materials, animated transforms over native controls — against
+  `budgets/windows.toml` for cold start, resident memory, and frame time, per
+  control set and architecture (Milestones 42 and 72); flicker under resize and
+  scrolling; accessibility unchanged. The measurements go into
+  `BUILD_STATUS.md`, and a row whose cost breaks a budget stays approximated or
+  unavailable in that set's table until it does not.
 
 **Done when** a window moved across monitors of different scale keeps its
-native windows and is laid out, lettered, and clipped at the correct size, with
-a conformance case; the Windows unit mapping states the scaled behaviour; the
-composition prototype's measurements and decision are recorded, and — if it is
-adopted — the Windows table's changed rows are read back from the composed
-containers; and the criteria for the control-set decision are written.
+native windows and its XAML tree and is laid out, lettered, and clipped at the
+correct size in both layers, with a conformance case; the Windows unit mappings
+state the scaled behaviour; the composed rows of each control set's table are
+read back from the realized elements; each airspace answer is asserted on an
+adopted window and a window-handle surface; and the composition measurements are
+recorded per control set and architecture.
 
-**Depends on** Milestone 58 (the capability table and unit mapping), Milestone
-42 (budgets), Milestone 41 (fidelity conformance), and Milestone 60 (the
-compositing vocabulary), for its composition half.
+**Depends on** Milestone 58 (the capability tables and unit mappings), Milestone
+42 (budgets), Milestone 41 (fidelity conformance), Milestone 60 (the compositing
+vocabulary), and Milestone 71 (the control sets whose visual layer it uses).
 
 ## Tier 3 — with and after the Web track
 
@@ -4329,110 +4916,6 @@ diagnosed and reset without a site visit.
 
 **Depends on** Milestone 59 (release tooling), Milestone 50 (updates),
 Milestone 51 (diagnostics), and the backends whose hosts each item belongs to.
-
-## Optional — on demand, and not required for completion
-
-The framework is complete without the milestone below. It is specified at the
-same depth as the rest so that taking it up is a decision rather than a design
-exercise, and so that nothing built before then closes the door on it.
-
-## Milestone 68 — Relational styling, container queries, and host passthrough
-
-Each part of this milestone is a real capability with a real and permanent
-cost, and each is something the framework already covers another way. That
-combination is what places it in the optional band rather than in a tier.
-
-Satisfies: `X-L3-21`, `X-L3-22`.
-
-### Why optional
-
-In a document styled by selectors, `group-hover:` is how a hovered card restyles
-its contents, because a document has no state of its own to pass down. A
-component here has typed state: the card already knows it is hovered and hands
-that to its children as a prop or through the environment (`C15`), where it is
-visible, typed, and tested like everything else. Relational variants would make
-that shorter, not possible. Container-relative decisions likewise exist already
-— a container decides by its own size class (Milestone 39) — and variants would
-make them spellable in a class string. Against that convenience stands the one
-new mechanism this milestone needs, a dependency index in the core: every
-node's style able to depend on another node's state, an invalidation path that
-must stay bounded, and a place performance and correctness bugs collect, kept
-for as long as the framework exists.
-
-### Relationships on another node's state
-
-- **groups**: `group` and `group/name` mark a node; `group-hover:`,
-  `group-focus:`, `group-active:`, and `group-disabled:` resolve by walking up to
-  the nearest group of that name — a bounded walk over ancestors, never a search;
-- **peers**: `peer` and `peer/name` on an earlier sibling; `peer-checked:`,
-  `peer-invalid:`, `peer-focus:`, and their kin are found through the parent.
-  Earlier siblings only, as in the upstream vocabulary, so every dependency
-  points one way;
-- **`has-*`**: a node styled by its direct children's interaction or form state
-  (`has-checked:`, `has-focus:`) — the reverse dependency, limited to direct
-  children and to those states so it stays a lookup rather than a query;
-- **the dependency index**: a state change re-resolves only the nodes whose
-  conditions name the node that changed, through the same transient path a
-  node's own hover takes, so a group hover restyles its descendants without a
-  render (2.10);
-- **in the browser**: the CSS rule generated from the relationship
-  (`.group:hover` and its descendant), held by the equivalence suite against the
-  core's resolution (Web milestone C).
-
-### Relationships on a container's size
-
-- `@container` marks a query container; `@sm:`, `@md:`, and `@min-[…]:` decide
-  by its resolved inline size, through the container size classes Milestone 39
-  already reports;
-- **one pass, no cycles**: as in the browser, a query container's inline size
-  may not depend on its children, so the order is layout, then resolution of the
-  container conditions, then at most one relayout of the affected subtrees. A
-  container whose inline size would depend on its content is refused as a query
-  container and reported by the layout diagnostics (Milestone 44);
-- **in the browser**: real container queries over `container-type:
-  inline-size`, under the same containment.
-
-### Generated content
-
-`before:` and `after:` as decorative child nodes the reconciler inserts, hidden
-from the accessibility tree, carrying `content-[…]` text, and keyed from their
-parent so identity and reuse hold (2.7). Low in value — a component can add the
-node itself — and listed so the vocabulary's coverage is stated in full.
-
-### Host passthrough
-
-- **what it is**: host styling with no typed equivalent, for one host — an
-  arbitrary property or selector written only under a target variant that names
-  a host which speaks a styling language of its own (`web:[mask-type:alpha]`;
-  GTK's CSS would be the second);
-- **its rules**: opaque to resolution — the core carries it as an uninterpreted
-  value to that backend alone; outside the equivalence suite, and stated to be;
-  printed by `rustnative expand` as passthrough, unverified; never followed by
-  another backend; emitted into the generated stylesheet rather than inline, so
-  the content security policy is unchanged; and counted per project by a lint;
-- **why it would exist**: as 2.6's escape hatch for style — a last resort for a
-  property the typed range has not yet taken in. Adding the property to
-  Milestone 67's range is always the preferred route, and every passthrough use
-  is a place the equivalence suite cannot reach.
-
-### When to take it up
-
-Each part is taken up independently, when its trigger is met and recorded:
-repeated requests for a relationship that props make awkward; a component in
-Milestone 48's library that the props route makes unworkable; a container-sized
-layout that size classes cannot spell; or a passthrough need for a property the
-typed range cannot take in soon enough.
-
-**Done when**, for each part taken up: it exists in both spellings with
-equivalence cases; the core's resolution and every shipped backend's
-realization agree, the browser's generated rule included; the dependency
-index's invalidation is bounded and asserted by the over-invalidation suite of
-Milestone 41; container conditions settle in one relayout; and passthrough, if
-built, is reported as unverified everywhere it appears.
-
-**Depends on** Milestone 67 (guards and structural variants), Milestone 39
-(container size classes), Milestone 41 (invalidation conformance), Milestone 44
-(layout diagnostics), and Web milestone C.
 
 ## What these milestones do not change
 
