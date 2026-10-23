@@ -44,7 +44,7 @@ impl Workflow for Approval {
         context: &mut WorkflowContext,
         fail_shipping: bool,
     ) -> Result<String, WorkflowError> {
-        context.sleep(Duration::from_secs(86_400)).await?;
+        context.sleep(Duration::from_hours(24)).await?;
         let approved: bool = context.signal("approve").await?;
         if !approved {
             return Ok("declined".into());

@@ -116,21 +116,20 @@ where
 
     fn render(&mut self, context: &mut ComponentContext<'_, ()>) -> Node {
         let node = context.child_with_props::<C, _>("wasm", self.props.props.clone(), C::new);
-        if let Some(render) = context.services().extension::<ServerRender>() {
-            if let (Some(owner), Ok(state)) =
+        if let Some(render) = context.services().extension::<ServerRender>()
+            && let (Some(owner), Ok(state)) =
                 (node.id().owner(), crate::client::state_json(&self.props.props))
-            {
-                render.register(Island {
-                    owner,
-                    kind: IslandKind::Wasm {
-                        module: self.props.module,
-                        component: self.props.component,
-                        worker: self.props.worker,
-                    },
-                    state,
-                    persist: false,
-                });
-            }
+        {
+            render.register(Island {
+                owner,
+                kind: IslandKind::Wasm {
+                    module: self.props.module,
+                    component: self.props.component,
+                    worker: self.props.worker,
+                },
+                state,
+                persist: false,
+            });
         }
         node
     }

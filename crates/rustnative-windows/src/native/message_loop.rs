@@ -1127,10 +1127,10 @@ fn tab_selected(runtime: &mut Runtime, control: HWND) {
         return;
     }
     let selected = runtime.renderer.snapshot.get(id).and_then(|node| node.tabs.as_ref());
-    if let Some(tabs) = selected {
-        if tabs.selected() != index {
-            super::rendering::tabs::select(control, tabs.selected());
-        }
+    if let Some(tabs) = selected
+        && tabs.selected() != index
+    {
+        super::rendering::tabs::select(control, tabs.selected());
     }
 }
 

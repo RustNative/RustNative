@@ -46,7 +46,7 @@ impl Component for Loader {
                 });
             }
             if self.slow {
-                let delay = context.sleep(Duration::from_secs(3600));
+                let delay = context.sleep(Duration::from_hours(1));
                 context.spawn(async move {
                     delay.await;
                     "late".to_owned()

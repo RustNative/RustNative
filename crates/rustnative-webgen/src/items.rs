@@ -515,10 +515,10 @@ fn collect(module: &syn::ItemMod, errors: &mut Vec<syn::Error>) -> Module {
                 let type_name = crate::ty::last_segment(&self_ty.path);
                 let trait_name =
                     item.trait_.as_ref().map(|(_, path, _)| crate::ty::last_segment(path));
-                if trait_name.as_deref() == Some("Default") {
-                    if let Some(def) = out.structs.get_mut(&type_name) {
-                        def.default = true;
-                    }
+                if trait_name.as_deref() == Some("Default")
+                    && let Some(def) = out.structs.get_mut(&type_name)
+                {
+                    def.default = true;
                 }
                 if trait_name.is_some() && trait_name.as_deref() != Some("Default") {
                     continue;
@@ -560,20 +560,19 @@ struct Literals<'a>(&'a [String]);
 
 impl syn::visit_mut::VisitMut for Literals<'_> {
     fn visit_expr_mut(&mut self, expr: &mut syn::Expr) {
-        if let syn::Expr::Path(path) = expr {
-            if let Some(index) = path.path.get_ident().and_then(|ident| {
+        if let syn::Expr::Path(path) = expr
+            && let Some(index) = path.path.get_ident().and_then(|ident| {
                 ident
                     .to_string()
                     .strip_prefix("__rn_lit_")
                     .and_then(|index| index.parse::<usize>().ok())
-            }) {
-                if let Some(literal) = self.0.get(index) {
-                    let span = path.span();
-                    if let Ok(parsed) = syn::parse_str::<syn::Expr>(literal) {
-                        *expr = syn::parse_quote_spanned!(span=> #parsed);
-                        return;
-                    }
-                }
+            })
+            && let Some(literal) = self.0.get(index)
+        {
+            let span = path.span();
+            if let Ok(parsed) = syn::parse_str::<syn::Expr>(literal) {
+                *expr = syn::parse_quote_spanned!(span=> #parsed);
+                return;
             }
         }
         syn::visit_mut::visit_expr_mut(self, expr);
@@ -723,28 +722,16 @@ pub fn translate_module(module: &mut syn::ItemMod) -> Result<Translation, Vec<sy
         for item in items {
             if let syn::Item::Impl(item) = item {
                 for impl_item in &item.items {
-                    if let syn::ImplItem::Fn(function) = impl_item {
-                        if function.sig.ident == "update" {
-                            if let Some(syn::FnArg::Typed(typed)) =
-                                function.sig.inputs.iter().nth(2)
-                            {
-                                if let syn::Type::Reference(reference) = &*typed.ty {
-                                    if let syn::Type::Path(path) = &*reference.elem {
-                                        if let Some(segment) = path.path.segments.last() {
-                                            if let syn::PathArguments::AngleBracketed(args) =
-                                                &segment.arguments
-                                            {
-                                                if let Some(syn::GenericArgument::Type(ty)) =
-                                                    args.args.first()
-                                                {
-                                                    message_type = Some(ty.clone());
-                                                }
-                                            }
-                                        }
-                                    }
-                                }
-                            }
-                        }
+                    if let syn::ImplItem::Fn(function) = impl_item
+                        && function.sig.ident == "update"
+                        && let Some(syn::FnArg::Typed(typed)) = function.sig.inputs.iter().nth(2)
+                        && let syn::Type::Reference(reference) = &*typed.ty
+                        && let syn::Type::Path(path) = &*reference.elem
+                        && let Some(segment) = path.path.segments.last()
+                        && let syn::PathArguments::AngleBracketed(args) = &segment.arguments
+                        && let Some(syn::GenericArgument::Type(ty)) = args.args.first()
+                    {
+                        message_type = Some(ty.clone());
                     }
                 }
             }

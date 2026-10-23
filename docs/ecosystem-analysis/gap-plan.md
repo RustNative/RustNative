@@ -32,9 +32,10 @@ Tier 3  with and after the web track   — the server, deployment, ecosystem,
                                          reconciliation beyond the screen,
                                          durable execution, surfaces,
                                          product operations, and reach
-Optional on demand                     — capabilities the existing mechanisms
-                                         already cover another way; the
-                                         framework is complete without them
+Optional on demand                     — capabilities outside a guarantee the
+                                         framework makes (host style
+                                         passthrough); the framework is
+                                         complete without them
 ```
 
 Tiers are not strict phases: Tier 1 runs continuously the way `PLAN.md`
@@ -135,7 +136,7 @@ resolution half of `X-L3-7`; concept `C22-4`.
   already exist — Milestone 21's state variants and Milestone 39's size classes
   — with the structural variants taken up as typed relationships in Milestone
   67, and container-relative and relational variants specified the same way in
-  the optional Milestone 68, rather than implied.
+  Milestone 68, rather than implied.
 - Both style spellings in every document, example, template, and component
   entry, on the same terms as the two syntaxes.
 
@@ -802,29 +803,85 @@ fails the build for each declared target that cannot realize it, a
 class-spelled transition runs on the framework's timeline and as generated CSS,
 and structural variants agree between the core and the browser.
 
+## Milestone 68 — Relational styling and container queries
+
+**Why.** `foundations.md` F3.4, the ceiling of the relational half: what
+selectors are used for is mostly relationships between named nodes, which a
+framework that owns the tree can resolve without a matcher. The positional ones
+are in Milestone 67. The state- and size-dependent ones need a dependency index
+— a permanent cost — and a component model with typed state can already express
+each of them through props or the environment. They are scheduled anyway,
+because they are part of the utility vocabulary a developer arrives with
+(`group-hover:`, `peer-invalid:`, `has-checked:`, `@container`), and a
+vocabulary claimed as Tailwind's is not compatible without them; the cost is
+accepted on the condition that it is bounded by a test.
+
+**Covers.** `X-L3-21`, and `X-L3-22` for the optional passthrough.
+
+**Scope.** Group, peer, unnamed-ancestor (`in-*`), and direct-children
+relationships on interaction and form state, through a dependency index that
+keeps invalidation bounded and transient; container-relative variants under the
+containment rule, settling in one relayout; and decorative generated content as
+reconciler-inserted nodes hidden from accessibility. Host passthrough — confined
+to one host that speaks a styling language, uninterpreted, outside the
+equivalence suite, and reported as unverified — is the one part left optional,
+with a recorded trigger.
+
+**Done when** both spellings exist with equivalence cases, the core and every
+shipped backend agree, invalidation is held by the over-invalidation suite, and
+passthrough, if built, is reported as unverified wherever it appears.
+
+## Milestone 73 — Tailwind CSS, complete
+
+**Why.** `X-L3-12` asks for vocabulary equality between the spellings; a
+vocabulary that names an upstream project is also making a compatibility claim,
+and a claim without a version and a test is not one. Most of what remained of
+upstream's vocabulary after Milestones 58, 67, and 68 is spelled upstream as a
+selector over attributes or media, and is, in this framework, a fact it already
+holds as typed data — accessibility state, form state, the environment.
+
+**Covers.** `X-L3-12` and `C22-4`, carried to the whole upstream vocabulary.
+
+**Scope.** The pin kept at the current upstream v4 release; a conformance corpus
+generated from upstream's compiler only when the pin moves, and the compiled
+declarations asserted equal to it; a coverage table with every upstream item in
+one row; the remaining variants compiled from the node's own state and the
+environment; `!`, the value forms, arbitrary properties over typed properties,
+conflict errors, and conditional composition; an upstream style file accepted
+as written or refused line by line; canonical class order in the formatter; an
+importer; framework utilities, in their own namespace, for host capabilities
+upstream has no word for; and the WinUI 3 table measured against the whole
+vocabulary.
+
+**Done when** the coverage table is complete and enforced, the corpus assertion
+passes for every compiled class, moving the pin is one command, and every
+compiled class is realized under WinUI 3 or its row names the host limit.
+
 ## Milestone 69 — Windows: scale and composition
 
 **Why.** `desktop.md`: per-monitor scaling is the first item on the Windows
-list (`D-WIN-1`), and the backend's unit mapping still equates a logical pixel
-with a device pixel. And the Windows backend is where the extended range shows
-least, because a GDI child window cannot shadow, blend, or anti-alias; the
-host's own compositor can decorate the boxes the framework owns without
-touching a control (`D-WIN-2`). Behind both stands a control-set decision that
-should be made on evidence rather than drift (`D-WIN-3`).
+list (`D-WIN-1`), and the backend's unit mapping equated a logical pixel with a
+device pixel. And the host's own compositor can decorate the boxes the framework
+owns without touching a control (`D-WIN-2`) — through the XAML control sets'
+own visual layer under WinUI 3 and WinUI 2, which also transforms and fades a
+live control without capturing it, and through DirectComposition behind the
+common controls' containers, under their airspace limits. The control-set
+decision behind both (`D-WIN-3`) is taken in `PLAN.md` Milestone 71.
 
-**Covers.** `D-WIN-1`, `D-WIN-2`, `D-WIN-3`; concept `C106` with Milestone 60.
+**Covers.** `D-WIN-1`, `D-WIN-2`; concept `C106` with Milestone 60.
 
 **Scope.** Layout, fonts, regions, and surfaces scaled per window, with live
 monitor changes on the same native windows and an updated unit mapping, before
-anything else; then a time-boxed prototype of host composition for
-framework-owned containers, with the airspace limits stated as capability
-answers, measured against the Windows budgets, and adopted or not on the record;
-and the criteria for the control-set decision written down, with the decision
-itself left to the evidence.
+anything else, and XAML's own scaling held to the same rounding rule; then
+composition through each control set's visual layer, with airspace answered for
+the nodes that remain child windows, measured against the Windows budgets per
+control set and architecture; and the common controls' DirectComposition
+prototype, adopted or not on the record.
 
 **Done when** a window crossing monitors of different scale keeps its native
-windows at the correct size under a conformance case, the prototype's
-measurements and decision are recorded, and the control-set criteria exist.
+windows at the correct size under a conformance case, each control set's
+composed rows are read back from the realized elements, and the measurements and
+the prototype's decision are recorded.
 
 # Tier 3 — With and after the web track
 
@@ -1147,31 +1204,9 @@ reset without a site visit.
 
 # Optional — On demand
 
-## Milestone 68 — Relational styling, container queries, and host passthrough
-
-**Why.** `foundations.md` F3.4, the ceiling of the relational half: what
-selectors are used for is mostly relationships between named nodes, which a
-framework that owns the tree can resolve without a matcher. The positional ones
-are in Milestone 67. The state- and size-dependent ones need a dependency index
-— a permanent cost — and a component model with typed state already expresses
-each of them through props or the environment, and container-relative decisions
-through Milestone 39's size classes. That is the case for specifying them fully
-and building them only on demand.
-
-**Covers.** `X-L3-21`, `X-L3-22`.
-
-**Scope.** Group, peer, and direct-children relationships on interaction and
-form state, through a dependency index that keeps invalidation bounded and
-transient; container-relative variants under the containment rule, settling in
-one relayout; decorative generated content as reconciler-inserted nodes hidden
-from accessibility; and host passthrough, confined to one host that speaks a
-styling language, uninterpreted, outside the equivalence suite, and reported as
-unverified. Each part has a recorded trigger and is taken up on its own.
-
-**Done when**, per part taken up, both spellings exist with equivalence cases,
-the core and every shipped backend agree, invalidation is held by the
-over-invalidation suite, and passthrough is reported as unverified wherever it
-appears.
+Host style passthrough, the last part of Milestone 68, is the one item here: it
+sits outside the equivalence suite by definition, so it is built only when its
+recorded trigger is met.
 
 # Dependency order
 
@@ -1212,10 +1247,12 @@ M48 components and tokens  ──┘        ↓             ├─→ M56 durabl
                               M64 product operations · M66 reach
 
 M58 style spellings ─┬─→ M67 extended style range ──→ M68 relational styling
-M27 timelines ───────┤                                 (optional, on demand)
-M45 headless ────────┘          ↑
-M69 Windows scale ──────────────┘ (its Windows half)
-M69 Windows composition ←── M60 compositing vocabulary, M42 budgets
+M27 timelines ───────┤          ↑                          │
+M45 headless ────────┘          │                          ↓
+M69 Windows scale ──────────────┤ (its Windows half)  M73 Tailwind CSS, complete
+M71 Windows control sets ───────┘                          ↑
+M71 WinUI 3 table ─────────────────────────────────────────┘
+M69 Windows composition ←── M60 compositing vocabulary, M42 budgets, M71
 ```
 
 Three web concepts — offline strategies and worker choreography (`C136`),
@@ -1229,6 +1266,11 @@ milestone H; typed peripherals in framework drivers (`C74-1`), asynchronous
 display region transfer (`C91-1`), and the direct-to-display embedded Linux
 profile (`C83-1`) in Milestone 37. The designer non-goal (`C56-2`) is kept with
 the rejected concepts in Milestone 52.
+
+The Windows control-set decision (`D-WIN-3`, `D-FP-2`) is backend work too, and
+`PLAN.md` carries it in Milestone 71: WinUI 3 by default, with WinUI 2 and the
+common controls as launch-time fallbacks, each with its own table and
+conformance column. Native ARM64 Windows is Milestone 72, beside it.
 
 The tablet-class requirements (`M-TB-1`–`M-TB-10`, `mobile.md`) are backend
 work too, and `PLAN.md` carries them in Milestone 70, the iPadOS backend,

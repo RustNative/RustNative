@@ -330,12 +330,11 @@ impl<T: RasterTarget> State<'_, T> {
                     for pair in polygon.points.windows(2) {
                         line(pair[0], pair[1], &mut strokes);
                     }
-                    if polygon.closed {
-                        if let (Some(last), Some(first)) =
+                    if polygon.closed
+                        && let (Some(last), Some(first)) =
                             (polygon.points.last(), polygon.points.first())
-                        {
-                            line(*last, *first, &mut strokes);
-                        }
+                    {
+                        line(*last, *first, &mut strokes);
                     }
                 }
                 self.emit_strokes(strokes, paint.color);
@@ -408,12 +407,11 @@ impl<T: RasterTarget> State<'_, T> {
                 center_unit.get_or_insert((floor_unit(cx), floor_unit(cy)));
             }
         }
-        if !any {
-            if let Some((x, y)) = center_unit {
-                if clip.contains(x, y) {
-                    self.target.fill(x, y, color);
-                }
-            }
+        if !any
+            && let Some((x, y)) = center_unit
+            && clip.contains(x, y)
+        {
+            self.target.fill(x, y, color);
         }
     }
 

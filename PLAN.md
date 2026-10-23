@@ -81,7 +81,8 @@ The framework should use native host controls and platform services wherever a n
 What the host *is* differs per target, and that difference is the point:
 
 ```text
-Windows   WinUI 3 controls in Win32 windows (WinUI 2 where WinUI 3 cannot run)
+Windows   WinUI 3 controls in Win32 windows (then WinUI 2, then the
+          common controls, where the richer set cannot run)
 macOS     NSView + AppKit controls
 Linux     the chosen toolkit's native widgets
 Android   the android.view.View hierarchy
@@ -92,7 +93,7 @@ Terminal  the terminal's own cell grid and input protocols
 Embedded  the display and input the device actually has
 ```
 
-The Windows backend, for example, realizes the tree as WinUI 3 controls — the host's current control set, the one its own first-party applications are built with — inside real Win32 windows, and as WinUI 2 controls in the same windows wherever the Windows App SDK runtime that carries WinUI 3 cannot run. Every other backend should realize the tree in its own host's terms rather than painting a facsimile of an operating-system UI.
+The Windows backend, for example, realizes the tree as WinUI 3 controls — the host's current control set, the one its own first-party applications are built with — inside real Win32 windows; as WinUI 2 controls in the same windows wherever the Windows App SDK runtime that carries WinUI 3 cannot run; and as the Win32 common controls where neither XAML framework can. Every other backend should realize the tree in its own host's terms rather than painting a facsimile of an operating-system UI.
 
 The rule is about controls, and it reaches exactly as far as "wherever a native equivalent exists". A button, a text field, a list, or a menu has a native equivalent, and it is realized as that control and keeps what the host gives it — its shape, its focus visuals, its text editing, its accessibility. A plain container, a card, a divider, or a background has none: it is a box the framework owns, and a backend may decorate it with whatever drawing and composition services its host offers, which is how every layer-backed host already works. One rule therefore governs every visual capability a backend adds: **decorate the box around a control, never the control.** A backend never captures a native control's output into a bitmap to rotate, scale, blur, or shadow it, because that breaks its input method, caret, focus, selection, and accessibility — the things the control exists to provide — and a style that would need it is answered as unavailable for native controls (2.14). The line is drawn at capture and redraw, not at transformation: where the host's own control framework transforms, clips, or fades a control while keeping it live — as XAML does through an element's render transform and its composition visual, with hit-testing, focus, caret, and UI Automation following the control — that is the host realizing the style on its own control, and a backend may use it. Replacing a control's template is the opposite case: a re-templated control is a redrawn one, so a backend sets only the properties and theme resources the control's own template reads, and never supplies a template of its own.
 
@@ -259,7 +260,7 @@ Six rules follow, and they are the whole of the principle:
 - **Vocabulary equality.** Every utility class resolves to style properties reachable from both syntaxes, and every style property has a spelling in the utility vocabulary or is documented as having none. A class that does not resolve is a compile error naming the property it was looking for, rather than a class silently dropped — which is how utility vocabularies normally fail.
 - **No second engine.** The utility layer is a compile-time front end, the way markup is (2.9). It introduces no runtime type, no matching step, no style storage, and no capability of its own: `rustnative expand` shows the style properties a class string became, and an equivalence suite asserts that the two spellings resolve to equal values.
 - **Tokens are references, not constants.** A token-valued declaration resolves through the theme at style-resolution time, so a theme change, a colour-scheme change, or a user's own palette is a re-resolution rather than a rebuild; values declared fixed are folded at build time and stated to be fixed. This is also the boundary 2.2 needs — semantic tokens may map to host appearance, while absolute brand values are applied as given.
-- **Capability honesty, per property.** Rounded corners, shadows, gradients, and transforms exist on some hosts and not others, and a terminal cell has neither a radius nor a shadow. Each backend declares, per style property, whether it realizes it, approximates it, or cannot express it, and an application that declares one its target cannot realize is told at build time (2.5, 2.13). A backend never silently ignores a style, and never abandons a native control to owner-drawing in order to satisfy one — that trade is exactly what 2.2 exists to refuse. Honesty works in both directions: the vocabulary is not cut down to what the narrowest host can do, because that would hide what the richer ones offer (section 1). A property belongs in the vocabulary when a host can realize it; every backend answers it; and where an application's declared targets answer differently, a **guard** — a capability or target variant, in both spellings — applies the declaration only where it is realized. An unguarded declaration that a declared target cannot realize still fails the build, so a difference between hosts is always written where it was chosen, never discovered on one of them.
+- **Capability honesty, per property.** Rounded corners, shadows, gradients, and transforms exist on some hosts and not others, and a terminal cell has neither a radius nor a shadow. Each backend declares, per style property, whether it realizes it, approximates it, or cannot express it, and an application that declares one its target cannot realize is told at build time (2.5, 2.13). A backend never silently ignores a style, and never abandons a native control to owner-drawing in order to satisfy one — that trade is exactly what 2.2 exists to refuse. Honesty works in both directions: the vocabulary is not cut down to what the narrowest host can do, because that would hide what the richer ones offer (section 1). A property belongs in the vocabulary when a host can realize it; every backend answers it; and where an application's declared targets answer differently, a **guard** — a capability or target variant, in both spellings — applies the declaration only where it is realized. An unguarded declaration that a declared target cannot realize still fails the build, so a difference between hosts is always written where it was chosen, never discovered on one of them. A declared fallback — a backend's second or third control set, chosen at launch only when the richer one cannot run — is written down the same way, once, in the project's configuration: the build lists each declaration that fallback will leave out rather than failing on it, unless the project asks for the fallback to be held to the primary's rule (Milestone 71).
 - **Relationships, not matchers.** A style may depend on another node only through a closed set of typed relationships that the core resolves by a bounded lookup — the node's position among its siblings, its parent, a named ancestor group, an earlier sibling, a container's resolved size. Each is a condition like any other: `rustnative expand` prints it, the headless backend resolves it, and every backend realizes the result. An arbitrary selector is a search over the tree, which is the second engine the second rule refuses, and it is not admitted as a variant. The one place host styling with no typed equivalent may ever enter is an explicit, single-host passthrough outside the equivalence suite (Milestone 68), and the framework is complete without it.
 - **Compatibility is complete and proven.** The utility vocabulary is Tailwind CSS v4's at a pinned upstream release, and it is taken whole: every utility, variant, modifier, and directive upstream ships at that release is either compiled through the five rules above or refused by name, with the reason and the spelling that replaces it, in a published coverage table that leaves nothing out. What upstream spells as a selector is almost always a fact the framework already holds as typed data — the node's own interaction, accessibility, or form state, the environment, or a typed relationship — and it is compiled from that fact; what remains is refused rather than matched. Compatibility is checked rather than claimed: a corpus generated from upstream's own compiler at the pin holds, for every class, the declarations upstream emits, and the declarations this framework compiles the class to must equal them. Upstream's toolchain runs only to regenerate that corpus when the pin moves, on a maintainer's machine; it is never a dependency of any build (Milestone 73).
 
@@ -286,7 +287,7 @@ Units follow 2.11 rather than the web's: the core keeps one geometry model in lo
 
 # 3. Completed milestones
 
-The following milestones are implemented in the current codebase. The backends built so far are Windows, Linux (GTK 4), Android, and the Web, with the headless reference backend. The Windows milestones below built the backend's Win32 shell — windows, the message loop, input, DPI, services, packaging — and realized the tree in it with the common controls, on x86_64; the control sets the Windows backend ships inside that shell, WinUI 3 by default and WinUI 2 as its fallback, are Milestone 71, and its native ARM64 build is Milestone 72; macOS, iOS, iPadOS, terminals, and embedded targets are planned (section 8), and what each built backend still owes is recorded in `BUILD_STATUS.md` and `docs/conformance/new-backend-checklist.md`.
+The following milestones are implemented in the current codebase. The backends built so far are Windows, Linux (GTK 4), Android, and the Web, with the headless reference backend. The Windows milestones below built the backend's Win32 shell — windows, the message loop, input, DPI, services, packaging — and realized the tree in it with the common controls, on x86_64; the control sets the Windows backend ships inside that shell — WinUI 3 by default, with WinUI 2 and those common controls as its fallbacks — are Milestone 71, and its native ARM64 build is Milestone 72; macOS, iOS, iPadOS, terminals, and embedded targets are planned (section 8), and what each built backend still owes is recorded in `BUILD_STATUS.md` and `docs/conformance/new-backend-checklist.md`.
 
 (Sections 4 and 5 — the stages these milestones were planned in — were folded into this section when they were completed; the numbers of the sections after them are kept, because the rest of the repository refers to them.)
 
@@ -1035,7 +1036,8 @@ framework owns — because 2.2's rule is to decorate the box, never the control:
 a backend may realize a shadow or a gradient on a container through its host's
 drawing and composition services while answering the same property as
 unavailable on a native button. A backend with more than one control set — the
-Windows backend's WinUI 3 and WinUI 2 — answers once per set as well. A backend that realizes the extended range on
+Windows backend's WinUI 3, WinUI 2, and common controls — answers once per set
+as well. A backend that realizes the extended range on
 neither is still complete; one that realizes it by owner-drawing a control is
 not.
 
@@ -1068,13 +1070,13 @@ onward, and they are part of this definition rather than separate work:
   host has a store, and updates gated by the native-input fingerprint — rather
   than a release process invented for that backend.
 
-The Windows backend is one backend with two control sets and two architectures, and neither pair makes a second backend. Its shell — Win32 top-level windows, the message loop, per-monitor scale, the shell's dialogs, tray, jump list, and single-instance handoff, and the canvas and native-surface paths — is shared. Inside each window the tree is realized as WinUI 3 controls by default, and as WinUI 2 controls where the Windows App SDK runtime cannot run (Milestone 71), and every part of it is built, tested, and shipped natively for x86_64 and for ARM64 (Milestone 72). Each control set keeps its own capability table, style table, conformance column, and budgets, as iOS and iPadOS do on their shared toolkit; the two architectures share all of those and differ in what is measured and where it is verified. Milestones 71 and 72 are placed here, ahead of the other backends, because they are the Windows backend's own; numbers are identities, not an order.
+The Windows backend is one backend with three control sets and two architectures, and none of them makes a second backend. Its shell — Win32 top-level windows, the message loop, per-monitor scale, the shell's dialogs, tray, jump list, and single-instance handoff, and the canvas and native-surface paths — is shared. Inside each window the tree is realized as WinUI 3 controls by default, as WinUI 2 controls where the Windows App SDK runtime cannot run, and as the common controls where no XAML framework can (Milestone 71), and every part of it is built, tested, and shipped natively for x86_64 and for ARM64 (Milestone 72). Each control set keeps its own capability table, style table, conformance column, and budgets, as iOS and iPadOS do on their shared toolkit, and the fallbacks are held to section 8 as fully as the default; the two architectures share all of those and differ in what is measured and where it is verified. Milestones 71 and 72 are placed here, ahead of the other backends, because they are the Windows backend's own; numbers are identities, not an order.
 
 Three of these — macOS, iOS, and iPadOS — cannot be verified on the project's current hardware (2.13). They remain fully planned, and each is finished when it runs on its own Apple hardware, not before: a Mac for macOS, an iPhone for iOS, an iPad for iPadOS. An iPad running the iOS backend does not verify iPadOS, and a Mac running an iPad application does not verify macOS.
 
 The three Apple targets share code only through platform-group crates (Milestone 39, `C65`), never by one backend depending on another: an **Apple** group (the Objective-C runtime bindings and the host's memory-management convention, Core Text measurement, accessibility role mapping, the Apple toolchain driver) for all three, and inside it a **UIKit** group (the view and control realization, scenes, `UITextInput`, `UIAccessibility`, the touch and gesture bridge) for iOS and iPadOS. Each backend keeps its own capability table, style table, unit mapping, conformance column, budgets, and verification. Milestones 36 and 70 share a toolkit and ship as one universal bundle, so they are planned to be built together, as one track with two targets; neither is finished by the other's tests. (Milestone 70 is numbered after the production-parity milestones because it was specified after them; it sits beside Milestone 36 because that is where it belongs.)
 
-## Milestone 71 — Windows control sets: WinUI 3, with WinUI 2 as its fallback
+## Milestone 71 — Windows control sets: WinUI 3, with WinUI 2 and the common controls as fallbacks
 
 WinUI 3 is the host's current control set. It is what the host's own
 first-party applications are built with, what its design language is expressed
@@ -1082,155 +1084,218 @@ in, and therefore what Milestone 41's fidelity conformance measures a Windows
 application against. Its controls are native Windows controls in every sense
 2.2 cares about — the host draws them and gives them their focus visuals, text
 editing, input methods, and UI Automation — and the host composes the whole
-tree through one visual layer, so the extended style range reaches it without
-the airspace limits of child windows. It ships in the Windows App SDK, a
-runtime that lives outside the operating system, and that is the one reason a
-fallback exists: where that runtime cannot be loaded, WinUI 2 — the control
+tree through one visual layer, so the whole style vocabulary can reach it
+without the airspace limits of child windows. It ships in the Windows App SDK, a
+runtime that lives outside the operating system, and that is the one reason
+fallbacks exist. Where that runtime cannot be loaded, WinUI 2 — the control
 library over the operating system's own XAML — gives the same family of
-controls, in the same windows, with nothing to install.
+controls in the same windows with nothing to install. Where no XAML framework
+can run, the Win32 common controls — the set this backend was first built and
+verified on (Milestones 1–32), present on every Windows installation — realize
+the same tree in the same shell.
 
 Satisfies: `D-FP-2`, `D-WIN-3`; with Milestone 41, `D-FP-1` on Windows.
 
-- **one shell, two XAML hosts**: each window root is a Win32 top-level window
-  the backend owns, and the tree is realized inside it through the host's XAML
-  island — `Microsoft.UI.Xaml.Hosting.DesktopWindowXamlSource` for WinUI 3 and
-  `Windows.UI.Xaml.Hosting.DesktopWindowXamlSource` for WinUI 2. Hosting both
-  the same way keeps everything the shell owns — window lifecycle and
-  placement, multiple windows, single-instance handoff and deep links, the
-  tray and jump list, embedding into a caller's window (Milestone 40), and the
-  scheduler's wake-ups — one implementation rather than two. The shell's loop
-  hands each message to the island first, so Tab traversal, keyboard
-  accelerators, access keys, and input-method messages reach XAML, and the
-  scheduler posts its wakes to the thread's `DispatcherQueue`;
-- **the choice is made once, at launch, and never by `cfg`**: both control
-  sets are compiled into one binary, as iOS and iPadOS are (Milestone 70).
-  `rustnative.toml` declares the sets a project ships, `[windows] control_sets
-  = ["winui3", "winui2"]` by default. At launch the backend loads the Windows
-  App SDK runtime — carried inside the application, or the framework package
-  through the host's bootstrapper — and realizes in WinUI 3 if it loads; if it
-  does not and WinUI 2 is declared, it realizes in WinUI 2 and records why in
-  the diagnostics channel and the inspection protocol (Milestone 44), never
-  silently; if neither can run, launch fails with a message naming what is
-  missing and the command or package that supplies it. No window switches
-  control set while the application runs, and a process never mixes the two.
-  A project that declares only `winui3` links no WinUI 2 code, and an
-  application embedding into a host that already runs one of the two XAML
+- **one shell, three control sets**: each window root is a Win32 top-level
+  window the backend owns. Under WinUI 3 and WinUI 2 the tree is realized
+  inside it through the host's XAML island —
+  `Microsoft.UI.Xaml.Hosting.DesktopWindowXamlSource` and
+  `Windows.UI.Xaml.Hosting.DesktopWindowXamlSource` respectively — and under the
+  common controls as child windows of it, as Milestones 1–32 built. Everything
+  the shell owns — window lifecycle and placement, multiple windows,
+  single-instance handoff and deep links, the tray and jump list, embedding into
+  a caller's window (Milestone 40), and the scheduler's wake-ups — is one
+  implementation for all three. Under a XAML set the shell's loop hands each
+  message to the island first, so Tab traversal, keyboard accelerators, access
+  keys, and input-method messages reach XAML, and the scheduler posts its wakes
+  to the thread's `DispatcherQueue`;
+- **the choice is made once, at launch, and never by `cfg`**: every declared set
+  is compiled into one binary, as iOS and iPadOS are (Milestone 70).
+  `rustnative.toml` declares the sets a project ships in order of preference,
+  `[windows] control_sets = ["winui3", "winui2", "win32"]` by default. At launch
+  the backend loads the Windows App SDK runtime — carried inside the
+  application, or the framework package through the host's bootstrapper — and
+  realizes in WinUI 3 if it loads; otherwise it initializes the operating
+  system's XAML and realizes in WinUI 2; otherwise it realizes in the common
+  controls. Each step down is recorded with its reason in the diagnostics
+  channel and the inspection protocol (Milestone 44), never taken silently; if
+  no declared set can run, launch fails with a message naming what is missing
+  and the command or package that supplies it. No window switches set while the
+  application runs, and a process never mixes them. A project links only the
+  sets it declares — one that declares `["win32"]` alone carries no XAML at all,
+  for the smallest artifact and the fastest cold start its budget can ask for —
+  and an application embedding into a host that already runs one of the XAML
   frameworks on that thread realizes in that one;
-- **realization**: one native control per node kind, chosen from the control
-  set's own controls — `TextBlock` for a label, `Button`, `TextBox` (and
-  `PasswordBox` for Milestone 61's secure entry) for text input, `ScrollView`
-  for a scrolling container (the host's scroller, with its own inertia,
-  rubber-banding, and anchoring), `TabView` for a tab bar with every tab's
-  content kept mounted, `MenuBar` and `MenuFlyout` bound to the command model
-  (Milestone 39), `ContentDialog` for in-application modal content, and the
-  shell's common item dialogs for files under both sets. A container the
+- **fallbacks are declared, and so are their differences**: the first declared
+  set is the primary one and is held to 2.14's fourth rule like any target. A
+  declared fallback realizes less of the extended range, and that difference is
+  written where it was chosen — in `rustnative.toml` — rather than discovered:
+  with `[windows] fallback_styles = "list"`, the default, a declaration a
+  fallback set cannot realize is left out on that set and listed by the build
+  per set, and `rustnative expand --targets` shows what each set draws; with
+  `"refuse"`, every declared set is held to the primary's rule and an
+  unguarded declaration any of them cannot realize fails the build
+  (Milestone 67);
+- **realization under the XAML sets**: one native control per node kind, chosen
+  from the set's own controls — `TextBlock` for a label, `Button`, `TextBox`
+  (and `PasswordBox` for Milestone 61's secure entry) for text input,
+  `ScrollView` for a scrolling container (the host's scroller, with its own
+  inertia, rubber-banding, and anchoring), `TabView` for a tab bar with every
+  tab's content kept mounted, `MenuBar` and `MenuFlyout` bound to the command
+  model (Milestone 39), `ContentDialog` for in-application modal content, and
+  the shell's common item dialogs for files under every set. A container the
   framework owns is a XAML panel whose children are placed at the geometry the
-  portable layout engine computed (2.11): XAML's own layout pass runs over
-  fixed sizes and positions and decides nothing, so one subtree never has two
-  layout engines — the rule Web milestone C states for the browser, applied
-  here. Virtual lists keep Milestone 28's identity and recycling over XAML
-  elements rather than handing items to a host repeater whose identity is not
-  ours; a canvas is a `SwapChainPanel` drawn by Direct2D and DirectWrite from
-  its draw list, recovered on device loss as before; a native surface is a
-  `SwapChainPanel`, with a child-window surface kept for graphics APIs that
-  need a window handle and answered with that window's airspace limits;
-  embedded web content is the `WebView2` control (Milestone 48);
-- **measurement** through XAML's own measure on prototype elements per control
-  kind, and DirectWrite text layout for labels, cached until font, theme, or
-  scale changes — so a control is measured at the size the host draws it, as
-  on Linux and Android;
-- **style without re-templating** (2.2): resolved style is applied as the
-  controls' own properties and the lightweight-styling theme resources their
-  templates read — the per-state brushes a button's template already looks up,
-  for example — and a control's template is never replaced. Tokens map to
-  theme resources, so a theme or colour-scheme change re-resolves on the
-  realized controls (2.10); the accent colour, light and dark scheme, and
+  portable layout engine computed (2.11): XAML's own layout pass runs over fixed
+  sizes and positions and decides nothing, so one subtree never has two layout
+  engines — the rule Web milestone C states for the browser, applied here.
+  Virtual lists keep Milestone 28's identity and recycling over XAML elements
+  rather than handing items to a host repeater whose identity is not ours; a
+  canvas is a `SwapChainPanel` drawn by Direct2D and DirectWrite from its draw
+  list, recovered on device loss; a native surface is a `SwapChainPanel`, with a
+  child-window surface kept for graphics APIs that need a window handle and
+  answered with that window's airspace limits; embedded web content is the
+  `WebView2` control (Milestone 48). The common controls keep the realization
+  Milestones 1–32 built and verified;
+- **measurement** through each set's own text and control measurement — XAML's
+  measure on prototype elements per control kind and DirectWrite for labels
+  under the XAML sets, GDI under the common controls as built — cached until
+  font, theme, or scale changes, so a control is measured at the size the host
+  draws it;
+- **style without re-templating** (2.2): under the XAML sets, resolved style is
+  applied as the controls' own properties and the lightweight-styling theme
+  resources their templates read — the per-state brushes a button's template
+  already looks up, for example — and a control's template is never replaced.
+  Tokens map to theme resources, so a theme or colour-scheme change re-resolves
+  on the realized controls (2.10); the accent colour, light and dark scheme, and
   contrast themes come from the host, and a contrast theme's own resources win
   over brand values, as the host's fidelity rules require. Each set has its own
-  table — `rustnative_style::WINDOWS_WINUI3` and `WINDOWS_WINUI2` — answered
-  for native controls and for framework-owned boxes. Because XAML transforms,
-  clips, and fades a live control without capturing it, both tables realize
-  transforms, opacity, and per-corner radius on native controls as well as on
-  boxes (Milestone 67);
-- **the unit mapping**: one logical pixel is one XAML effective pixel; XAML
-  applies the island's rasterization scale, which follows the window's monitor
-  (Milestone 69); `rem` follows the host's text-scaling setting; and positions
-  round to the device-pixel grid half away from zero with XAML's layout
-  rounding on, held by the same 150 % conformance case the shell's scaling
-  uses;
-- **input** through XAML's routed events: pointer (mouse, touch, and pen with
-  pressure, tilt, and barrel button), wheel, keys and characters, XAML drag and
-  drop, and input methods in XAML's text controls and through the host's
-  text-services API for the framework's custom text targets; focus through
-  XAML's focus manager mapped onto the portable focus model, with directional
-  focus for Milestone 61's non-pointer navigation and keyboard accelerators
-  generated from the command model, so a menu's shortcut is the shortcut that
-  works;
-- **accessibility** through XAML's own UI Automation peers for every control,
-  given the portable model's names, descriptions, relationships, heading
-  levels, live settings, position in set, and automation ids through
-  `AutomationProperties`; custom peers only where the model has no host
-  control — a canvas's virtual elements and framework-owned boxes with a role.
-  Hand-written providers are therefore the exception rather than the rule
-  (Milestone 26), and both sets are verified with Narrator;
-- **animation** from Milestone 27's timeline, applied to element properties on
-  frames paced by the host's rendering event, with reduced motion read from
-  the host's animation setting and tracked live;
+  table — `rustnative_style::WINDOWS_WINUI3`, `WINDOWS_WINUI2`, and `WINDOWS`
+  for the common controls — answered for native controls and for
+  framework-owned boxes;
+- **the style vocabulary at the host's full reach**: WinUI 3 is the richest
+  native host this framework realizes, and its table is written to use all of
+  it rather than to match the narrower sets. Because XAML composes the whole
+  tree and transforms, clips, fades, and shadows a live control without
+  capturing it, the WinUI 3 table realizes, on boxes and on native controls
+  alike: per-corner radius and per-side borders, shadows (`shadow-*`, and
+  `drop-shadow-*` as a shadow of the element), opacity, and every 2D and 3D
+  transform (`translate-*`, `scale-*`, `rotate-*`, `skew-*`, `perspective-*`,
+  `rotate-x-*`, `rotate-y-*`, `transform-3d`, `backface-hidden`, origins) through
+  the element's transform matrix, with hit-testing, focus, caret, and UI
+  Automation following it. On boxes, images, canvases, and text it draws, it
+  realizes linear and radial gradients as XAML brushes and conic gradients drawn
+  by Direct2D into a composition surface; gradient text (`bg-clip-text`) as a
+  brush on the text's foreground; text shadows (`text-shadow-*`) from the text
+  element's own alpha mask; masks (`mask-*`) through composition mask brushes;
+  every filter (`blur-*`, `brightness-*`, `contrast-*`, `grayscale`,
+  `hue-rotate-*`, `invert`, `saturate-*`, `sepia`) and blend mode
+  (`mix-blend-*`, `bg-blend-*`) through composition effects; and every backdrop
+  filter (`backdrop-*`) over whatever lies beneath, native controls included,
+  because one composed tree has nothing to hide. Typography reaches DirectWrite
+  in full — variable-font axes and `font-stretch-*`, OpenType features
+  (`font-features-[…]`, `tabular-nums`, `oldstyle-nums`, `ordinal`, …), letter
+  spacing, line height, decoration colour and thickness, a line clamp — on the
+  text elements' own properties; the scrollbar utilities (`scrollbar-thin`,
+  `scrollbar-none`, thumb and track colours, gutters) on the `ScrollView`'s own
+  properties and resources; and the host's materials through the framework
+  utilities of Milestone 73. The table's remaining unavailable rows each name the
+  host limit behind them — chiefly that filtering, masking, or blending a native
+  control's own pixels would be capture (2.2). WinUI 2 realizes most of the same
+  through the operating system's composition layer, row by row in its own table;
+  the common controls keep the narrower answers Milestone 67 records, decorated
+  on boxes only (Milestone 69);
+- **motion on the compositor**: under the XAML sets, a class-spelled transition
+  or animation of a property the compositor animates — opacity, transforms,
+  colours, shadows, clips — runs on the host's compositor thread, so it stays
+  smooth while the UI thread works, whenever Milestone 27's curve maps onto the
+  compositor's exactly (a cubic Bézier, `linear()`, steps, or a spring through
+  the host's natural-motion animations); interruption and retargeting keep
+  Milestone 27's semantics, and anything the compositor cannot express exactly
+  is evaluated by the timeline on frames paced by the host's rendering event.
+  Reduced motion is read from the host's animation setting and tracked live;
+- **the unit mapping**: under the XAML sets, one logical pixel is one XAML
+  effective pixel; XAML applies the island's rasterization scale, which follows
+  the window's monitor (Milestone 69); `rem` follows the host's text-scaling
+  setting; and positions round to the device-pixel grid half away from zero
+  with XAML's layout rounding on. The common controls keep their scaled mapping
+  (Milestone 69), and the same 150 % conformance case holds every set to one
+  rounding rule;
+- **input** through XAML's routed events under the XAML sets: pointer (mouse,
+  touch, and pen with pressure, tilt, and barrel button), wheel, keys and
+  characters, XAML drag and drop, and input methods in XAML's text controls and
+  through the host's text-services API for the framework's custom text targets;
+  focus through XAML's focus manager mapped onto the portable focus model, with
+  directional focus for Milestone 61's non-pointer navigation and keyboard
+  accelerators generated from the command model, so a menu's shortcut is the
+  shortcut that works. The common controls keep Milestone 25's input path;
+- **accessibility** through XAML's own UI Automation peers for every control
+  under the XAML sets, given the portable model's names, descriptions,
+  relationships, heading levels, live settings, position in set, and automation
+  ids through `AutomationProperties`; custom peers only where the model has no
+  host control — a canvas's virtual elements and framework-owned boxes with a
+  role. The common controls keep Milestone 26's providers. Every set is
+  verified with Narrator;
 - **materials** (Milestone 60): Mica and Acrylic window and surface backdrops
   through the host's system-backdrop APIs under WinUI 3, honouring the
-  transparency-effects setting; WinUI 2 answers each material through its own
-  table;
-- **services, per set where they differ**: app notifications with their
-  actions routed back as events under WinUI 3 and the shell's notification
-  path under WinUI 2; everything else — clipboard, files, URLs, secure storage,
-  state store, tray, jump list, taskbar progress — from the shared shell;
+  transparency-effects setting; WinUI 2 and the common controls answer each
+  material through their own tables;
+- **services, per set where they differ**: app notifications with their actions
+  routed back as events under WinUI 3, and the shell's notification path under
+  the other two; everything else — clipboard, files, URLs, secure storage, state
+  store, tray, jump list, taskbar progress — from the shared shell;
 - **the runtime, pinned and packaged**: the Windows App SDK is pinned to a
-  stated release of its current stable line (the 2.x line; 2.4 as of
-  2026-08), recorded in `VENDORED.md` with its hashes, and moved deliberately
-  with the release train (Milestone 59). The Rust bindings are generated from
-  the SDK's metadata at the pin and committed, so a build needs no package
-  client and no network; the runtime's redistributables are fetched by
-  `rustnative doctor --install` against the pinned hashes, with the offline
-  mirror of Milestone 65. The MSIX declares a dependency on the runtime's
-  framework package, which the store and the host's installer provide; the
-  zip carries the runtime inside it, so it runs on a machine with nothing
-  installed. WinUI 2 needs nothing beyond the operating system and its control
-  library, packaged the same two ways. The runtime counts toward artifact size
-  and its bootstrap toward cold start in `budgets/windows.toml` (Milestone 42);
+  stated release of its current stable line (the 2.x line; 2.4 as of 2026-08),
+  recorded in `VENDORED.md` with its hashes, and moved deliberately with the
+  release train (Milestone 59). The Rust bindings are generated from the SDK's
+  metadata at the pin and committed, so a build needs no package client and no
+  network; the runtime's redistributables are fetched by `rustnative doctor
+  --install` against the pinned hashes, with the offline mirror of Milestone 65.
+  The MSIX declares a dependency on the runtime's framework package, which the
+  store and the host's installer provide; the zip carries the runtime inside it,
+  so it runs on a machine with nothing installed. WinUI 2 needs nothing beyond
+  the operating system and its control library, packaged the same two ways, and
+  the common controls need nothing at all. The runtime counts toward artifact
+  size and its bootstrap toward cold start in `budgets/windows.toml`
+  (Milestone 42);
 - **supported hosts, stated per set**: WinUI 3 on the Windows versions the
-  pinned Windows App SDK supports, WinUI 2 on Windows 10 version 1903 and
-  later; both appear in the supported-host matrix of each release (Milestone
-  59), and `doctor` checks them;
+  pinned Windows App SDK supports, WinUI 2 on Windows 10 version 1903 and later,
+  and the common controls on every Windows version the release supports; all
+  three appear in the supported-host matrix of each release (Milestone 59), and
+  `doctor` checks them;
 - **embedding in both directions** (Milestone 40): our tree into a caller's
-  window, inside an island the backend creates, and into a caller's XAML tree
-  as one element; a foreign XAML element, or a foreign window with its
-  airspace stated, adopted as a leaf;
-- **the common-controls realization as the reference, not a third set**: the
-  common controls are where this backend was built and verified (Milestones
-  1–32), and they remain the reference both XAML realizations are measured
-  against — the same screens, conformance cases, and budgets — until each
-  passes section 8. Then the common-controls realization is removed, and what
-  it proved stays as tests that run against the XAML realizations;
-- **its own checklist columns, inspection, loop, and budgets**: one
-  conformance column per control set, capabilities advertised per set and only
-  once realized (2.13), the inspection protocol reporting the active set and
-  why it was chosen, the developer loop under both, and budgets keyed by set
-  and architecture (Milestone 72).
+  window — inside an island the backend creates under a XAML set, as child
+  windows under the common controls — and into a caller's XAML tree as one
+  element; a foreign XAML element, or a foreign window with its airspace stated,
+  adopted as a leaf;
+- **the common controls as the reference as well as the floor**: the screens,
+  conformance cases, and budgets the common controls already pass are the
+  baseline both XAML sets are measured against while they are built, and they
+  stay in CI as the common controls' own column afterwards, so the last fallback
+  never rots behind the default;
+- **its own checklist columns, inspection, loop, and budgets**: one conformance
+  column per control set, capabilities advertised per set and only once
+  realized (2.13), the inspection protocol reporting the active set and why it
+  was chosen, the developer loop under each, and budgets keyed by set and
+  architecture (Milestone 72).
 
-**Done when** both control sets pass section 8 on real Windows sessions — every
-node kind realized as the set's own control, measured, styled without a
+**Done when** every declared set passes section 8 on real Windows sessions —
+every node kind realized as the set's own control, measured, styled without a
 replaced template, and read back from the realized elements; Narrator passes
-recorded under each; the fallback taken and reported when the runtime is
-absent, and launch refused with a named remedy when no declared set can run; a
-theme, scheme, contrast, and text-scale change re-resolving on the realized
-controls with no tree rebuild; a WinUI 3 tree embedded in an existing Win32
-application and in an existing XAML application; both packaging shapes
-installing and running on a clean machine; and the common-controls realization
-removed with its tests carried over.
+recorded under each; WinUI 3's table realizes every extended-range row the host
+can, each remaining unavailable row naming its host limit, and a
+compositor-thread transition stays smooth while the UI thread is held busy; each
+step down taken and reported when the runtime or XAML is absent, and launch
+refused with a named remedy when no declared set can run; `fallback_styles`
+listing and refusing as declared; a theme, scheme, contrast, and text-scale
+change re-resolving on the realized controls with no tree rebuild under every
+set; a WinUI 3 tree embedded in an existing Win32 application and in an existing
+XAML application; and every packaging shape installing and running on a clean
+machine.
 
 **Depends on** Milestones 39 (mappers and the command model), 40 (embedding),
-41 (fidelity conformance), 58 (the capability tables and unit mapping), and the
-scaling half of Milestone 69; Milestone 72 runs both sets on ARM64.
+41 (fidelity conformance), 58 (the capability tables and unit mapping), 67 (the
+extended range its WinUI 3 table answers), and the scaling half of Milestone 69;
+Milestone 72 runs every set on ARM64.
 
 ## Milestone 72 — Windows on ARM64
 
@@ -1244,7 +1309,7 @@ therefore built, tested, packaged, updated, and verified natively for
 
 Satisfies: `D-FP-1` and `D-FP-2` on ARM64 hardware.
 
-- **every Windows crate on both architectures**: the shell, both control sets,
+- **every Windows crate on both architectures**: the shell, every control set,
   the canvas and surface paths, the terminal backend's console path, the server
   and its deployment tooling, the interop bindings, and the CLI itself, with
   `cfg(target_arch)` confined to the places an architecture genuinely differs
@@ -1260,8 +1325,8 @@ Satisfies: `D-FP-1` and `D-FP-2` on ARM64 hardware.
   for both and the Windows SDK's per-architecture libraries. `doctor` reports
   both compilers, both library sets, and the per-architecture runtime
   redistributables; `rust-toolchain.toml` carries both targets; and the MSRV
-  check runs for both, at the workspace MSRV or Rust 1.91 for ARM64, whichever
-  is later;
+  check runs for both at the workspace MSRV, Rust 1.91 — the release that made
+  ARM64 Windows a Tier 1 target, and the reason the floor sits there;
 - **packaging per architecture, delivered as one**: an MSIX per architecture,
   combined into one bundle from which the host installs the native package; a
   zip per architecture with the architecture in its name; the Windows App SDK
@@ -1296,7 +1361,7 @@ Satisfies: `D-FP-1` and `D-FP-2` on ARM64 hardware.
   ARM64 Windows device, and until one is used they are recorded in
   `BUILD_STATUS.md` as unverified on ARM64.
 
-**Done when** every Windows crate builds, tests, and passes both control sets'
+**Done when** every Windows crate builds, tests, and passes every control set's
 conformance columns natively on ARM64; `rustnative package windows --arch all`
 produces a bundle the host installs natively on each architecture; an update is
 refused across architectures and an emulated installation is moved to the
@@ -3813,7 +3878,9 @@ continued.
   ["windows", "linux", "web"]`), defaulting to every backend the project
   depends on. The build checks each unguarded declaration against every
   declared target's table, not only the target being compiled — for `windows`,
-  the table of every control set the project declares — and a failure
+  the table of the primary control set, with each declared fallback set listed
+  or held to the same rule as `[windows] fallback_styles` says (Milestone 71) —
+  and a failure
   names the class, the property, the target, that target's reason, and the
   guard that would resolve it. Adding a target surfaces every unguarded use at
   once, which is the point;
@@ -3843,15 +3910,16 @@ owns (section 8).
 
 | Family | Properties and utilities | Expected answers |
 |---|---|---|
-| Borders | width and per-side width (`border-2`, `border-t-4`), style (`border-dashed`, `border-dotted`), per-corner radius (`rounded-tl-lg`) | browser and GTK CSS realize; WinUI 3 and WinUI 2 realize per-side width and per-corner radius on boxes and native controls through the elements' own border properties, and dashed and dotted strokes on boxes, answering them unavailable on native controls; a terminal approximates style with box-drawing characters where its font has them |
-| Backgrounds | linear, radial, and conic gradients (`bg-linear-to-r`, `from-*`, `via-*`, `to-*`), images, size, and position | browser and GTK CSS realize; WinUI 3 and WinUI 2 realize linear and radial gradients and images as XAML brushes, on boxes and as a native control's background resource, and answer conic as unavailable; a terminal answers unavailable |
-| Transforms | translate, scale, rotate, origin | the browser realizes; Linux answers from what GTK paints; WinUI 3 and WinUI 2 realize all four on boxes and on native controls alike through the element's render transform, which keeps the control live — hit-testing, focus, caret, and UI Automation follow it (2.2); a terminal answers unavailable |
-| Effects | filters (`blur-*`, `brightness-*`, …), backdrop filters (`backdrop-*`), blend modes | the browser realizes; Linux answers from GTK; WinUI 3 realizes backdrop blur and tint on boxes through the host's acrylic and backdrop brushes and filters on a box's own background through composition effects, WinUI 2 answers each per its table, and both answer filters on a native control's content as unavailable, because filtering a control's pixels is capture |
-| Motion | `transition-*`, `duration-*`, `ease-*`, `delay-*`, `animate-*`, and `@keyframes` in `app.css` | every backend that runs frames, through Milestone 27's timeline; the browser as CSS transitions generated from the same model, with a spring approximated by a `linear()` easing; a terminal at its own frame rate; a property the timeline cannot animate is unavailable under `transition-[…]` |
-| Text | `tracking-*`, `leading-*`, decoration (`underline`, `line-through`), case (`uppercase`, …), alignment (`text-center`, …), `truncate`, `line-clamp-*` | browser and GTK CSS realize; WinUI 3 and WinUI 2 realize letter spacing, line height, decoration, alignment, single-line truncation, and a line clamp through the text elements' own properties, case by transforming the string locale-aware before it reaches the control, and on an editable control exactly what that control exposes |
+| Borders | width and per-side width (`border-2`, `border-t-4`), style (`border-dashed`, `border-dotted`), per-corner radius (`rounded-tl-lg`) | browser and GTK CSS realize; WinUI 3 and WinUI 2 realize per-side width and anti-aliased per-corner radius on boxes and native controls through the elements' own properties, and dashed and dotted strokes on boxes, answering those unavailable on native controls; the common controls approximate on containers (GDI pens, per-corner radius as a region without anti-aliasing, or composed through Milestone 69) while native controls keep their system border; a terminal approximates style with box-drawing characters where its font has them |
+| Backgrounds | linear, radial, and conic gradients (`bg-linear-to-r`, `bg-radial`, `bg-conic`, `from-*`, `via-*`, `to-*`), images, size, position, and `bg-clip-text` | browser and GTK CSS realize; WinUI 3 realizes all of them — linear and radial as XAML brushes, conic drawn by Direct2D into a composition surface, gradient text as a brush on the text's foreground — on boxes and as a native control's background resource; WinUI 2 realizes linear, radial, images, and gradient text and answers conic per its table; the common controls realize a linear gradient on a container (`GradientFill`) and answer the rest unavailable unless Milestone 69's composition changes it; a terminal answers unavailable |
+| Shadows and masks | `inset-shadow-*`, `text-shadow-*`, `drop-shadow-*`, `mask-*` | the browser realizes; Linux answers from GTK; WinUI 3 realizes inset and drop shadows on boxes and native controls, text shadows from the text element's own alpha mask, and masks through composition mask brushes on boxes, images, and canvases, answering masks on native controls unavailable (masking a control's pixels is capture); WinUI 2 answers per its table; the common controls answer unavailable outside Milestone 69's composed containers; a terminal answers unavailable |
+| Transforms | translate, scale, rotate, skew, origin, and 3D — `perspective-*`, `rotate-x-*`, `rotate-y-*`, `transform-3d`, `backface-hidden` | the browser realizes; Linux answers from what GTK paints; WinUI 3 realizes every 2D and 3D transform on boxes and on native controls alike through the element's transform matrix, which keeps the control live — hit-testing, focus, caret, and UI Automation follow it (2.2) — and WinUI 2 realizes 2D transforms the same way and 3D per its table; the common controls realize translation by moving the window without relayout, as Milestone 27 already does, and answer the rest unavailable; a terminal answers unavailable |
+| Effects | filters (`blur-*`, `brightness-*`, `contrast-*`, `grayscale`, `hue-rotate-*`, `invert`, `saturate-*`, `sepia`), backdrop filters (`backdrop-*`), blend modes (`mix-blend-*`, `bg-blend-*`) | the browser realizes; Linux answers from GTK; WinUI 3 realizes every filter and blend mode on boxes, images, canvases, and the text it draws through composition effects, and every backdrop filter over whatever lies beneath, native controls included, because one composed tree has nothing to hide — answering filters and blends on a native control's own pixels unavailable, because that would be capture; WinUI 2 answers each per its table; the common controls answer unavailable, since blending a child window with what lies behind it is the airspace limit (Milestone 69) |
+| Motion | `transition-*`, `duration-*`, `ease-*`, `delay-*`, `animate-*`, `starting:`, and `@keyframes` in `app.css` | every backend that runs frames, through Milestone 27's timeline; under WinUI 3 and WinUI 2, on the compositor thread wherever the curve maps exactly (Milestone 71); the browser as CSS transitions generated from the same model, with a spring approximated by a `linear()` easing; a terminal at its own frame rate; a property the timeline cannot animate is unavailable under `transition-[…]` |
+| Text | `tracking-*`, `leading-*`, decoration (`underline`, `line-through`, `decoration-*`), case (`uppercase`, …), alignment (`text-center`, …), `truncate`, `line-clamp-*`, `font-stretch-*`, `font-features-[…]`, numeric variants (`tabular-nums`, …) | browser and GTK CSS realize; WinUI 3 and WinUI 2 realize letter spacing, line height, decoration with its colour and thickness, alignment, truncation, a line clamp, variable-font axes, and OpenType features through the text elements' own properties and DirectWrite, case by transforming the string locale-aware before it reaches the control, and on an editable control exactly what that control exposes; the common controls realize decoration through the font, alignment and single-line truncation through the control's own styles, and case the same way, approximate a line clamp, and answer letter spacing, line height, and font features as unavailable on native controls |
 | Layout extras | `aspect-*`, `z-*` | every backend: the shared layout engine computes them and the backend applies geometry and stacking order |
-| Interaction | `cursor-*`, `pointer-events-none`, `select-none`, `select-text`, `outline-*`, `ring-*` | cursor and pointer events wherever there is a pointer; an outline or ring is realized on boxes, and a native control keeps the host's focus visual, whose colour and thickness WinUI exposes as properties of the control and realizes there |
-| Control parts | `placeholder:`, `caret-*`, `selection:`, `accent-*` | properties of a native control rather than relationships; the browser realizes; Linux answers from GTK; WinUI 3 and WinUI 2 realize placeholder colour, selection highlight, and accent through the controls' own properties and resources, and the caret where the control exposes it |
+| Interaction | `cursor-*`, `pointer-events-none`, `select-none`, `select-text`, `outline-*`, `ring-*`, `scrollbar-*` | cursor and pointer events wherever there is a pointer; an outline or ring is realized on boxes, and a native control keeps the host's focus visual, whose colour and thickness WinUI exposes as properties of the control and realizes there; scrollbar width, colour, and gutter on WinUI's own scroller and the browser's, approximated or unavailable elsewhere per table; the common controls approximate an outline or ring on containers |
+| Control parts | `placeholder:`, `caret-*`, `selection:`, `accent-*` | properties of a native control rather than relationships; the browser realizes; Linux answers from GTK; WinUI 3 and WinUI 2 realize placeholder colour, selection highlight, and accent through the controls' own properties and resources, and the caret where the control exposes it; the common controls answer most as unavailable because they do not expose them — the clearest case for a declared fallback's list (Milestone 71) |
 
 ### Structural variants
 
@@ -3877,15 +3945,18 @@ reconciler already holds:
 
 ### What bounds the payoff, stated so it is not discovered
 
-The extended range shows unevenly, and the plan says where. It shows in the
-browser, on Linux, on Windows under WinUI 3, in the headless backend, and on the
-layer-backed hosts still to come (macOS, iOS, iPadOS, Android); WinUI 2 shows
-most of it, with each difference in its own table; and the terminal shows each
-guard's fallback. That reach on Windows is one of the reasons its control set is
-WinUI 3 (Milestone 71): GDI-styled child windows could carry almost none of the
-transform and effect rows without owner-drawing a control, while XAML composes
-its whole tree and transforms a live control without capturing it. The guards
-make the remaining differences honest; they do not make them equal.
+The extended range shows unevenly, and the plan says where. It shows in full in
+the browser and on Windows under WinUI 3 — the richest native host this framework
+realizes, whose table is written to use everything the host composes (Milestone
+71) — and widely on Linux, in the headless backend, and on the layer-backed
+hosts still to come (macOS, iOS, iPadOS, Android). WinUI 2 shows most of it,
+with each difference in its own table; the common controls, as a fallback, show
+the narrower answers above and list what they leave out; and the terminal shows
+each guard's fallback. That reach is one of the reasons WinUI 3 is the Windows
+default: GDI-styled child windows could carry almost none of the transform and
+effect rows without owner-drawing a control, while XAML composes its whole tree
+and transforms a live control without capturing it. The guards and declared
+fallbacks make the remaining differences honest; they do not make them equal.
 
 The cost is ongoing as well as initial. Every property here is an answer owed by
 every backend — properties times backends, including backends not yet built —
@@ -4058,8 +4129,10 @@ Satisfies: `X-L3-12` and `C22-4`, carried to the whole upstream vocabulary.
 - **the current upstream release**: the vocabulary and the vendored default
   theme track the newest v4 release — v4.3.1 (2026-06-12) at this writing —
   with what arrived since the first pin taken by family like Milestone 67's:
-  the newer palettes in the default theme, and the scrollbar, zoom, and tab
-  utilities, each answered by every backend;
+  text shadows, masks, coloured drop shadows, and the newer pointer and
+  validity variants of 4.1; the newer palettes of 4.2; and the scrollbar, zoom,
+  and tab utilities of 4.3 — each answered by every backend, and each realized
+  under WinUI 3 wherever the host composes it (Milestone 71);
 - **moving the pin is one command** in the release train (Milestone 59): it
   vendors the new release's theme, regenerates the corpus and the coverage table
   below, and fails until every upstream addition is compiled or refused. The
@@ -4201,6 +4274,32 @@ An upstream v4 style file compiles as written, or names each line it refuses:
   codebases reach for a class-joining helper to do, with every class still
   compiled where it is written (Milestone 58).
 
+### The full reach of the richest hosts
+
+Completeness is measured twice: against the vocabulary, by the coverage table,
+and against the hosts, by what each one shows. The browser realizes the
+vocabulary as CSS, and WinUI 3 is held to the same standard among native hosts:
+every compiled class is realized under WinUI 3 unless its row in the WinUI 3
+table names the host limit that stops it, and the coverage table carries that
+column, so "works in the browser, refused on Windows" is visible as a number
+that the release train tracks downward. Its main entries are the ones 2.2 draws
+— a native control's own pixels are never filtered, masked, or blended — and
+every other unavailable row is a defect in the table until it is realized or
+its limit is written down.
+
+### Beyond the upstream vocabulary
+
+Some host capabilities have a typed property here and no word upstream — the
+host materials of Milestone 60 (`material-mica`, `material-acrylic`,
+`material-sheet`, `material-popover`, `material-sidebar`), elevation tokens
+mapped to the host's own shadow depths, and reveal and focus treatments that
+are host conventions. Each is a framework utility in a namespace upstream does
+not use, spelled in both syntaxes like every other style property (2.14), with
+every backend's answer, and listed in the coverage table as a framework
+addition, so it is never mistaken for upstream vocabulary and never collides
+with a name upstream adds later — a pin move that would collide fails until the
+framework utility is renamed through the deprecation policy.
+
 ### Tooling
 
 - **`rustnative fmt`** sorts every class string into upstream's canonical class
@@ -4223,7 +4322,9 @@ upstream v4 release and moving it is one command; an unmodified upstream v4
 style file compiles or names each line it refuses; the accessibility, data,
 form, disclosure, `focus-within:`, media-feature, `starting:`, and `not-*:`
 variants work in both spellings on every shipped backend and are recorded by
-the headless backend; `!`, the value forms, arbitrary properties, conflict
+the headless backend; every compiled class is realized under WinUI 3 or its row
+names the host limit, and the framework utilities exist in both spellings with
+every backend's answer; `!`, the value forms, arbitrary properties, conflict
 errors, and conditional composition work in both syntaxes; `rustnative fmt`
 reproduces upstream's order on the corpus; and `rustnative import tailwind`
 converts a sample upstream project.
@@ -4232,13 +4333,15 @@ converts a sample upstream project.
 extended range, guards, and control parts), Milestone 68 (relationships and
 container conditions), Milestones 26, 47, and 61 (the states its variants
 read), Milestone 27 (`starting:`), Milestone 39 (size classes and the
-environment), Milestone 60 (print), and Milestones 52 and 59 (the pin, the
+environment), Milestone 60 (print and materials), Milestone 71 (the WinUI 3
+table it is measured against), and Milestones 52 and 59 (the pin, the
 deprecation policy, and the release train).
 
 ## Milestone 69 — Windows: scale and composition
 
 The Windows backend's geometry reaches the host in two layers: the Win32 shell's
-windows, and the XAML tree inside them (Milestone 71). Both have to be at the
+windows, and, under the XAML control sets, the XAML tree inside them
+(Milestone 71). Both have to be at the
 right scale before anything else about them can be right, and the XAML tree's
 visual layer is what lets the backend decorate a box — and transform, clip, and
 fade a live control — the way a layer-backed host does. This milestone takes
@@ -4285,12 +4388,16 @@ range.
   WinUI 2, reached through each element's visual — to a Windows window what a
   layer is to every macOS and iOS view: a platform service, not a canvas runtime
   (2.3). Using it realizes the tree in the host's own terms;
-- **what it realizes**: on boxes, anti-aliased per-corner radius, shadows,
-  multi-stop linear and radial gradients, borders, backdrop materials, opacity
-  fades, and transforms; on native controls, opacity, transforms, and clipping,
-  because XAML composes a control without capturing it and keeps its
-  hit-testing, focus, caret, and UI Automation with it (2.2). A control's own
-  pixels are never filtered, blurred, or re-rendered;
+- **what it realizes**: on boxes, anti-aliased per-corner radius, inset and
+  drop shadows, multi-stop linear, radial, and conic gradients, borders, masks,
+  every filter and blend mode, backdrop filters and materials, opacity fades,
+  and 2D and 3D transforms; on native controls, shadows, opacity, 2D and 3D
+  transforms, and clipping, because XAML composes a control without capturing it
+  and keeps its hit-testing, focus, caret, and UI Automation with it (2.2). A
+  control's own pixels are never filtered, masked, blended, or re-rendered;
+- **motion where the compositor runs it**: the transitions and animations
+  Milestone 71 hands to the compositor thread are realized here, as composition
+  animations of the same properties, so a busy UI thread does not stall them;
 - **airspace, confined to what is still a window**: everything inside the XAML
   tree is one composed surface, so a decoration draws over a neighbouring
   control, a translucent box blends over the controls beneath it, and an
@@ -4299,6 +4406,16 @@ range.
   needs a window handle — keeps the airspace limits: nothing composes over it,
   and it blends with nothing beneath it. The capability table answers those
   limits for exactly those nodes;
+- **the common controls' boxes**: under the common-controls fallback, every
+  native child window is its own surface, so composition reaches only the boxes
+  the framework owns — DirectComposition behind framework-owned containers for
+  anti-aliased corners, shadows, gradients, and fades — and the airspace limits
+  hold throughout: a decoration cannot draw over a neighbouring control, a
+  translucent or blurred box cannot blend over the controls beneath it, and
+  animating a box that holds controls moves real windows each frame. It is a
+  time-boxed prototype measured against the same budgets, adopted or not on
+  the record; if it is not adopted, the common controls' table stays as
+  Milestone 67 records it;
 - **measured before it is relied on**: composition-heavy screens — shadows,
   backdrop materials, animated transforms over native controls — against
   `budgets/windows.toml` for cold start, resident memory, and frame time, per
@@ -4308,12 +4425,13 @@ range.
   unavailable in that set's table until it does not.
 
 **Done when** a window moved across monitors of different scale keeps its
-native windows and its XAML tree and is laid out, lettered, and clipped at the
-correct size in both layers, with a conformance case; the Windows unit mappings
+native windows and, under a XAML set, its XAML tree, and is laid out, lettered,
+and clipped at the correct size in both layers, with a conformance case; the Windows unit mappings
 state the scaled behaviour; the composed rows of each control set's table are
 read back from the realized elements; each airspace answer is asserted on an
 adopted window and a window-handle surface; and the composition measurements are
-recorded per control set and architecture.
+recorded per control set and architecture, the common controls' prototype
+included, with its decision.
 
 **Depends on** Milestone 58 (the capability tables and unit mappings), Milestone
 42 (budgets), Milestone 41 (fidelity conformance), Milestone 60 (the compositing

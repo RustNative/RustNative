@@ -368,10 +368,10 @@ fn set_hover(runtime: &mut Runtime, next: Option<NodeId>) {
         return;
     }
     runtime.input.pointer.hover = next;
-    if let Some(previous) = previous {
-        if !runtime.dispatch_or_quit(Event::PointerLeave { target: previous }) {
-            return;
-        }
+    if let Some(previous) = previous
+        && !runtime.dispatch_or_quit(Event::PointerLeave { target: previous })
+    {
+        return;
     }
     if let Some(next) = next {
         runtime.dispatch_or_quit(Event::PointerEnter { target: next });

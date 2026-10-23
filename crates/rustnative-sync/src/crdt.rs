@@ -292,10 +292,10 @@ impl<T: Clone> Rga<T> {
 
     /// Deletes the visible element at `index`.
     pub fn delete(&mut self, index: usize) {
-        if let Some(id) = self.visible_ids().get(index).copied() {
-            if let Some(element) = self.elements.get_mut(&id) {
-                element.deleted = true;
-            }
+        if let Some(id) = self.visible_ids().get(index).copied()
+            && let Some(element) = self.elements.get_mut(&id)
+        {
+            element.deleted = true;
         }
     }
 

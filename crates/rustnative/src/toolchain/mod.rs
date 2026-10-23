@@ -18,7 +18,7 @@ pub mod windows_sdk;
 
 /// The minimum Rust version this workspace supports, which `rustnative doctor`
 /// checks the installed toolchain against.
-pub const MINIMUM_RUST: (u64, u64) = (1, 85);
+pub const MINIMUM_RUST: (u64, u64) = (1, 91);
 
 /// The `rustc` on the path, and whether it is new enough.
 #[derive(Debug, Clone, PartialEq, Eq)]

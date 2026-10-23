@@ -136,10 +136,10 @@ pub(crate) fn poll(
     // Asked to close (the development loop restarting it): closed as the
     // person closing the window would, so state is flushed and placement
     // saved.
-    if application.take_quit_request() {
-        if let Some(window) = &runtime.window {
-            window.close();
-        }
+    if application.take_quit_request()
+        && let Some(window) = &runtime.window
+    {
+        window.close();
     }
     answered
 }

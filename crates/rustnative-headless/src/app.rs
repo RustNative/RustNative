@@ -435,15 +435,16 @@ impl HeadlessApp {
             node: format!("point {},{}", point.x, point.y),
             reason: "nothing is there".to_owned(),
         })?;
-        if let Some(expected) = expected {
-            if hit != expected && !self.is_ancestor(expected, hit) {
-                let covering = self.realized().get(hit).map_or_else(String::new, describe);
-                let target = self.realized().get(expected).map_or_else(String::new, describe);
-                return Err(QueryError::NotInteractable {
-                    node: target,
-                    reason: format!("it is covered by {covering}"),
-                });
-            }
+        if let Some(expected) = expected
+            && hit != expected
+            && !self.is_ancestor(expected, hit)
+        {
+            let covering = self.realized().get(hit).map_or_else(String::new, describe);
+            let target = self.realized().get(expected).map_or_else(String::new, describe);
+            return Err(QueryError::NotInteractable {
+                node: target,
+                reason: format!("it is covered by {covering}"),
+            });
         }
         let target = expected.unwrap_or(hit);
         let node =
@@ -673,16 +674,14 @@ impl HeadlessApp {
             return;
         }
         self.dispatch(Event::KeyDown { target: focused, key, modifiers });
-        if matches!(key, KeyCode::Enter | KeyCode::Space) {
-            if let Some(target) = focused {
-                if self
-                    .realized()
-                    .get(target)
-                    .is_some_and(|node| node.kind == NodeKind::Button && node.is_interactable())
-                {
-                    self.dispatch(Event::Click { target });
-                }
-            }
+        if matches!(key, KeyCode::Enter | KeyCode::Space)
+            && let Some(target) = focused
+            && self
+                .realized()
+                .get(target)
+                .is_some_and(|node| node.kind == NodeKind::Button && node.is_interactable())
+        {
+            self.dispatch(Event::Click { target });
         }
         let focused = self.realized().focused();
         self.dispatch(Event::KeyUp { target: focused, key, modifiers });
@@ -975,11 +974,11 @@ impl HeadlessApp {
 
     fn schedule_flush(&mut self) {
         let now = self.executor.now();
-        if let Some(due) = self.flush_due {
-            if now >= due {
-                let _ = self.app.flush_state();
-                self.flush_due = None;
-            }
+        if let Some(due) = self.flush_due
+            && now >= due
+        {
+            let _ = self.app.flush_state();
+            self.flush_due = None;
         }
         if self.flush_due.is_none() && self.app.has_unsaved_state() {
             self.flush_due = Some(now + STATE_FLUSH_DELAY);

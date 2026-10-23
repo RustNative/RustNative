@@ -89,7 +89,7 @@ reach the page:
 | Guards (`supports-[…]:`, `not-supports-[…]:`, `web:`, …) | decided by the framework against `rustnative_style::WEB` at resolution and emitted only when they hold — never compiled into an `@supports` query, so a guard means here what it means on every host |
 | Motion (`transition-*`, `animate-*`) | `transition` and `@keyframes` generated from the same `Transition` and `Animation` values the native backends run on Milestone 27's timeline; a spring becomes a `linear()` easing, an approximation named here |
 | Structural variants (`first:`, `odd:`, `nth-[n]:`, `*:`) | the structural pseudo-class counted over the framework's own elements only (`:nth-child(… of S)`, with `S` matching the elements the framework realizes for nodes), so virtual-list spacers and host-only elements never shift a position; held against the core's resolution by the equivalence suite |
-| Relationships on another node and container queries (optional, Milestone 68) | the rule generated from the typed relationship (`.group:hover` and its descendant; `@container` over `container-type: inline-size`), held against the core's resolution |
+| Relationships on another node and container queries (Milestone 68) | the rule generated from the typed relationship (`.group:hover` and its descendant; `@container` over `container-type: inline-size`), held against the core's resolution |
 | Host passthrough (optional, Milestone 68) | only behind a `web:[…]` marker, carried uninterpreted into the generated stylesheet — never inline, so the content security policy is unchanged — and reported as unverified |
 
 ## Approximations

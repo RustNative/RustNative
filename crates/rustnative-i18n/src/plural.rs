@@ -71,7 +71,7 @@ pub fn plural_category(locale: &str, n: i64) -> PluralCategory {
         "ja" | "zh" | "ko" => Other,
         "fr" => match i {
             0 | 1 => One,
-            _ if i % 1_000_000 == 0 => Many,
+            _ if i.is_multiple_of(1_000_000) => Many,
             _ => Other,
         },
         "ar" => match i {

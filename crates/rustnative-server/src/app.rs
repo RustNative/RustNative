@@ -398,18 +398,18 @@ impl AppService {
             let ours =
                 app.web.version.lock().unwrap_or_else(std::sync::PoisonError::into_inner).clone();
             let theirs = parts.headers.get("x-rn-fn-version").and_then(|value| value.to_str().ok());
-            if let (Some(ours), Some(theirs)) = (ours, theirs) {
-                if ours != theirs {
-                    let mut response = (
-                        StatusCode::CONFLICT,
-                        crate::response::Json(
-                            serde_json::json!({ "error": "version", "version": ours }),
-                        ),
-                    )
-                        .into_response();
-                    secure_headers(response.headers_mut(), &app.security, "", false);
-                    return response;
-                }
+            if let (Some(ours), Some(theirs)) = (ours, theirs)
+                && ours != theirs
+            {
+                let mut response = (
+                    StatusCode::CONFLICT,
+                    crate::response::Json(
+                        serde_json::json!({ "error": "version", "version": ours }),
+                    ),
+                )
+                    .into_response();
+                secure_headers(response.headers_mut(), &app.security, "", false);
+                return response;
             }
         }
 
@@ -463,15 +463,16 @@ impl AppService {
                 return fail(error);
             }
         }
-        if let Some(gate) = &router.gate {
-            if let Err(error) = gate(&mut context) {
-                return fail(error);
-            }
+        if let Some(gate) = &router.gate
+            && let Err(error) = gate(&mut context)
+        {
+            return fail(error);
         }
-        if app.security.csrf && !router.csrf_exempt {
-            if let Err(error) = check_csrf(&context) {
-                return fail(error);
-            }
+        if app.security.csrf
+            && !router.csrf_exempt
+            && let Err(error) = check_csrf(&context)
+        {
+            return fail(error);
         }
 
         let head = context.method == Method::HEAD;
@@ -550,11 +551,11 @@ impl AppService {
         if let Some((_, build)) = inner.app.extra.iter().find(|(candidate, _)| candidate == path) {
             return Some(build());
         }
-        if path == "/openapi.json" {
-            if let Some((title, version)) = &inner.app.openapi {
-                let document = inner.app.openapi_document(title, version);
-                return Some(crate::response::Json(document).into_response());
-            }
+        if path == "/openapi.json"
+            && let Some((title, version)) = &inner.app.openapi
+        {
+            let document = inner.app.openapi_document(title, version);
+            return Some(crate::response::Json(document).into_response());
         }
         match path {
             "/healthz" if cfg!(feature = "health") => Some("ok".into_response()),

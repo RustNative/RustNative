@@ -122,17 +122,17 @@ pub(crate) fn handle(runtime: &mut Runtime, hwnd: HWND, message: u32, lparam: LP
             // `lParam` carries the `GCS_*` flags saying which strings changed.
             #[allow(clippy::cast_sign_loss, clippy::cast_possible_truncation)]
             let flags = lparam as u32;
-            if flags & GCS_RESULTSTR != 0 {
-                if let Some(units) = read_string(hwnd, GCS_RESULTSTR) {
-                    let text = String::from_utf16_lossy(&units);
-                    runtime.input.ime.committed = true;
-                    if runtime.dispatch_or_quit(Event::Composition {
-                        target,
-                        composition: Composition::Committed { text: text.clone() },
-                    }) && !text.is_empty()
-                    {
-                        runtime.dispatch_or_quit(Event::TextInput { target, text });
-                    }
+            if flags & GCS_RESULTSTR != 0
+                && let Some(units) = read_string(hwnd, GCS_RESULTSTR)
+            {
+                let text = String::from_utf16_lossy(&units);
+                runtime.input.ime.committed = true;
+                if runtime.dispatch_or_quit(Event::Composition {
+                    target,
+                    composition: Composition::Committed { text: text.clone() },
+                }) && !text.is_empty()
+                {
+                    runtime.dispatch_or_quit(Event::TextInput { target, text });
                 }
             }
             if flags & GCS_COMPSTR != 0 {

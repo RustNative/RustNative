@@ -1252,10 +1252,10 @@ impl Node {
     /// Disables every node bound to a command the registry reports
     /// disabled — the pass that makes "disabled everywhere at once" true.
     pub(crate) fn apply_command_states(&mut self, enabled: &dyn Fn(CommandId) -> bool) {
-        if let Some(id) = self.command() {
-            if !enabled(id) {
-                *self = std::mem::replace(self, Self::label("", "")).disabled(true);
-            }
+        if let Some(id) = self.command()
+            && !enabled(id)
+        {
+            *self = std::mem::replace(self, Self::label("", "")).disabled(true);
         }
         match self {
             Self::Column(node) => {

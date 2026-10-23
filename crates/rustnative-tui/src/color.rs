@@ -170,7 +170,7 @@ impl ColorDepth {
 
 /// The weighted ("redmean") squared distance between two colours.
 fn distance(a: (u8, u8, u8), b: (u8, u8, u8)) -> i64 {
-    let mean = (i64::from(a.0) + i64::from(b.0)) / 2;
+    let mean = i64::midpoint(i64::from(a.0), i64::from(b.0));
     let (dr, dg, db) = (
         i64::from(a.0) - i64::from(b.0),
         i64::from(a.1) - i64::from(b.1),

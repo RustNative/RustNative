@@ -10,7 +10,11 @@ Web milestones A–K, Milestones 34, 35, and 38, and the first part of Milestone
 (Windows per-monitor DPI scaling) are built. The backends not yet built —
 macOS (33), iOS (36), embedded (37), and iPadOS (70) — owe
 the standard in `PLAN.md` section 8 and
-`docs/conformance/new-backend-checklist.md`, row by row. The 2026-10-12
+`docs/conformance/new-backend-checklist.md`, row by row, and so do the Windows
+backend's planned control sets (WinUI 3 by default, WinUI 2 as the first
+fallback; the common controls built today are the last; Milestone 71) and its
+native ARM64 build (Milestone 72). Everything verified on Windows so far ran
+under the common controls on x86_64. The 2026-10-12
 whole-framework review and the fixes it led to are the second entry below; the
 terminal backend is the first.
 

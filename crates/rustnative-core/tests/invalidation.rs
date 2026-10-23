@@ -178,10 +178,10 @@ fn texts(tree: &ComponentTree) -> Vec<String> {
 fn leaf_id(tree: &ComponentTree, label_prefix: &str) -> NodeId {
     let mut found = None;
     tree.view().visit(&mut |node, _, _| {
-        if let Node::Button(button) = node {
-            if button.text().starts_with(label_prefix) {
-                found = Some(node.id());
-            }
+        if let Node::Button(button) = node
+            && button.text().starts_with(label_prefix)
+        {
+            found = Some(node.id());
         }
     });
     assert!(found.is_some(), "the leaf is rendered");

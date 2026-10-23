@@ -189,10 +189,10 @@ pub(super) fn controls_report_and_stay_controlled(_: &Instrumentation) {
             harness.with_application(|application| {
                 let mut value = String::new();
                 application.view().visit(&mut |node, _, _| {
-                    if let Node::Control(control) = node {
-                        if node.id() == NodeId::from_key("spinner") {
-                            value = format!("{:?}", control.control());
-                        }
+                    if let Node::Control(control) = node
+                        && node.id() == NodeId::from_key("spinner")
+                    {
+                        value = format!("{:?}", control.control());
                     }
                 });
                 value

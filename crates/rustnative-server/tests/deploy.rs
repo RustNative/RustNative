@@ -323,7 +323,7 @@ async fn cached_pages_are_reused_until_their_tag_is_invalidated() {
             async move { format!("render {}", renders.fetch_add(1, Ordering::SeqCst) + 1) }
         })
         .public()
-        .cached(&["notes"], Duration::from_secs(60)),
+        .cached(&["notes"], Duration::from_mins(1)),
     );
     let cache = app.response_cache();
     let service = app.into_service();
@@ -373,7 +373,7 @@ async fn a_response_carrying_one_visitor_s_secrets_is_never_replayed_to_another(
             }
         })
         .public()
-        .cached(&["pages"], Duration::from_secs(60)),
+        .cached(&["pages"], Duration::from_mins(1)),
     );
     let cache = app.response_cache();
     let service = app.into_service();
@@ -397,7 +397,7 @@ async fn cached_responses_vary_by_language() {
                 .to_owned()
         })
         .public()
-        .cached(&["hello"], Duration::from_secs(60)),
+        .cached(&["hello"], Duration::from_mins(1)),
     );
     let service = app.into_service();
     let fetch = |language: &'static str| {

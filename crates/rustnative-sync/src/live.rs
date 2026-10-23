@@ -586,12 +586,11 @@ fn run_session<A: LiveApp>(app: &A, snapshot: Option<Value>, commands: &mpsc::Re
         // The nodes a component reads the size of, when they change.
         let watched: Vec<String> =
             tree.watched_nodes().into_iter().map(rustnative_core::wire::key_of).collect();
-        if watch_sent.as_ref() != Some(&watched) {
-            if let Some(sender) = &outbound {
-                if sender.send(ServerFrame::Watch { keys: watched.clone() }).is_ok() {
-                    watch_sent = Some(watched);
-                }
-            }
+        if watch_sent.as_ref() != Some(&watched)
+            && let Some(sender) = &outbound
+            && sender.send(ServerFrame::Watch { keys: watched.clone() }).is_ok()
+        {
+            watch_sent = Some(watched);
         }
         // The shortcuts the enabled commands answer, when they change.
         let shortcuts: Vec<_> = tree
@@ -601,12 +600,11 @@ fn run_session<A: LiveApp>(app: &A, snapshot: Option<Value>, commands: &mpsc::Re
             .filter_map(rustnative_core::command::Command::shortcut_key)
             .map(|shortcut| (shortcut.key, shortcut.modifiers))
             .collect();
-        if shortcuts_sent.as_ref() != Some(&shortcuts) {
-            if let Some(sender) = &outbound {
-                if sender.send(ServerFrame::Shortcuts { keys: shortcuts.clone() }).is_ok() {
-                    shortcuts_sent = Some(shortcuts);
-                }
-            }
+        if shortcuts_sent.as_ref() != Some(&shortcuts)
+            && let Some(sender) = &outbound
+            && sender.send(ServerFrame::Shortcuts { keys: shortcuts.clone() }).is_ok()
+        {
+            shortcuts_sent = Some(shortcuts);
         }
     }
 }

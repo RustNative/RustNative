@@ -95,18 +95,18 @@ impl<'ast> Visit<'ast> for Insets {
     fn visit_pat_struct(&mut self, node: &'ast syn::PatStruct) {
         if names_edge_insets(&node.path) {
             for field in &node.fields {
-                if let syn::Member::Named(name) = &field.member {
-                    if name == "left" || name == "right" {
-                        let start = name.span().start();
-                        self.manual.push((
-                            start.line,
-                            start.column,
-                            format!(
-                                "a pattern binds EdgeInsets' `{name}`; bind `{}`",
-                                if name == "left" { "start" } else { "end" }
-                            ),
-                        ));
-                    }
+                if let syn::Member::Named(name) = &field.member
+                    && (name == "left" || name == "right")
+                {
+                    let start = name.span().start();
+                    self.manual.push((
+                        start.line,
+                        start.column,
+                        format!(
+                            "a pattern binds EdgeInsets' `{name}`; bind `{}`",
+                            if name == "left" { "start" } else { "end" }
+                        ),
+                    ));
                 }
             }
         }
@@ -116,29 +116,29 @@ impl<'ast> Visit<'ast> for Insets {
     fn visit_expr_field(&mut self, node: &'ast syn::ExprField) {
         // `.left` on an unknown type may not be EdgeInsets: reported, not
         // rewritten, unless the receiver is plainly an `EdgeInsets` value.
-        if let syn::Member::Named(name) = &node.member {
-            if name == "left" || name == "right" {
-                let plainly_insets = matches!(&*node.base, syn::Expr::Call(call)
+        if let syn::Member::Named(name) = &node.member
+            && (name == "left" || name == "right")
+        {
+            let plainly_insets = matches!(&*node.base, syn::Expr::Call(call)
                     if matches!(&*call.func, syn::Expr::Path(path) if path.path.segments.iter().any(|segment| segment.ident == "EdgeInsets")))
-                    || matches!(&*node.base, syn::Expr::Struct(value) if names_edge_insets(&value.path));
-                let start = name.span().start();
-                if plainly_insets {
-                    self.renames.push((
-                        start.line,
-                        start.column,
-                        if name == "left" { "left" } else { "right" },
-                        if name == "left" { "start" } else { "end" },
-                    ));
-                } else {
-                    self.manual.push((
-                        start.line,
-                        start.column,
-                        format!(
-                            "`.{name}`: if this is EdgeInsets, it is now `.{}`",
-                            if name == "left" { "start" } else { "end" }
-                        ),
-                    ));
-                }
+                || matches!(&*node.base, syn::Expr::Struct(value) if names_edge_insets(&value.path));
+            let start = name.span().start();
+            if plainly_insets {
+                self.renames.push((
+                    start.line,
+                    start.column,
+                    if name == "left" { "left" } else { "right" },
+                    if name == "left" { "start" } else { "end" },
+                ));
+            } else {
+                self.manual.push((
+                    start.line,
+                    start.column,
+                    format!(
+                        "`.{name}`: if this is EdgeInsets, it is now `.{}`",
+                        if name == "left" { "start" } else { "end" }
+                    ),
+                ));
             }
         }
         syn::visit::visit_expr_field(self, node);

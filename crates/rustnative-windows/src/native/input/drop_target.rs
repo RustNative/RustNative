@@ -223,10 +223,10 @@ fn over(runtime: &mut Runtime, screen: POINT) -> DropEffect {
     let previous = runtime.input.drag.target;
     if previous != next {
         runtime.input.drag.target = next;
-        if let Some(previous) = previous {
-            if !runtime.dispatch_or_quit(Event::DragLeave { target: previous }) {
-                return DropEffect::None;
-            }
+        if let Some(previous) = previous
+            && !runtime.dispatch_or_quit(Event::DragLeave { target: previous })
+        {
+            return DropEffect::None;
         }
         return match next {
             Some(target) => {

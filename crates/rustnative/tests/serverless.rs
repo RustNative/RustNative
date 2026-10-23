@@ -59,7 +59,7 @@ impl Drop for Process {
 fn wait_for(port: u16) {
     let started = Instant::now();
     while TcpStream::connect(("127.0.0.1", port)).is_err() {
-        assert!(started.elapsed() < Duration::from_secs(60), "nothing listened on {port}");
+        assert!(started.elapsed() < Duration::from_mins(1), "nothing listened on {port}");
         std::thread::sleep(Duration::from_millis(50));
     }
 }
@@ -79,7 +79,7 @@ impl Reply {
 
 fn send(port: u16, method: &str, path: &str, headers: &[(&str, &str)], body: &str) -> Reply {
     let mut stream = TcpStream::connect(("127.0.0.1", port)).unwrap();
-    stream.set_read_timeout(Some(Duration::from_secs(120))).unwrap();
+    stream.set_read_timeout(Some(Duration::from_mins(2))).unwrap();
     let mut head = format!(
         "{method} {path} HTTP/1.1\r\nconnection: close\r\ncontent-length: {}\r\n",
         body.len()
@@ -413,7 +413,7 @@ fn interact(page: &rustnative_web_testing::Page) -> Vec<String> {
     };
     if let Err(error) = page.wait_until(
         "document.documentElement.hasAttribute('data-rn-ready')",
-        Duration::from_secs(60),
+        Duration::from_mins(1),
     ) {
         panic!("{error:?}: {:?} {:?}", page.eval("location.href"), page.console());
     }
@@ -439,7 +439,7 @@ fn browser_sign_in(page: &rustnative_web_testing::Page, origin: &str) {
     page.goto(&format!("{origin}/")).unwrap();
     page.wait_until(
         "!!(document.getElementById('name') || document.getElementById('i0-editor'))",
-        Duration::from_secs(60),
+        Duration::from_mins(1),
     )
     .unwrap();
     // Cookies are per host, not per port: a session from another shape is
@@ -453,7 +453,7 @@ fn browser_sign_in(page: &rustnative_web_testing::Page, origin: &str) {
     page.type_text("analytical engine").unwrap();
     page.click("#go").unwrap();
     if let Err(error) =
-        page.wait_until("!!document.getElementById('i0-editor')", Duration::from_secs(60))
+        page.wait_until("!!document.getElementById('i0-editor')", Duration::from_mins(1))
     {
         let state =
             page.eval("location.href + ' | ' + document.cookie + ' | ' + document.body.innerHTML");
@@ -575,7 +575,7 @@ fn a_function_deployment_previews_promotes_and_rolls_back() {
     let preview_file = runtime.join("rustnative").join(format!("deploy-{control}-preview.token"));
     let started = Instant::now();
     while !token_file.is_file() {
-        assert!(started.elapsed() < Duration::from_secs(60), "no control token");
+        assert!(started.elapsed() < Duration::from_mins(1), "no control token");
         std::thread::sleep(Duration::from_millis(50));
     }
     let deploy = |arguments: &[&str]| {

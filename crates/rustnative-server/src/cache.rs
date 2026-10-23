@@ -217,18 +217,18 @@ mod tests {
     #[test]
     fn a_response_that_must_not_be_shared_is_not_stored() {
         let cache = ResponseCache::new();
-        cache.put("page".into(), &response(Some("no-store")), &[], Duration::from_secs(60));
+        cache.put("page".into(), &response(Some("no-store")), &[], Duration::from_mins(1));
         cache.put(
             "mine".into(),
             &response(Some("max-age=0, private")),
             &[],
-            Duration::from_secs(60),
+            Duration::from_mins(1),
         );
         cache.put(
             "public".into(),
             &response(Some("public, max-age=60")),
             &[],
-            Duration::from_secs(60),
+            Duration::from_mins(1),
         );
         assert_eq!(cache.len(), 1);
         assert!(cache.get("public").is_some());

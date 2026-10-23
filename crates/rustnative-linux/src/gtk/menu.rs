@@ -205,10 +205,10 @@ impl WindowMenu {
             if entry.action.is_enabled() != enabled {
                 entry.action.set_enabled(enabled);
             }
-            if let Some(checked) = checked {
-                if entry.action.state().and_then(|state| state.get::<bool>()) != Some(checked) {
-                    entry.action.set_state(&checked.to_variant());
-                }
+            if let Some(checked) = checked
+                && entry.action.state().and_then(|state| state.get::<bool>()) != Some(checked)
+            {
+                entry.action.set_state(&checked.to_variant());
             }
             let accel = shortcut.and_then(accelerator);
             if accel != entry.accel {

@@ -428,7 +428,9 @@ codemod is a release blocker unless no rewrite is possible.
   for each break: E5 **[Review]**, E4 once CMP-2 exists.
 
 **CMP-5 — MSRV is declared, checked, and raised deliberately.**
-`rust-version` (1.85) is checked on every change. Raising it is a minor
+`rust-version` (1.91, the first release with ARM64 Windows as a Tier 1
+target, which the Windows backend ships natively — `PLAN.md` Milestone 72) is
+checked on every change. Raising it is a minor
 release before 1.0 and a major one after, and the release notes say so.
 - *Enforcement:* E3, the `msrv` CI job **[Enforced]**.
 
@@ -526,8 +528,11 @@ editing, input method, and accessibility (`PLAN.md` 2.2).
   Android, Web, and terminal.
 
 **NAT-2 — Decorate the box, never the control.** No backend captures,
-redraws, or owner-draws a native control to satisfy a style. A style that
-would need it is answered unavailable for native controls.
+redraws, or owner-draws a native control to satisfy a style, and replacing a
+XAML control's template counts as redrawing it. A transform, clip, fade, or
+shadow the host's own control framework applies to a live control is the host
+realizing the style, and is allowed (`PLAN.md` 2.2). A style that would need
+capture or redraw is answered unavailable for native controls.
 - *Enforcement:* E5 **[Review]**, plus conformance row 25 once Milestone 67
   lands **[Owed]**.
 

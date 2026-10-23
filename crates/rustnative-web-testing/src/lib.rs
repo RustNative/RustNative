@@ -147,7 +147,7 @@ impl Connection {
         self.socket
             .send(Message::Text(command.to_string()))
             .map_err(|error| Error::Socket(error.to_string()))?;
-        let deadline = Instant::now() + Duration::from_secs(60);
+        let deadline = Instant::now() + Duration::from_mins(1);
         loop {
             let Some(message) = self.read(deadline)? else {
                 return Err(Error::Timeout(format!("an answer to {method}")));
@@ -253,10 +253,10 @@ impl Browser {
         let (port, path) = loop {
             if let Ok(text) = std::fs::read_to_string(&port_file) {
                 let mut lines = text.lines();
-                if let (Some(port), Some(path)) = (lines.next(), lines.next()) {
-                    if let Ok(port) = port.trim().parse::<u16>() {
-                        break (port, path.trim().to_owned());
-                    }
+                if let (Some(port), Some(path)) = (lines.next(), lines.next())
+                    && let Ok(port) = port.trim().parse::<u16>()
+                {
+                    break (port, path.trim().to_owned());
                 }
             }
             if Instant::now() > deadline {
@@ -956,10 +956,10 @@ fn serve(stream: TcpStream, routes: &Routes) {
             if line.is_empty() {
                 break;
             }
-            if let Some((name, value)) = line.split_once(':') {
-                if name.eq_ignore_ascii_case("content-length") {
-                    length = value.trim().parse().unwrap_or(0);
-                }
+            if let Some((name, value)) = line.split_once(':')
+                && name.eq_ignore_ascii_case("content-length")
+            {
+                length = value.trim().parse().unwrap_or(0);
             }
         }
         let mut body = vec![0; length];

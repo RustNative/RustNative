@@ -81,12 +81,11 @@ impl Component for Notes {
                     .ok()
                     .and_then(|route| route.matches(rustnative_core::url_path(&url)))
                     .and_then(|params| params.param::<u32>("id"))
+                    && let Some(stack) = &self.stack
                 {
-                    if let Some(stack) = &self.stack {
-                        stack.update(|stack| {
-                            stack.push(Screen::Item(id));
-                        });
-                    }
+                    stack.update(|stack| {
+                        stack.push(Screen::Item(id));
+                    });
                 }
             }
             Event::Lifecycle(Lifecycle::LowMemory) => self.cache = Vec::new(),

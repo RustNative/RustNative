@@ -227,12 +227,12 @@ impl Cx<'_> {
             }
             return Ok(());
         }
-        if let syn::Pat::Ident(pat_ident) = &pat {
-            if pat_ident.subpat.is_none() {
-                let variable = self.bind(&pat_ident.ident.to_string(), ty);
-                self.w.line(&format!("let {variable} = {js};"), Some(span));
-                return Ok(());
-            }
+        if let syn::Pat::Ident(pat_ident) = &pat
+            && pat_ident.subpat.is_none()
+        {
+            let variable = self.bind(&pat_ident.ident.to_string(), ty);
+            self.w.line(&format!("let {variable} = {js};"), Some(span));
+            return Ok(());
         }
         let scrutinee = self.temp();
         self.w.line(&format!("const {scrutinee} = {js};"), Some(span));
@@ -1058,12 +1058,12 @@ impl Cx<'_> {
                 self.w.line(&format!("let {variable} = {value};"), None);
             }
             let mut guard_open = false;
-            if let Some((_, guard)) = &mut arm.guard {
-                if let Ok(guard) = self.expr(guard, Some(&Ty::Bool)) {
-                    let js = self.flush(guard);
-                    self.w.open(&format!("if ({js}) {{"), None);
-                    guard_open = true;
-                }
+            if let Some((_, guard)) = &mut arm.guard
+                && let Ok(guard) = self.expr(guard, Some(&Ty::Bool))
+            {
+                let js = self.flush(guard);
+                self.w.open(&format!("if ({js}) {{"), None);
+                guard_open = true;
             }
             let arm_ty = match &mut *arm.body {
                 syn::Expr::Block(block) => self.block_into(
@@ -1159,63 +1159,56 @@ impl Cx<'_> {
                     .map(|label| format!("{}: ", label_js(&label.name)))
                     .unwrap_or_default();
                 // A range loops by counting.
-                if let syn::Expr::Range(range) = &mut *looped.expr {
-                    if let (Some(start), Some(end), syn::Pat::Ident(pat)) =
+                if let syn::Expr::Range(range) = &mut *looped.expr
+                    && let (Some(start), Some(end), syn::Pat::Ident(pat)) =
                         (&mut range.start, &mut range.end, &*looped.pat)
+                {
+                    let kind = self.fresh_int();
+                    let start = self.expr(start, Some(&Ty::Int(kind)))?;
+                    let end = self.expr(end, Some(&Ty::Int(kind)))?;
+                    let ty = self.unify(&start.ty, &end.ty);
+                    let start = self.flush(start);
+                    let end = self.flush(end);
+                    let bound = self.temp();
+                    let comparison = if matches!(range.limits, syn::RangeLimits::Closed(_)) {
+                        "<="
+                    } else {
+                        "<"
+                    };
+                    self.push_scope();
+                    let variable = self.bind(&pat.ident.to_string(), ty);
+                    self.w.open(&format!("{label}for (let {variable} = {start}, {bound} = {end}; {variable} {comparison} {bound}; {variable}++) {{"), Some(span));
+                    self.block_into(&mut looped.body, None, None);
+                    self.w.close("}");
+                    self.pop_scope();
+                    return Ok(Ty::Unit);
+                }
+                // `for x in v.iter_mut()` over primitives: `x` is `v[i]`.
+                if let syn::Expr::MethodCall(call) = &mut *looped.expr
+                    && call.method == "iter_mut"
+                {
+                    let receiver = self.expr(&mut call.receiver, None)?;
+                    if let (Ty::Vec(element), syn::Pat::Ident(pat)) = (&receiver.ty, &*looped.pat)
+                        && element.is_primitive()
                     {
-                        let kind = self.fresh_int();
-                        let start = self.expr(start, Some(&Ty::Int(kind)))?;
-                        let end = self.expr(end, Some(&Ty::Int(kind)))?;
-                        let ty = self.unify(&start.ty, &end.ty);
-                        let start = self.flush(start);
-                        let end = self.flush(end);
-                        let bound = self.temp();
-                        let comparison = if matches!(range.limits, syn::RangeLimits::Closed(_)) {
-                            "<="
-                        } else {
-                            "<"
-                        };
+                        let element = (**element).clone();
+                        let array = self.flush(receiver);
+                        let index = self.temp();
                         self.push_scope();
-                        let variable = self.bind(&pat.ident.to_string(), ty);
-                        self.w.open(&format!("{label}for (let {variable} = {start}, {bound} = {end}; {variable} {comparison} {bound}; {variable}++) {{"), Some(span));
+                        self.alias(&pat.ident.to_string(), format!("{array}[{index}]"), element);
+                        self.w.open(&format!("{label}for (let {index} = 0; {index} < {array}.length; {index}++) {{"), Some(span));
                         self.block_into(&mut looped.body, None, None);
                         self.w.close("}");
                         self.pop_scope();
                         return Ok(Ty::Unit);
                     }
-                }
-                // `for x in v.iter_mut()` over primitives: `x` is `v[i]`.
-                if let syn::Expr::MethodCall(call) = &mut *looped.expr {
-                    if call.method == "iter_mut" {
-                        let receiver = self.expr(&mut call.receiver, None)?;
-                        if let (Ty::Vec(element), syn::Pat::Ident(pat)) =
-                            (&receiver.ty, &*looped.pat)
-                        {
-                            if element.is_primitive() {
-                                let element = (**element).clone();
-                                let array = self.flush(receiver);
-                                let index = self.temp();
-                                self.push_scope();
-                                self.alias(
-                                    &pat.ident.to_string(),
-                                    format!("{array}[{index}]"),
-                                    element,
-                                );
-                                self.w.open(&format!("{label}for (let {index} = 0; {index} < {array}.length; {index}++) {{"), Some(span));
-                                self.block_into(&mut looped.body, None, None);
-                                self.w.close("}");
-                                self.pop_scope();
-                                return Ok(Ty::Unit);
-                            }
-                        }
-                        let value = V::new(receiver.js.clone(), receiver.ty.clone());
-                        return self.for_each(
-                            looped,
-                            seq(receiver.pre, value.js, value.ty),
-                            &label,
-                            span,
-                        );
-                    }
+                    let value = V::new(receiver.js.clone(), receiver.ty.clone());
+                    return self.for_each(
+                        looped,
+                        seq(receiver.pre, value.js, value.ty),
+                        &label,
+                        span,
+                    );
                 }
                 let iterable = self.expr(&mut looped.expr, None)?;
                 self.for_each(looped, iterable, &label, span)
@@ -1417,13 +1410,13 @@ impl Cx<'_> {
 /// A block's last statement written as a macro with no semicolon (`rsx! {}`,
 /// `format!(..)`) is its value: syn reads it as a macro statement.
 fn tail_macro(block: &mut syn::Block) {
-    if let Some(syn::Stmt::Macro(mac)) = block.stmts.last() {
-        if mac.semi_token.is_none() {
-            let expr =
-                syn::Expr::Macro(syn::ExprMacro { attrs: mac.attrs.clone(), mac: mac.mac.clone() });
-            if let Some(last) = block.stmts.last_mut() {
-                *last = syn::Stmt::Expr(expr, None);
-            }
+    if let Some(syn::Stmt::Macro(mac)) = block.stmts.last()
+        && mac.semi_token.is_none()
+    {
+        let expr =
+            syn::Expr::Macro(syn::ExprMacro { attrs: mac.attrs.clone(), mac: mac.mac.clone() });
+        if let Some(last) = block.stmts.last_mut() {
+            *last = syn::Stmt::Expr(expr, None);
         }
     }
 }

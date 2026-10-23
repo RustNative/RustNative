@@ -43,12 +43,12 @@ pub fn middleware(tracer: Tracer) -> (Before, After) {
     });
     let after: After =
         Arc::new(|request: &RequestContext, response: &mut rustnative_server::Response| {
-            if let Some(Open(open)) = request.value::<Open>() {
-                if let Some(span) = open.lock().unwrap_or_else(PoisonError::into_inner).take() {
-                    span.set(crate::conventions::HTTP_STATUS, response.status().as_u16());
-                    if response.status().is_server_error() {
-                        span.fail(response.status().to_string());
-                    }
+            if let Some(Open(open)) = request.value::<Open>()
+                && let Some(span) = open.lock().unwrap_or_else(PoisonError::into_inner).take()
+            {
+                span.set(crate::conventions::HTTP_STATUS, response.status().as_u16());
+                if response.status().is_server_error() {
+                    span.fail(response.status().to_string());
                 }
             }
         });

@@ -206,7 +206,7 @@ async fn every_response_carries_the_security_headers() {
 async fn clients_are_rate_limited_and_bodies_bounded() {
     let service = ServerApp::new()
         .security(Security {
-            rate_limit: Some((3, Duration::from_secs(60))),
+            rate_limit: Some((3, Duration::from_mins(1))),
             body_limit: 16,
             ..Security::default()
         })

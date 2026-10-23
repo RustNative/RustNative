@@ -488,14 +488,13 @@ mod platform {
                     && (kind == PointerKind::Touch
                         || (button == Some(rustnative_core::PointerButton::Primary)
                             && wants.wants_gestures()))
+                    && let Some(runtime) = registry.windows.get_mut(&window)
                 {
-                    if let Some(runtime) = registry.windows.get_mut(&window) {
-                        runtime
-                            .input
-                            .pointer
-                            .captures
-                            .insert(pointer, Capture { node: target, implicit: true });
-                    }
+                    runtime
+                        .input
+                        .pointer
+                        .captures
+                        .insert(pointer, Capture { node: target, implicit: true });
                 }
                 let mut sample = PointerEvent::new(
                     pointer,
@@ -512,18 +511,16 @@ mod platform {
                     sample = sample.with_pressure(pressure);
                 }
                 deliver(registry, window, target, phase, sample)?;
-                if matches!(phase, PointerPhase::Up | PointerPhase::Cancel) {
-                    if let Some(runtime) = registry.windows.get_mut(&window) {
-                        if runtime
-                            .input
-                            .pointer
-                            .captures
-                            .get(&pointer)
-                            .is_some_and(|capture| capture.implicit)
-                        {
-                            runtime.input.pointer.captures.remove(&pointer);
-                        }
-                    }
+                if matches!(phase, PointerPhase::Up | PointerPhase::Cancel)
+                    && let Some(runtime) = registry.windows.get_mut(&window)
+                    && runtime
+                        .input
+                        .pointer
+                        .captures
+                        .get(&pointer)
+                        .is_some_and(|capture| capture.implicit)
+                {
+                    runtime.input.pointer.captures.remove(&pointer);
                 }
                 Ok(false)
             }
@@ -722,17 +719,17 @@ mod platform {
                 other => crate::input::drag::apply_request(registry, window, other)?,
             }
         }
-        if let Some(runtime) = registry.windows.get_mut(&window) {
-            if let Some(renderer) = runtime.renderer.as_ref() {
-                let snapshot = &renderer.snapshot;
-                runtime.input.pointer.captures.retain(|_, capture| snapshot.contains(capture.node));
-                runtime.input.pointer.recognizers.retain(|id, _| snapshot.contains(*id));
-                if runtime.input.pointer.hover.is_some_and(|id| !snapshot.contains(id)) {
-                    runtime.input.pointer.hover = None;
-                }
-                if runtime.input.focused.is_some_and(|id| !snapshot.contains(id)) {
-                    runtime.input.focused = None;
-                }
+        if let Some(runtime) = registry.windows.get_mut(&window)
+            && let Some(renderer) = runtime.renderer.as_ref()
+        {
+            let snapshot = &renderer.snapshot;
+            runtime.input.pointer.captures.retain(|_, capture| snapshot.contains(capture.node));
+            runtime.input.pointer.recognizers.retain(|id, _| snapshot.contains(*id));
+            if runtime.input.pointer.hover.is_some_and(|id| !snapshot.contains(id)) {
+                runtime.input.pointer.hover = None;
+            }
+            if runtime.input.focused.is_some_and(|id| !snapshot.contains(id)) {
+                runtime.input.focused = None;
             }
         }
         Ok(())

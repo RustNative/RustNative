@@ -120,17 +120,17 @@ impl Runtime {
             return;
         }
         let rest = path.strip_prefix("/2018-06-01/runtime/invocation/");
-        if let (Some(rest), "POST") = (rest, request.method.as_str()) {
-            if let Some((id, outcome)) = rest.split_once('/') {
-                let sender =
-                    self.queue.lock().unwrap_or_else(PoisonError::into_inner).running.remove(id);
-                if let Some(sender) = sender {
-                    let reply =
-                        if outcome == "response" { Ok(request.body) } else { Err(request.body) };
-                    let _ = sender.send(reply);
-                    write_response(&mut stream, 202, &[], b"");
-                    return;
-                }
+        if let (Some(rest), "POST") = (rest, request.method.as_str())
+            && let Some((id, outcome)) = rest.split_once('/')
+        {
+            let sender =
+                self.queue.lock().unwrap_or_else(PoisonError::into_inner).running.remove(id);
+            if let Some(sender) = sender {
+                let reply =
+                    if outcome == "response" { Ok(request.body) } else { Err(request.body) };
+                let _ = sender.send(reply);
+                write_response(&mut stream, 202, &[], b"");
+                return;
             }
         }
         if path == "/2018-06-01/runtime/init/error" {
@@ -276,10 +276,10 @@ struct Instance {
 
 impl Instance {
     fn ensure(&mut self) {
-        if let Some(child) = &mut self.child {
-            if matches!(child.try_wait(), Ok(None)) {
-                return;
-            }
+        if let Some(child) = &mut self.child
+            && matches!(child.try_wait(), Ok(None))
+        {
+            return;
         }
         match Command::new(&self.binary)
             .env("AWS_LAMBDA_RUNTIME_API", self.api.to_string())

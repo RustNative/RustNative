@@ -124,10 +124,11 @@ pub(crate) fn watch_startup(window: &gtk::Window) {
             gtk::glib::idle_add_local_full(gtk::glib::Priority::LOW, || {
                 let exit =
                     std::env::var("RUSTNATIVE_EXIT_AT").is_ok_and(|value| value == "interactive");
-                if perf::mark(StartupPhase::Interactive) && exit {
-                    if let Some(backend) = super::backend::current() {
-                        backend.quit();
-                    }
+                if perf::mark(StartupPhase::Interactive)
+                    && exit
+                    && let Some(backend) = super::backend::current()
+                {
+                    backend.quit();
                 }
                 gtk::glib::ControlFlow::Break
             });

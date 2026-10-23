@@ -456,10 +456,10 @@ pub(crate) fn update(object: &HostObject, node: &TreeNode) {
                 while let Some(widget) = child {
                     child = widget.next_sibling();
                     if let Some(tab) = widget.downcast_ref::<gtk::ToggleButton>() {
-                        if let Some(label) = tabs.labels().get(index) {
-                            if tab.label().as_deref() != Some(label.as_str()) {
-                                tab.set_label(label);
-                            }
+                        if let Some(label) = tabs.labels().get(index)
+                            && tab.label().as_deref() != Some(label.as_str())
+                        {
+                            tab.set_label(label);
                         }
                         let selected = index == tabs.selected();
                         if tab.is_active() != selected {
@@ -513,15 +513,15 @@ fn update_control(widget: &gtk::Widget, control: &Control) {
                     .as_ref()
                     .and_then(WidgetExt::next_sibling)
                     .and_then(|child| child.downcast::<gtk::Label>().ok());
-                if let Some(text) = text {
-                    if text.text() != *label {
-                        text.set_text(label);
-                    }
+                if let Some(text) = text
+                    && text.text() != *label
+                {
+                    text.set_text(label);
                 }
-                if let Some(switch) = switch {
-                    if switch.is_active() != *on {
-                        switch.set_active(*on);
-                    }
+                if let Some(switch) = switch
+                    && switch.is_active() != *on
+                {
+                    switch.set_active(*on);
                 }
                 place_toggle(row);
             }
@@ -604,27 +604,26 @@ fn update_control(widget: &gtk::Widget, control: &Control) {
                     .popover()
                     .and_then(|popover| popover.child())
                     .and_downcast::<gtk::Calendar>();
-                if let Some(calendar) = calendar {
-                    if calendar_date(&calendar.date()) != Some(*date) {
-                        if let Ok(value) = glib::DateTime::from_local(
-                            date.year,
-                            i32::from(date.month),
-                            i32::from(date.day),
-                            0,
-                            0,
-                            0.0,
-                        ) {
-                            calendar.select_day(&value);
-                        }
-                    }
+                if let Some(calendar) = calendar
+                    && calendar_date(&calendar.date()) != Some(*date)
+                    && let Ok(value) = glib::DateTime::from_local(
+                        date.year,
+                        i32::from(date.month),
+                        i32::from(date.day),
+                        0,
+                        0,
+                        0.0,
+                    )
+                {
+                    calendar.select_day(&value);
                 }
             }
         }
         Control::Link { text } => {
-            if let Some(link) = widget.downcast_ref::<gtk::Button>() {
-                if link.label().as_deref() != Some(text.as_str()) {
-                    link.set_label(text);
-                }
+            if let Some(link) = widget.downcast_ref::<gtk::Button>()
+                && link.label().as_deref() != Some(text.as_str())
+            {
+                link.set_label(text);
             }
         }
         Control::MultilineText { value } => {

@@ -294,8 +294,7 @@ async fn the_admin_surface_is_generated_and_guarded() {
         .unwrap();
     let schema = Schema::of(&db.get()).unwrap();
     let signer = TokenSigner::new(Secret::new(vec![1; 32]));
-    let (before, after) =
-        Sessions::new(&Secret::new([2; 32]), Duration::from_secs(60)).middleware();
+    let (before, after) = Sessions::new(&Secret::new([2; 32]), Duration::from_mins(1)).middleware();
     let jobs = Jobs::new(db.clone()).unwrap();
     let service = ServerApp::new()
         .before(before)
@@ -307,7 +306,7 @@ async fn the_admin_surface_is_generated_and_guarded() {
     let bearer = |admin: bool| {
         format!(
             "Bearer {}",
-            signer.issue(serde_json::to_string(&Staff { admin }).unwrap(), Duration::from_secs(60))
+            signer.issue(serde_json::to_string(&Staff { admin }).unwrap(), Duration::from_mins(1))
         )
     };
     let send = |method: &str, uri: &str, auth: String, body: &str| {

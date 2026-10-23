@@ -80,7 +80,7 @@ impl Component for Probe {
                 if std::env::args().any(|argument| argument.ends_with("=stuck")) {
                     // A component that never returns: only a second signal
                     // ends the process.
-                    std::thread::sleep(Duration::from_secs(60));
+                    std::thread::sleep(Duration::from_mins(1));
                 }
                 panic!("a component panicked on purpose");
             }

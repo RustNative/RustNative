@@ -297,12 +297,12 @@ impl Application {
         }
         // A minimized window's components keep their state and stop their
         // deferrable work (`PLAN.md` Milestone 54).
-        if let Event::WindowStateChanged { state, .. } = &event {
-            if let Some(entry) = self.windows.get_mut(&id) {
-                entry
-                    .components
-                    .set_backgrounded(*state == crate::window::WindowPresentation::Minimized);
-            }
+        if let Event::WindowStateChanged { state, .. } = &event
+            && let Some(entry) = self.windows.get_mut(&id)
+        {
+            entry
+                .components
+                .set_backgrounded(*state == crate::window::WindowPresentation::Minimized);
         }
 
         // A menu item bound to a command invokes it.
@@ -380,10 +380,10 @@ impl Application {
         let mut ids = self.windows.keys().copied().collect::<Vec<_>>();
         ids.sort();
         for id in ids {
-            if let Some(entry) = self.windows.get(&id) {
-                if let Err(error) = entry.components.flush_state() {
-                    first_error.get_or_insert(error);
-                }
+            if let Some(entry) = self.windows.get(&id)
+                && let Err(error) = entry.components.flush_state()
+            {
+                first_error.get_or_insert(error);
             }
         }
         self.orphaned_state.retain(|cache| {
@@ -904,14 +904,13 @@ impl Application {
         // Reduced motion is one trait with two readers — the environment
         // (components, `motion-reduce:`) and the animation timelines — so
         // setting it either way reaches both.
-        if key.name() == crate::environment::keys::REDUCED_MOTION.name() {
-            if let Some(motion) =
+        if key.name() == crate::environment::keys::REDUCED_MOTION.name()
+            && let Some(motion) =
                 (&value as &dyn std::any::Any).downcast_ref::<crate::MotionPreference>()
-            {
-                self.motion = *motion;
-                for entry in self.windows.values() {
-                    entry.components.set_motion_preference(*motion);
-                }
+        {
+            self.motion = *motion;
+            for entry in self.windows.values() {
+                entry.components.set_motion_preference(*motion);
             }
         }
         let _ = self.environment.set(key, value.clone(), 0);

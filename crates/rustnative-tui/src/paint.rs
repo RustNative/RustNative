@@ -195,14 +195,12 @@ pub fn paint_window(
         draw_scrollbar(grid, node, context, context.mapping);
     }
     // An open select's list is drawn over everything else.
-    if let Some(focused) = model.focused() {
-        if let Some(node) = model.get(focused).cloned() {
-            if model.widget(focused).open {
-                if let Some(spot) = paint_popup(model, grid, &node, context) {
-                    cursor = Some(spot);
-                }
-            }
-        }
+    if let Some(focused) = model.focused()
+        && let Some(node) = model.get(focused).cloned()
+        && model.widget(focused).open
+        && let Some(spot) = paint_popup(model, grid, &node, context)
+    {
+        cursor = Some(spot);
     }
     cursor
 }
@@ -530,11 +528,11 @@ fn paint_node(
             if let Some(border) = border {
                 draw_box(grid, rect, CellStyle::DEFAULT.fg(Some(border)), clip, context);
             }
-            if node.kind == NodeKind::Canvas {
-                if let Some(list) = &node.draw_list {
-                    let mut target = CellTarget { grid, clip, context };
-                    let _ = rasterize(list, rect, context.mapping, &mut target);
-                }
+            if node.kind == NodeKind::Canvas
+                && let Some(list) = &node.draw_list
+            {
+                let mut target = CellTarget { grid, clip, context };
+                let _ = rasterize(list, rect, context.mapping, &mut target);
             }
             None
         }

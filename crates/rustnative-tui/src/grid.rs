@@ -206,11 +206,11 @@ impl Grid {
             }
             let style = self.cells[index].style;
             self.cells[index] = Cell::blank(style);
-        } else if cell.width == 2 {
-            if let Some(right) = self.index(x + 1, y) {
-                let style = self.cells[right].style;
-                self.cells[right] = Cell::blank(style);
-            }
+        } else if cell.width == 2
+            && let Some(right) = self.index(x + 1, y)
+        {
+            let style = self.cells[right].style;
+            self.cells[right] = Cell::blank(style);
         }
     }
 

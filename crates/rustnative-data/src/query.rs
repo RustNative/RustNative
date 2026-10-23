@@ -232,7 +232,7 @@ impl Default for Options {
     fn default() -> Self {
         Self {
             stale: Duration::ZERO,
-            retain: Duration::from_secs(300),
+            retain: Duration::from_mins(5),
             retries: 3,
             retry_delay: Duration::from_millis(500),
             revalidate: Revalidate::default(),
@@ -854,10 +854,10 @@ impl QueryClient {
                 });
             }
         });
-        if let Some(entry) = self.inner.meta.borrow_mut().get_mut(key) {
-            if let Some(previous) = entry.retention.replace(handle) {
-                previous.cancel();
-            }
+        if let Some(entry) = self.inner.meta.borrow_mut().get_mut(key)
+            && let Some(previous) = entry.retention.replace(handle)
+        {
+            previous.cancel();
         }
     }
 

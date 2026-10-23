@@ -476,17 +476,17 @@ impl Cx<'_> {
                 let (pre, args, _) = arguments(self, &mut call.args, &sig.params)?;
                 return Ok(seq(pre, format!("{}({})", ident(&name), args.join(", ")), sig.ret));
             }
-            if let Some(def) = self.module.structs.get(&name).cloned() {
-                if def.tuple {
-                    let types: Vec<Ty> = def.fields.iter().map(|(_, ty)| ty.clone()).collect();
-                    let (pre, args, _) = arguments(self, &mut call.args, &types)?;
-                    let js = if args.len() == 1 {
-                        args[0].clone()
-                    } else {
-                        format!("[{}]", args.join(", "))
-                    };
-                    return Ok(seq(pre, js, Ty::Adt(name)));
-                }
+            if let Some(def) = self.module.structs.get(&name).cloned()
+                && def.tuple
+            {
+                let types: Vec<Ty> = def.fields.iter().map(|(_, ty)| ty.clone()).collect();
+                let (pre, args, _) = arguments(self, &mut call.args, &types)?;
+                let js = if args.len() == 1 {
+                    args[0].clone()
+                } else {
+                    format!("[{}]", args.join(", "))
+                };
+                return Ok(seq(pre, js, Ty::Adt(name)));
             }
             return self.fail(
                 span,
@@ -497,18 +497,17 @@ impl Cx<'_> {
         let owner = segments[segments.len() - 2].clone();
         let owner = if owner == "Self" { self.self_ty.clone().unwrap_or_default() } else { owner };
         // A module enum's tuple variant.
-        if let Some(def) = self.module.enums.get(&owner).cloned() {
-            if let Some((_, Shape::Tuple(fields))) =
+        if let Some(def) = self.module.enums.get(&owner).cloned()
+            && let Some((_, Shape::Tuple(fields))) =
                 def.variants.iter().find(|(variant, _)| *variant == name)
-            {
-                let (pre, args, _) = arguments(self, &mut call.args, fields)?;
-                let js = if args.len() == 1 {
-                    format!("{{ {}: {} }}", string(&name), args[0])
-                } else {
-                    format!("{{ {}: [{}] }}", string(&name), args.join(", "))
-                };
-                return Ok(seq(pre, js, Ty::Adt(owner)));
-            }
+        {
+            let (pre, args, _) = arguments(self, &mut call.args, fields)?;
+            let js = if args.len() == 1 {
+                format!("{{ {}: {} }}", string(&name), args[0])
+            } else {
+                format!("{{ {}: [{}] }}", string(&name), args.join(", "))
+            };
+            return Ok(seq(pre, js, Ty::Adt(owner)));
         }
         // A module type's associated function or method.
         if let Some(sig) = self.module.methods.get(&(owner.clone(), name.clone())).cloned() {
@@ -1123,54 +1122,52 @@ impl Cx<'_> {
         if matches!(
             method.as_str(),
             "push_str" | "push" | "clear" | "insert_str" | "truncate" | "pop"
-        ) {
-            if let Ok((pre, place, ty)) = self.place_quiet(&mut call.receiver) {
-                if ty == Ty::Str {
-                    let (more, args, _) = arguments(self, &mut call.args, &[Ty::Str])?;
-                    let mut all = pre;
-                    all.extend(more);
-                    let js = match method.as_str() {
-                        "push_str" | "push" => format!("{place} = {place} + {}", args[0]),
-                        "clear" => format!("{place} = \"\""),
-                        "pop" => {
-                            let last = self.temp();
-                            all.push(format!("const {last} = [...{place}].pop() ?? null;"));
-                            all.push(format!("if ({last} !== null) {place} = {place}.slice(0, {place}.length - {last}.length);"));
-                            return Ok(seq(all, last, Ty::Opt(Box::new(Ty::Char))));
-                        }
-                        _ => {
-                            return self.fail(
-                                span,
-                                &format!("`String::{method}`"),
-                                "strings are indexed by bytes in Rust",
-                            );
-                        }
-                    };
-                    all.push(format!("{js};"));
-                    return Ok(seq(all, "undefined", Ty::Unit));
+        ) && let Ok((pre, place, ty)) = self.place_quiet(&mut call.receiver)
+            && ty == Ty::Str
+        {
+            let (more, args, _) = arguments(self, &mut call.args, &[Ty::Str])?;
+            let mut all = pre;
+            all.extend(more);
+            let js = match method.as_str() {
+                "push_str" | "push" => format!("{place} = {place} + {}", args[0]),
+                "clear" => format!("{place} = \"\""),
+                "pop" => {
+                    let last = self.temp();
+                    all.push(format!("const {last} = [...{place}].pop() ?? null;"));
+                    all.push(format!("if ({last} !== null) {place} = {place}.slice(0, {place}.length - {last}.length);"));
+                    return Ok(seq(all, last, Ty::Opt(Box::new(Ty::Char))));
                 }
-            }
+                _ => {
+                    return self.fail(
+                        span,
+                        &format!("`String::{method}`"),
+                        "strings are indexed by bytes in Rust",
+                    );
+                }
+            };
+            all.push(format!("{js};"));
+            return Ok(seq(all, "undefined", Ty::Unit));
         }
-        if method == "take" || method == "replace" || method == "get_or_insert_with" {
-            if let Ok((pre, place, Ty::Opt(inner))) = self.place_quiet(&mut call.receiver) {
-                let mut all = pre;
-                let taken = self.temp();
-                all.push(format!("const {taken} = {place};"));
-                if method == "take" {
-                    all.push(format!("{place} = null;"));
-                } else if method == "replace" {
-                    let (more, args, _) = arguments(self, &mut call.args, &[(*inner).clone()])?;
-                    all.extend(more);
-                    all.push(format!("{place} = {};", args[0]));
-                } else {
-                    let Some(argument) = call.args.first_mut() else { return Err(()) };
-                    let make = closure_arg(self, argument, &[])?;
-                    all.extend(make.pre);
-                    all.push(format!("if ({place} === null) {place} = {}();", make.js));
-                    return Ok(seq(all, place, (*inner).clone()));
-                }
-                return Ok(seq(all, taken, Ty::Opt(inner)));
+        if (method == "take" || method == "replace" || method == "get_or_insert_with")
+            && let Ok((pre, place, Ty::Opt(inner))) = self.place_quiet(&mut call.receiver)
+        {
+            let mut all = pre;
+            let taken = self.temp();
+            all.push(format!("const {taken} = {place};"));
+            if method == "take" {
+                all.push(format!("{place} = null;"));
+            } else if method == "replace" {
+                let (more, args, _) = arguments(self, &mut call.args, &[(*inner).clone()])?;
+                all.extend(more);
+                all.push(format!("{place} = {};", args[0]));
+            } else {
+                let Some(argument) = call.args.first_mut() else { return Err(()) };
+                let make = closure_arg(self, argument, &[])?;
+                all.extend(make.pre);
+                all.push(format!("if ({place} === null) {place} = {}();", make.js));
+                return Ok(seq(all, place, (*inner).clone()));
             }
+            return Ok(seq(all, taken, Ty::Opt(inner)));
         }
         let turbofish: Vec<syn::Type> = call
             .turbofish
@@ -1315,10 +1312,10 @@ impl Cx<'_> {
                 if let Some((extra, expected)) = capability_signature(other, &message) {
                     let (pre, mut args, _) = arguments(self, &mut call.args, &expected)?;
                     // Values crossing to the runtime are copies, as in Rust.
-                    if other == "db_put" || other == "worker" {
-                        if let Some(value) = args.get_mut(if other == "db_put" { 2 } else { 1 }) {
-                            *value = format!("rn.clone({value})");
-                        }
+                    if (other == "db_put" || other == "worker")
+                        && let Some(value) = args.get_mut(if other == "db_put" { 2 } else { 1 })
+                    {
+                        *value = format!("rn.clone({value})");
                     }
                     let mut all = fx.pre;
                     all.extend(pre);

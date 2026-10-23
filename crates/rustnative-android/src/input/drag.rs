@@ -16,10 +16,10 @@ pub(crate) fn apply_request(
     window: WindowId,
     request: InputRequest,
 ) -> Result<(), Error> {
-    if let InputRequest::SetDropEffect(effect) = request {
-        if let Some(runtime) = registry.windows.get_mut(&window) {
-            runtime.input.drop_effect = Some(effect);
-        }
+    if let InputRequest::SetDropEffect(effect) = request
+        && let Some(runtime) = registry.windows.get_mut(&window)
+    {
+        runtime.input.drop_effect = Some(effect);
     }
     Ok(())
 }

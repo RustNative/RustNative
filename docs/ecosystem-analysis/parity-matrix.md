@@ -57,8 +57,8 @@ refreshed on 2026-09-27 for every concept that milestone set names as built.
 | Host-window/view embedding (both directions) | **Absent** | Not specified for any backend | `D-LG-1`, `D-LG-2`, `M-AS-1`, `M-AS-2` |
 | Host rendering-surface handoff | **Absent** | Milestone 29 accepts our draw list only | `D-GX-1`, `M-EN-1` |
 | Per-monitor scaling of layout, live (Windows) | **Partial** | Manifest declares per-monitor awareness (Milestone 32); layout is not scaled (`BUILD_STATUS.md`, Milestone 58); Milestone 69 | `D-WIN-1` |
-| Framework-owned boxes decorated through the host compositor (Windows) | **Planned** | 2.2's decorate-the-box rule; Milestone 69, prototype first | `D-WIN-2` |
-| Control-set decision recorded with criteria (Windows) | **Planned** | Milestone 69 | `D-WIN-3` |
+| Framework-owned boxes decorated through the host compositor (Windows) | **Planned** | 2.2's decorate-the-box rule; Milestone 69, through each control set's visual layer | `D-WIN-2` |
+| Control-set decision recorded with criteria (Windows) | **Met** (decision) / **Planned** (realization) | `PLAN.md` Milestone 71: WinUI 3 by default, WinUI 2 and the common controls as fallbacks | `D-WIN-3` |
 
 ## L3 — Semantic UI
 
@@ -85,7 +85,7 @@ refreshed on 2026-09-27 for every concept that milestone set names as built.
 | Capability and target guards, declared targets checked at build | **Planned** | 2.14; Milestone 67 | `X-L3-18` |
 | Style motion on the framework's own timelines | **Partial** | Timelines exist (Milestone 27); the style vocabulary does not reach them | `X-L3-19` |
 | Structural conditions from the reconciler's child lists | **Planned** | 2.14 (fifth rule); Milestone 67 | `X-L3-20` |
-| State- and size-dependent relationships without a matcher | **Planned** (optional) | Milestone 68; props and the environment cover the cases today | `X-L3-21` |
+| State- and size-dependent relationships without a matcher | **Planned** | Milestone 68; props and the environment cover the cases today | `X-L3-21` |
 | Host style passthrough, single-host and unverified | **Planned** (optional) | Milestone 68 | `X-L3-22` |
 | Builder authoring surface | **Met** | Every node kind and modifier since Milestone 1; 2.9 | — |
 | Markup authoring surface at equal capability, in `.rsx` files and `rsx!` | **Planned** | 2.9; Milestone 53 | `X-L3-8` |
@@ -471,10 +471,12 @@ come were styled no further than the narrowest backend could go
 (`X-L3-17`–`X-L3-20`, Milestone 67). The fix is not a wider vocabulary alone
 but a wider vocabulary with guards, because the alternative to cutting the
 range is not pretending every host realizes it. Two neighbours sit beside it:
-the Windows backend's own limits — scale first, then composition for the boxes
-it owns (`D-WIN-1`–`D-WIN-3`, Milestone 69) — and the relational styling that
-the component model already covers another way, kept optional
-(`X-L3-21`, `X-L3-22`, Milestone 68).
+the Windows backend's own limits — scale first, then composition (`D-WIN-1`,
+`D-WIN-2`, Milestone 69), and the control set that lifts most of them, WinUI 3,
+with WinUI 2 and the common controls as fallbacks (`D-WIN-3`, Milestone 71) —
+and the relational styling that the component model already covers another way,
+scheduled because the vocabulary is not complete without it (`X-L3-21`,
+Milestone 68), with host passthrough alone kept optional (`X-L3-22`).
 
 Those fourteen, the two missing spellings, the narrower range, and the
 conformance suites that turn our root-layer advantages from claims into tested

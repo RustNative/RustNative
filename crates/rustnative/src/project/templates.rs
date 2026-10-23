@@ -138,7 +138,7 @@ pub const CARGO_TOML: &str = r#"[package]
 name = "{{name}}"
 version = "{{version}}"
 edition = "2024"
-rust-version = "1.85"
+rust-version = "1.91"
 publish = false
 
 [dependencies]
@@ -469,7 +469,7 @@ pub const WEB_CARGO_TOML: &str = r#"[package]
 name = "{{name}}"
 version = "{{version}}"
 edition = "2024"
-rust-version = "1.85"
+rust-version = "1.91"
 publish = false
 
 [dependencies]

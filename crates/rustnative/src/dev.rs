@@ -49,7 +49,7 @@ use crate::error::{Error, Result};
 use crate::project::Project;
 
 /// How long a started application has to publish its inspection endpoint.
-const START_TIMEOUT: Duration = Duration::from_secs(60);
+const START_TIMEOUT: Duration = Duration::from_mins(1);
 /// How often the project is looked at.
 const POLL: Duration = Duration::from_millis(250);
 
@@ -424,10 +424,10 @@ impl Host {
                 // it is current once it answers.
                 let started = Instant::now();
                 loop {
-                    if let Ok(endpoint) = crate::inspect::android_endpoint() {
-                        if ask(&endpoint, &Request::Hello).is_ok() {
-                            return Ok(endpoint);
-                        }
+                    if let Ok(endpoint) = crate::inspect::android_endpoint()
+                        && ask(&endpoint, &Request::Hello).is_ok()
+                    {
+                        return Ok(endpoint);
                     }
                     if started.elapsed() > Duration::from_secs(30) {
                         return Err(Error::Usage(
@@ -469,14 +469,13 @@ impl Host {
             std::thread::sleep(Duration::from_millis(300));
             if let (Ok(toolchain), Ok(here)) =
                 (crate::package::android::toolchain(), std::env::current_dir())
+                && let Ok(project) = Project::find(&here)
             {
-                if let Ok(project) = Project::find(&here) {
-                    let package = crate::package::android::application_id(&project.config);
-                    let _ = crate::package::android::adb(
-                        &toolchain,
-                        &["shell", "am", "force-stop", &package],
-                    );
-                }
+                let package = crate::package::android::application_id(&project.config);
+                let _ = crate::package::android::adb(
+                    &toolchain,
+                    &["shell", "am", "force-stop", &package],
+                );
             }
         }
         if let Self::Local { child: Some(child), .. } = self {
@@ -949,10 +948,10 @@ fn serve_deployment(
     .ok()
     .map(|mut endpoint| {
         // Bound to every interface: named by the one the developer reached.
-        if endpoint.addr.ip().is_unspecified() {
-            if let Some(ip) = local_ip {
-                endpoint.addr.set_ip(ip);
-            }
+        if endpoint.addr.ip().is_unspecified()
+            && let Some(ip) = local_ip
+        {
+            endpoint.addr.set_ip(ip);
         }
         endpoint
     });

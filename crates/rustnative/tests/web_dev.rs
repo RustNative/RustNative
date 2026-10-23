@@ -84,7 +84,7 @@ fn a_new_web_application_develops_in_the_browser() {
     );
     let started = Instant::now();
     while TcpStream::connect(("127.0.0.1", port)).is_err() {
-        assert!(started.elapsed() < Duration::from_secs(60), "dev never listened");
+        assert!(started.elapsed() < Duration::from_mins(1), "dev never listened");
         std::thread::sleep(Duration::from_millis(100));
     }
 
@@ -93,7 +93,7 @@ fn a_new_web_application_develops_in_the_browser() {
     page.goto(&format!("http://localhost:{port}/")).unwrap();
     page.wait_until(
         "document.documentElement.hasAttribute('data-rn-ready')",
-        Duration::from_secs(600),
+        Duration::from_mins(10),
     )
     .unwrap();
     page.click("#i0-click").unwrap();
@@ -109,7 +109,7 @@ fn a_new_web_application_develops_in_the_browser() {
     std::fs::write(&lib, source.replace("\"Hello from ", "\"Welcome to ")).unwrap();
     page.wait_until(
         "(document.getElementById('greeting') || {}).textContent === 'Welcome to hello-web'",
-        Duration::from_secs(600),
+        Duration::from_mins(10),
     )
     .unwrap();
     page.wait_until(
@@ -123,14 +123,14 @@ fn a_new_web_application_develops_in_the_browser() {
     std::fs::write(&lib, edited.replace("pub struct Home;", "pub struct Home")).unwrap();
     page.wait_until(
         "(document.getElementById('rn-dev-overlay') || {}).textContent?.includes('The build failed')",
-        Duration::from_secs(600),
+        Duration::from_mins(10),
     )
     .unwrap();
     // Fixed: the page reloads without them.
     std::fs::write(&lib, edited).unwrap();
     page.wait_until(
         "!document.getElementById('rn-dev-overlay') && document.documentElement.hasAttribute('data-rn-ready')",
-        Duration::from_secs(600),
+        Duration::from_mins(10),
     )
     .unwrap();
     let _ = std::fs::remove_dir_all(&parent);

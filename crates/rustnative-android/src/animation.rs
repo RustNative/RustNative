@@ -115,10 +115,10 @@ pub(crate) fn apply_requests(registry: &mut WindowRegistry, window: WindowId) ->
                 );
             }
             AnimationRequest::Cancel { node, property } => {
-                if let Some(id) = runtime.animation.timeline.running_id(node, property) {
-                    if let Some(frame) = runtime.animation.timeline.cancel(id) {
-                        renderer.apply_animation_frame(&frame)?;
-                    }
+                if let Some(id) = runtime.animation.timeline.running_id(node, property)
+                    && let Some(frame) = runtime.animation.timeline.cancel(id)
+                {
+                    renderer.apply_animation_frame(&frame)?;
                 }
             }
             AnimationRequest::CancelOwner(owner) => {

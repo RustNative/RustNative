@@ -140,7 +140,7 @@ impl Passkeys {
             rp_id: rp_id.into(),
             origin: origin.into(),
             challenges: Arc::new(MemoryChallenges::default()),
-            lifetime: Duration::from_secs(300),
+            lifetime: Duration::from_mins(5),
             user_verification: true,
         }
     }

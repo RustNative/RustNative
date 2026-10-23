@@ -37,10 +37,10 @@ pub mod counter {
     impl Counter {
         pub fn update(&mut self, event: Event, fx: &mut Effects<()>) {
             let _ = fx;
-            if let Event::Click { target } = event {
-                if target == NodeId::from_key("add") {
-                    self.count += 1;
-                }
+            if let Event::Click { target } = event
+                && target == NodeId::from_key("add")
+            {
+                self.count += 1;
             }
         }
 
@@ -269,11 +269,12 @@ impl Component for Greets {
         self.name = Some(name);
     }
     fn render(&mut self, context: &mut ComponentContext<'_, String>) -> Node {
-        if self.name.is_none() && context.task_scope().task_count() == 0 {
-            if let Some(request) = request(context) {
-                let name = request.query_param("name").unwrap_or_default();
-                context.spawn(async move { name });
-            }
+        if self.name.is_none()
+            && context.task_scope().task_count() == 0
+            && let Some(request) = request(context)
+        {
+            let name = request.query_param("name").unwrap_or_default();
+            context.spawn(async move { name });
         }
         let greeting =
             self.name.as_ref().map(|name| Node::label("hello", format!("Hello, {name}")));
@@ -397,7 +398,7 @@ impl Component for Lingers {
         }
         if context.task_scope().task_count() == 0 {
             let flag = Flag(Arc::clone(&self.0.0));
-            let forever = context.sleep(Duration::from_secs(3600));
+            let forever = context.sleep(Duration::from_hours(1));
             context.spawn(async move {
                 forever.await;
                 drop(flag);

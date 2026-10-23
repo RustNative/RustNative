@@ -36,12 +36,11 @@ impl Component for Demo {
         Node::column("demo", [])
     }
     fn update(&mut self, event: Event) {
-        if let Event::Click { target } = event {
-            if let Some((tag, _)) =
+        if let Event::Click { target } = event
+            && let Some((tag, _)) =
                 LOCALES.iter().find(|(tag, _)| target == NodeId::from_key(&format!("locale-{tag}")))
-            {
-                self.locale = Locale::new(*tag);
-            }
+        {
+            self.locale = Locale::new(*tag);
         }
     }
     fn render(&mut self, context: &mut ComponentContext<'_, ()>) -> Node {

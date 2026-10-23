@@ -81,11 +81,11 @@ pub fn class_string_at(text: &str, offset: usize, rsx_file: bool) -> Option<Clas
     let elements = markup_edit::scan(text, rsx_file);
     if let Some(element) = markup_edit::element_at(&elements, offset) {
         for attr in &element.attrs {
-            if let Some((start, end)) = literal(attr.value) {
-                if (start..=end).contains(&offset) && (attr.name == "class" || attr.name == "style")
-                {
-                    return Some(ClassString { start, end, declarations: attr.name == "style" });
-                }
+            if let Some((start, end)) = literal(attr.value)
+                && (start..=end).contains(&offset)
+                && (attr.name == "class" || attr.name == "style")
+            {
+                return Some(ClassString { start, end, declarations: attr.name == "style" });
             }
         }
     }
@@ -234,10 +234,10 @@ pub fn builder_method_location(method: &str, path: &Path) -> Option<Value> {
     for file in files {
         let Ok(text) = std::fs::read_to_string(&file) else { continue };
         let has_impl = text.contains(&format!("impl {type_name} {{"));
-        if let Some(at) = pattern.iter().filter_map(|pattern| text.find(pattern)).min() {
-            if best.as_ref().is_none_or(|(impl_found, _, _)| has_impl && !impl_found) {
-                best = Some((has_impl, file, at));
-            }
+        if let Some(at) = pattern.iter().filter_map(|pattern| text.find(pattern)).min()
+            && best.as_ref().is_none_or(|(impl_found, _, _)| has_impl && !impl_found)
+        {
+            best = Some((has_impl, file, at));
         }
     }
     let (_, file, at) = best?;

@@ -436,7 +436,7 @@ impl Component for Weather {
     fn view(&self) -> Node {
         // Take one failure off the budget, if any is left (a compare-exchange
         // loop: Rust 1.99 deprecates `fetch_update`, and its replacement is
-        // newer than the 1.85 floor).
+        // newer than the 1.91 floor).
         let budget = &self.server.flaky_renders;
         let mut left = budget.load(Ordering::SeqCst);
         let failing = loop {

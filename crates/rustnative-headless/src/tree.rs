@@ -188,11 +188,11 @@ impl HeadlessTree {
         );
         let mut layout =
             LayoutEngine::new().layout_result_with(&snapshot, inner, &measurer, &extents);
-        if let Some(root) = snapshot.ordered_nodes().first().map(|node| node.id) {
-            if let Some(rect) = layout.rects.get_mut(&root) {
-                rect.x += safe_area.left(direction);
-                rect.y += safe_area.top;
-            }
+        if let Some(root) = snapshot.ordered_nodes().first().map(|node| node.id)
+            && let Some(rect) = layout.rects.get_mut(&root)
+        {
+            rect.x += safe_area.left(direction);
+            rect.y += safe_area.top;
         }
         let accessibility = AccessibilityTree::from_snapshot(&snapshot);
         // This backend has no host mirroring of its own, so it places the
@@ -414,10 +414,10 @@ impl HeadlessTree {
             if role != default_role(node.kind) {
                 let _ = write!(out, " role={role:?}");
             }
-            if let Some(name) = &node.name {
-                if node.text.as_ref() != Some(name) {
-                    let _ = write!(out, " name={name:?}");
-                }
+            if let Some(name) = &node.name
+                && node.text.as_ref() != Some(name)
+            {
+                let _ = write!(out, " name={name:?}");
             }
             if let Some(tabs) = &node.tabs {
                 let _ = write!(out, " tabs={:?} selected={}", tabs.labels(), tabs.selected());

@@ -42,10 +42,10 @@ impl Component for Counter {
         )
     }
     fn update(&mut self, event: Event) {
-        if matches!(event, Event::Click { .. }) {
-            if let Some(count) = &self.count {
-                count.update(|count| *count += 1);
-            }
+        if matches!(event, Event::Click { .. })
+            && let Some(count) = &self.count
+        {
+            count.update(|count| *count += 1);
         }
     }
 }

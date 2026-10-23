@@ -503,7 +503,7 @@ mod tests {
     fn abort_prevents_further_progress_of_a_pending_task() {
         let executor = TokioExecutor::dedicated(1);
         let handle = executor.spawn(Box::pin(async move {
-            tokio::time::sleep(Duration::from_secs(60)).await;
+            tokio::time::sleep(Duration::from_mins(1)).await;
         }));
         handle.abort();
         // Polled to a deadline rather than asserted after a fixed sleep.

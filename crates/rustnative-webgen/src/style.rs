@@ -14,12 +14,11 @@ fn style_file() -> Option<PathBuf> {
         for line in text.lines().map(str::trim) {
             if line.starts_with('[') {
                 in_style = line == "[style]";
-            } else if in_style {
-                if let Some(value) =
+            } else if in_style
+                && let Some(value) =
                     line.strip_prefix("file").map(str::trim).and_then(|rest| rest.strip_prefix('='))
-                {
-                    return Some(value.trim().trim_matches('"').to_owned());
-                }
+            {
+                return Some(value.trim().trim_matches('"').to_owned());
             }
         }
         None

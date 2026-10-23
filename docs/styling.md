@@ -11,8 +11,11 @@ what it describes is **built** or **planned**, and which milestone owns it:
 | Declared targets (`[style] targets`) | built | 58, 2026-10-12 review |
 | Guards, the extended range, structural variants, `approximations` | planned | 67 |
 | Windows per-monitor scaling | built | 69 (first part) |
-| Windows composition for framework-owned boxes | planned | 69 |
-| Relationships on another node's state or size, generated content, host passthrough | optional | 68 |
+| Windows control sets: WinUI 3 by default, WinUI 2 and the common controls as fallbacks, one table each | planned | 71 |
+| Windows composition through each control set's visual layer | planned | 69 |
+| Relationships on another node's state or size, generated content | planned | 68 |
+| The whole Tailwind CSS v4 vocabulary, current with upstream, proven against upstream's compiler | planned | 73 |
+| Host passthrough | optional | 68 |
 
 ## The model
 
@@ -85,6 +88,14 @@ Web's table, which realizes shadows, rather than against the compiling
 machine's. Planned targets (`macos`, `ios`, `ipados`, `tui`, `embedded`) are
 accepted and checked once their tables exist; an unknown name is an error.
 
+For `windows`, the table checked is that of the project's primary control set
+(*planned, Milestone 71*): `[windows] control_sets = ["winui3", "winui2",
+"win32"]` by default, in order of preference. A declared fallback set is
+checked too, and what it leaves out is written down once rather than
+discovered: with `[windows] fallback_styles = "list"`, the default, the build
+lists each declaration a fallback set will not show; with `"refuse"`, every
+declared set is held to the primary's rule.
+
 Without `targets`, the native backend of the operating system the project is
 compiled for is checked — right for a native application built where it
 runs, and the reason a project spanning hosts should declare them.
@@ -125,7 +136,9 @@ Node::column("card", children)
 - **Target variants** — `windows:`, `linux:`, `macos:`, `android:`, `ios:`,
   `ipados:`, `web:`, `tui:`, `embedded:` — are for a deliberate difference that
   is not a capability question: a host convention, or a brand decision made per
-  platform.
+  platform. There is no variant per Windows control set or per architecture: a
+  difference between control sets is a capability question, answered by the
+  table of the set the window was realized in.
 - **Decided per backend, once.** A guard is evaluated against the table of the
   backend the tree is realized on, not against the operating system the code
   was compiled for — one binary can serve a page to a browser and open a native
@@ -150,17 +163,21 @@ spellings, an equivalence case, and every backend's answer. The answers below
 are expectations, and the backend's table is the authority once the family
 lands. "Box" means a container the framework owns; "control" a native control.
 
-| Family | Utilities | Windows | Linux | Web | Headless | Terminal |
-|---|---|---|---|---|---|---|
-| Borders | `border-2`, `border-t-4`, `border-dashed`, `rounded-tl-lg` | box: approximated (GDI pens; per-corner radius as a region, not anti-aliased); control: system border | GTK CSS | CSS | yes | style approximated with box-drawing characters; radius unavailable |
-| Backgrounds | `bg-linear-to-r`, `from-*`, `via-*`, `to-*`, radial and conic, images | box: linear realized (`GradientFill`), radial and conic unavailable; control: unavailable | GTK CSS | CSS | yes | unavailable |
-| Transforms | `translate-*`, `scale-*`, `rotate-*`, `origin-*` | translate realized by moving the window without relayout; scale and rotate unavailable | by its table | CSS | yes | unavailable |
-| Effects | `blur-*`, `brightness-*`, `backdrop-*`, `mix-blend-*` | unavailable | by its table | CSS | yes | unavailable |
-| Motion | `transition-*`, `duration-*`, `ease-*`, `delay-*`, `animate-*` | Milestone 27 timeline | GTK frame clock, same timeline | CSS generated from the timeline model | yes | timeline at the terminal's frame rate |
-| Text | `tracking-*`, `leading-*`, `underline`, `uppercase`, `text-center`, `truncate`, `line-clamp-*` | decoration, alignment, truncation, case realized; line clamp approximated; letter spacing and line height unavailable on controls | GTK CSS | CSS | yes | case, truncation; others unavailable |
-| Layout extras | `aspect-*`, `z-*` | shared layout engine | shared layout engine | CSS from the same meaning | yes | shared layout engine |
-| Interaction | `cursor-*`, `pointer-events-none`, `select-none`, `outline-*`, `ring-*` | cursor and pointer events realized; ring approximated on boxes, controls keep the system focus visual | by its table | CSS | yes | no pointer cursor; ring as attributes |
-| Control parts | `placeholder:`, `caret-*`, `selection:`, `accent-*` | mostly unavailable (the common controls do not expose them) | by its table | CSS | yes | mostly unavailable |
+| Family | Utilities | Windows — WinUI 3 | Windows — common controls | Linux | Web | Headless | Terminal |
+|---|---|---|---|---|---|---|---|
+| Borders | `border-2`, `border-t-4`, `border-dashed`, `rounded-tl-lg` | per-side width and anti-aliased per-corner radius on boxes and controls; dashed and dotted on boxes | box: approximated (GDI pens; per-corner radius as a region, not anti-aliased); control: system border | GTK CSS | CSS | yes | style approximated with box-drawing characters; radius unavailable |
+| Backgrounds | `bg-linear-to-r`, `bg-radial`, `bg-conic`, `from-*`, `via-*`, `to-*`, images, `bg-clip-text` | all realized: linear and radial as XAML brushes, conic drawn by Direct2D into a composition surface, gradient text as a foreground brush; on boxes and as a control's background resource | box: linear realized (`GradientFill`), radial and conic unavailable; control: unavailable | GTK CSS | CSS | yes | unavailable |
+| Shadows and masks | `inset-shadow-*`, `text-shadow-*`, `drop-shadow-*`, `mask-*` | shadows on boxes and controls; text shadows from the text's alpha mask; masks on boxes, images, canvases (unavailable on a control's own pixels) | unavailable outside composed containers (Milestone 69) | by its table | CSS | yes | unavailable |
+| Transforms | `translate-*`, `scale-*`, `rotate-*`, `skew-*`, `origin-*`, `perspective-*`, `rotate-x-*`, `rotate-y-*`, `transform-3d`, `backface-hidden` | every 2D and 3D transform on boxes and controls, through the element's transform matrix; the control stays live | translate realized by moving the window without relayout; the rest unavailable | by its table | CSS | yes | unavailable |
+| Effects | `blur-*`, `brightness-*`, `contrast-*`, `grayscale`, `hue-rotate-*`, `invert`, `saturate-*`, `sepia`, `backdrop-*`, `mix-blend-*`, `bg-blend-*` | every filter and blend on boxes, images, canvases, and drawn text through composition effects; every backdrop filter over anything beneath, controls included; unavailable on a control's own pixels | unavailable | by its table | CSS | yes | unavailable |
+| Motion | `transition-*`, `duration-*`, `ease-*`, `delay-*`, `animate-*`, `starting:` | Milestone 27 timeline, run on the compositor thread wherever the curve maps exactly | Milestone 27 timeline | GTK frame clock, same timeline | CSS generated from the timeline model | yes | timeline at the terminal's frame rate |
+| Text | `tracking-*`, `leading-*`, `underline`, `decoration-*`, `uppercase`, `text-center`, `truncate`, `line-clamp-*`, `font-stretch-*`, `font-features-[…]`, `tabular-nums` | all realized through the text elements' properties and DirectWrite; on an editable control, what the control exposes | decoration, alignment, truncation, case realized; line clamp approximated; letter spacing, line height, and font features unavailable on controls | GTK CSS | CSS | yes | case, truncation; others unavailable |
+| Layout extras | `aspect-*`, `z-*` | shared layout engine | shared layout engine | shared layout engine | CSS from the same meaning | yes | shared layout engine |
+| Interaction | `cursor-*`, `pointer-events-none`, `select-none`, `outline-*`, `ring-*`, `scrollbar-*` | realized; a control's focus visual takes the ring's colour and thickness; scrollbars on the host's own scroller | cursor and pointer events realized; ring approximated on boxes, controls keep the system focus visual | by its table | CSS | yes | no pointer cursor; ring as attributes |
+| Control parts | `placeholder:`, `caret-*`, `selection:`, `accent-*` | placeholder, selection, and accent through the controls' own properties and resources; caret where exposed | mostly unavailable (the common controls do not expose them) | by its table | CSS | yes | mostly unavailable |
+
+WinUI 2 answers each row in its own table, realizing most of what WinUI 3 does
+through the operating system's composition layer.
 
 ## Motion
 
@@ -189,37 +206,74 @@ property the timeline cannot animate is unavailable under `transition-[…]`.
 - In the browser, the generated rule counts the framework's own nodes only, so
   spacers and host-only elements never shift a position.
 
-## Relationships on another node (optional)
+## Relationships on another node
 
-*Optional (Milestone 68).* `group-*`, `peer-*`, and `has-*` make a node's style
-depend on another node's interaction or form state; they resolve by bounded
-lookups — up to the nearest named group, back to an earlier sibling, down to
-direct children — through a dependency index that re-resolves only the nodes
-whose conditions name the node that changed, without a render.
+*Planned (Milestone 68).* `group-*`, `peer-*`, `in-*`, and `has-*` make a node's
+style depend on another node's interaction or form state; they resolve by
+bounded lookups — up to the nearest named group or ancestor in that state, back
+to an earlier sibling, down to direct children — through a dependency index
+that re-resolves only the nodes whose conditions name the node that changed,
+without a render. They are part of the vocabulary a developer arrives with, so
+they are built rather than left to the props route; that route stays the one
+the component library prefers wherever typed state reads more clearly.
 
-Until they are built, the component model already covers each case: a card
-that knows it is hovered passes that to its children as a prop or through the
-environment, and they style themselves with an ordinary state or a conditional
-style. That is why this part is optional.
+## Container queries
 
-## Container queries (optional)
+*Planned (Milestone 68).* `@container`, `@sm:`, `@md:`, `@max-*:`, and
+`@min-[…]:` decide by a container's resolved inline size. As in the browser, a
+query container's inline size may not depend on its children, so a layout
+settles in at most one extra pass; a container that breaks the rule is reported
+by the layout diagnostics.
 
-*Optional (Milestone 68).* `@container`, `@sm:`, `@md:`, and `@min-[…]:` decide
-by a container's resolved inline size. As in the browser, a query container's
-inline size may not depend on its children, so a layout settles in at most one
-extra pass; a container that breaks the rule is reported by the layout
-diagnostics. Until then, a container decides by its own size class in code
-(Milestone 39).
+## Generated content
 
-## Generated content (optional)
+*Planned (Milestone 68).* `before:` and `after:` as decorative child nodes the
+reconciler inserts, hidden from the accessibility tree, keyed from their parent.
 
-*Optional (Milestone 68).* `before:` and `after:` as decorative child nodes the
-reconciler inserts, hidden from the accessibility tree, keyed from their
-parent. A component can add the node itself today.
+## The whole Tailwind CSS vocabulary
+
+*Planned (Milestone 73).* The vocabulary is Tailwind CSS v4 at a pinned upstream
+release, taken whole, and the pin follows the current release. Every upstream
+utility, variant, modifier, and directive sits in one row of a generated
+coverage table: compiled in a range, compiled as a relationship, passthrough
+only, or refused with the reason and the replacement. A corpus generated from
+upstream's own compiler, only when the pin moves and never in a build, holds the
+declarations upstream emits for each class, and the framework's must equal them.
+
+What upstream spells as a selector is, here, almost always a fact the framework
+already holds, and compiles from that fact:
+
+- `aria-*:` from the node's accessibility state; `data-*:` from the node's own
+  typed values (`with_data`, or a `data-*` attribute in markup);
+- `checked:`, `invalid:`, `user-invalid:`, `required:`, `placeholder-shown:`,
+  `read-only:`, and the other form states from the forms model; `open:`,
+  `inert:`, and `focus-within:` from the node and the focus path;
+- `contrast-more:`, `forced-colors:`, `portrait:`, `print:`, `pointer-fine:`,
+  and the other media features from the environment; `max-*:` and stacked
+  breakpoints from the size classes;
+- `starting:` as an animation from the node's initial values; `not-*:` as a
+  negated condition.
+
+Also: `!` as a documented precedence step, negative and fractional values,
+arbitrary properties (an ordinary declaration over a typed property, host
+passthrough otherwise), a compile error for two classes setting the same
+property under the same condition, and conditional composition
+(`classes!("px-4", active => "bg-primary")`) with every fragment still a checked
+literal. An upstream style file compiles as written — `@import "tailwindcss"`,
+single-class `@layer components` rules, `@source`, functional `@utility`,
+`@variant`, `@property` — or names each line it refuses; `@plugin` and
+`@config` stay refused, since no build runs JavaScript. `rustnative fmt` sorts
+class strings into upstream's canonical order, and `rustnative import tailwind`
+converts an existing project's style entry point.
+
+Host capabilities upstream has no word for — the host materials
+(`material-mica`, `material-acrylic`, …) and elevation tokens — are framework
+utilities in a namespace upstream does not use, listed in the coverage table as
+framework additions.
 
 ## Host passthrough (optional)
 
-*Optional (Milestone 68).* Host styling with no typed equivalent, allowed only
+*Optional (Milestone 68), taken up on demand.* Host styling with no typed equivalent, allowed only
 under a target variant naming a host that speaks a styling language of its own
 (`web:[mask-type:alpha]`). The core carries it uninterpreted to that backend
 alone; it is outside the equivalence suite, printed by `rustnative expand` as
@@ -228,55 +282,69 @@ inline, and counted per project. It is the escape hatch for style (2.6), not a
 styling channel: adding the property to the extended range is always the
 preferred route.
 
-## Windows: decorate the box, never the control
+## Windows: three control sets, one shell
 
-The Windows backend realizes nodes as Win32 windows and common controls. A
-native control keeps what the host gives it — its shape, focus visual, text
-editing, and accessibility — and the backend never captures a control's output
-into a bitmap to rotate, scale, blur, or shadow it. A container has no native
-equivalent: it is a box the framework owns, and the backend may decorate it.
+*Planned (Milestone 71).* The Windows backend realizes the tree in WinUI 3 by
+default — the host's current control set, composed through one visual layer —
+inside its Win32 windows. Where the Windows App SDK runtime cannot load, it
+falls back to WinUI 2 over the operating system's own XAML; where no XAML can
+run, to the Win32 common controls the backend was first built on. The choice is
+made once at launch and reported, never by `cfg`, and each set has its own
+table: `rustnative_style::WINDOWS_WINUI3`, `WINDOWS_WINUI2`, and `WINDOWS` for the
+common controls.
+
+Under every set a native control keeps what the host gives it — its shape,
+focus visual, text editing, and accessibility — and the backend never captures a
+control's output into a bitmap or replaces a XAML control's template. Under the
+XAML sets, the host itself transforms, clips, fades, and shadows a live control
+without capturing it, so those rows are realized on controls too; filtering,
+masking, or blending a control's own pixels stays unavailable, because that
+would be capture.
+
+WinUI 3 is the richest native host the vocabulary reaches, and its table is
+written to use all of it: every row it leaves unavailable names the host limit
+behind it (Milestone 73 tracks that count).
 
 Milestone 69, in this order:
 
 1. **Scale** *(done, 2026-10-14)*. Layout runs in logical pixels, scaled by
    each window's DPI where geometry reaches Win32; fonts, padding, rounded
    regions, canvases, and surfaces follow the same factor; `WM_DPICHANGED` is
-   handled live on the same windows (`rustnative_style::WINDOWS_UNITS`).
-2. **Composition for boxes** *(planned)*. DirectComposition — the host's own compositor —
-   behind framework-owned containers, for anti-aliased corners, shadows,
-   gradients, and fades. Its limit is stated rather than discovered: every
-   native child window is its own surface, so a decoration cannot draw over a
-   neighbouring control, a translucent or blurred box cannot blend over the
-   controls beneath it, and animating a box that holds controls moves real
-   windows each frame. It starts as a time-boxed prototype measured against
-   `budgets/windows.toml`, and is adopted or not on the record.
-3. **The control-set decision, named and not taken** *(planned)*. WinUI 3's controls are
-   native too, and composition runs through its whole tree, so it has no
-   airspace limit — but it is a different control set and effectively a second
-   Windows backend. It is decided as a control-set question, on written
-   criteria, not as a styling one.
+   handled live on the same windows (`rustnative_style::WINDOWS_UNITS`). Under
+   the XAML sets, XAML scales its own tree by the island's rasterization scale,
+   held to the same rounding rule.
+2. **Composition** *(planned)*. Under the XAML sets, the control sets' own
+   visual layer realizes corners, shadows, gradients, masks, filters, backdrop
+   filters, blends, fades, 2D and 3D transforms, and compositor-thread motion.
+   Airspace remains only where a child window remains — an adopted foreign
+   window, or a surface for a graphics API that needs a window handle. Under the
+   common controls, DirectComposition behind framework-owned containers is a
+   time-boxed prototype with every child window's airspace limit stated, adopted
+   or not on the record.
 
 ## What bounds the payoff
 
 The extended range shows unevenly, and that is stated rather than discovered.
-In practice it shows in the browser, on Linux, in the headless backend, and on
-the layer-backed hosts still to come; on Windows, most transform and effect rows
-are unavailable, and an application shows each guard's fallback there. Guards
-make the difference honest; they do not make it equal. Milestone 69 is what can
-change Windows' answers, and Milestone 67 does not wait for it.
+It shows in full in the browser and under WinUI 3, widely on Linux, in the
+headless backend, and on the layer-backed hosts still to come; WinUI 2 shows
+most of it; the common controls, as a fallback, show the narrower answers and
+list what they leave out (`fallback_styles`); the terminal shows each guard's
+fallback. Guards and declared fallbacks make the difference honest; they do not
+make it equal.
 
-The cost is ongoing: every property is an answer owed by every backend,
-including backends not yet written. That is why properties arrive by family
-with their tests, and why a family no host realizes beyond the browser is not
-added for the browser alone.
+The cost is ongoing: every property is an answer owed by every backend and
+control set, including those not yet written. That is why properties arrive by
+family with their tests, and why a family no host realizes beyond the browser is
+not added for the browser alone.
 
 ## Where each piece is specified
 
-- `PLAN.md` 2.2 (decorate the box), 2.14 (the five rules and the three ranges),
+- `PLAN.md` 2.2 (decorate the box), 2.14 (the six rules and the three ranges),
   Milestone 27 (timelines), Milestone 58 (the portable range), Milestone 67
-  (the extended range), Milestone 68 (optional relationships and passthrough),
-  Milestone 69 (Windows scale and composition), Web milestone C (the browser's
-  mapping).
+  (the extended range), Milestone 68 (relationships, container queries, and the
+  optional passthrough), Milestone 69 (Windows scale and composition),
+  Milestone 71 (the Windows control sets), Milestone 73 (the whole Tailwind
+  vocabulary), Web milestone C (the browser's mapping).
 - `docs/web/layout-mapping.md`: how the browser receives styles.
 - `docs/linux.md`: how GTK receives them.
 - `docs/conformance/new-backend-checklist.md`: what a backend owes.

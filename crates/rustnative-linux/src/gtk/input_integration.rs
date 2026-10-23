@@ -49,10 +49,10 @@ impl Component for Surface {
         Node::column("root", [])
     }
     fn update(&mut self, event: Event) {
-        if matches!(event, Event::DragEnter { .. } | Event::DragOver { .. }) {
-            if let Some(input) = &self.input {
-                input.set_drop_effect(DropEffect::Copy);
-            }
+        if matches!(event, Event::DragEnter { .. } | Event::DragOver { .. })
+            && let Some(input) = &self.input
+        {
+            input.set_drop_effect(DropEffect::Copy);
         }
         self.log.borrow_mut().push(event);
     }

@@ -297,15 +297,15 @@ fn apply(
 ) {
     let changed = |differs: &dyn Fn(&Applied) -> bool| previous.is_none_or(differs);
     let mut properties: Vec<accessible::Property<'_>> = Vec::new();
-    if changed(&|previous| previous.name != next.name) {
-        if let Some(name) = &next.name {
-            properties.push(accessible::Property::Label(name));
-        }
+    if changed(&|previous| previous.name != next.name)
+        && let Some(name) = &next.name
+    {
+        properties.push(accessible::Property::Label(name));
     }
-    if changed(&|previous| previous.description != next.description) {
-        if let Some(description) = &next.description {
-            properties.push(accessible::Property::Description(description));
-        }
+    if changed(&|previous| previous.description != next.description)
+        && let Some(description) = &next.description
+    {
+        properties.push(accessible::Property::Description(description));
     }
     if changed(&|previous| previous.value != next.value) {
         match &next.value {
@@ -326,24 +326,24 @@ fn apply(
     if changed(&|previous| previous.required != next.required) {
         properties.push(accessible::Property::Required(next.required));
     }
-    if changed(&|previous| previous.level != next.level) {
-        if let Some(level) = next.level {
-            properties.push(accessible::Property::Level(i32::from(level)));
-        }
+    if changed(&|previous| previous.level != next.level)
+        && let Some(level) = next.level
+    {
+        properties.push(accessible::Property::Level(i32::from(level)));
     }
     if !properties.is_empty() {
         widget.update_property(&properties);
     }
 
     let mut states: Vec<accessible::State> = Vec::new();
-    if changed(&|previous| previous.checked != next.checked) {
-        if let Some(checked) = next.checked {
-            states.push(accessible::State::Checked(match checked {
-                CheckedState::Checked => gtk::AccessibleTristate::True,
-                CheckedState::Unchecked => gtk::AccessibleTristate::False,
-                CheckedState::Mixed => gtk::AccessibleTristate::Mixed,
-            }));
-        }
+    if changed(&|previous| previous.checked != next.checked)
+        && let Some(checked) = next.checked
+    {
+        states.push(accessible::State::Checked(match checked {
+            CheckedState::Checked => gtk::AccessibleTristate::True,
+            CheckedState::Unchecked => gtk::AccessibleTristate::False,
+            CheckedState::Mixed => gtk::AccessibleTristate::Mixed,
+        }));
     }
     if changed(&|previous| previous.expanded != next.expanded) {
         states.push(accessible::State::Expanded(next.expanded));
@@ -370,20 +370,19 @@ fn apply(
     if changed(&|previous| previous.controls != next.controls) {
         relation(widget, gtk::AccessibleRelation::Controls, &widgets_of(&next.controls));
     }
-    if changed(&|previous| previous.position != next.position) {
-        if let Some((index, size)) = next.position {
-            widget.update_relation(&[
-                accessible::Relation::PosInSet(i32::try_from(index).unwrap_or(i32::MAX)),
-                accessible::Relation::SetSize(i32::try_from(size).unwrap_or(i32::MAX)),
-            ]);
-        }
+    if changed(&|previous| previous.position != next.position)
+        && let Some((index, size)) = next.position
+    {
+        widget.update_relation(&[
+            accessible::Relation::PosInSet(i32::try_from(index).unwrap_or(i32::MAX)),
+            accessible::Relation::SetSize(i32::try_from(size).unwrap_or(i32::MAX)),
+        ]);
     }
-    if changed(&|previous| previous.automation_id != next.automation_id) {
-        if let (Some(id), Some(widget)) =
+    if changed(&|previous| previous.automation_id != next.automation_id)
+        && let (Some(id), Some(widget)) =
             (&next.automation_id, widget.downcast_ref::<gtk::Widget>())
-        {
-            set_automation_id(widget, id);
-        }
+    {
+        set_automation_id(widget, id);
     }
 }
 

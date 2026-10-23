@@ -151,10 +151,10 @@ impl Broker {
     /// retransmission with the same id is not delivered again.
     pub fn publish(&self, message: &BusMessage, once: Option<(&str, u16)>) {
         let mut state = self.inner.lock().unwrap_or_else(PoisonError::into_inner);
-        if let (QoS::ExactlyOnce, Some((client, packet))) = (message.qos, once) {
-            if !state.delivered_once.insert((client.to_owned(), packet)) {
-                return;
-            }
+        if let (QoS::ExactlyOnce, Some((client, packet))) = (message.qos, once)
+            && !state.delivered_once.insert((client.to_owned(), packet))
+        {
+            return;
         }
         if message.retain {
             if message.payload.is_empty() {
@@ -189,10 +189,10 @@ impl Broker {
     /// persistent session's queue.
     pub fn requeue(&self, client_id: &str, messages: Vec<BusMessage>) {
         let mut state = self.inner.lock().unwrap_or_else(PoisonError::into_inner);
-        if let Some(session) = state.sessions.get_mut(client_id) {
-            if !session.clean {
-                session.queued.extend(messages);
-            }
+        if let Some(session) = state.sessions.get_mut(client_id)
+            && !session.clean
+        {
+            session.queued.extend(messages);
         }
     }
 
@@ -217,10 +217,8 @@ impl Broker {
             }
             will
         };
-        if publish_will {
-            if let Some(will) = will {
-                self.publish(&will, None);
-            }
+        if publish_will && let Some(will) = will {
+            self.publish(&will, None);
         }
     }
 }

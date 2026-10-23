@@ -214,8 +214,7 @@ async fn sign_in_page(
 #[must_use]
 pub fn app(db: &Db, jobs: &Jobs, key: [u8; 32]) -> ServerApp {
     let signer = TokenSigner::new(Secret::new(key.to_vec()));
-    let (before, after) =
-        Sessions::new(&Secret::new(key), Duration::from_secs(12 * 3600)).middleware();
+    let (before, after) = Sessions::new(&Secret::new(key), Duration::from_hours(12)).middleware();
     let schema = Schema::of(&db.get()).unwrap_or_default();
     let (sign_db, list_db, create_db, summary_db) =
         (db.clone(), db.clone(), db.clone(), db.clone());
@@ -236,7 +235,7 @@ pub fn app(db: &Db, jobs: &Jobs, key: [u8; 32]) -> ServerApp {
                 async move {
                     let user = find_user(&db, &credentials.name, &credentials.password).ok_or_else(ServerError::unauthorized)?;
                     let subject = serde_json::to_string(&user).map_err(|error| ServerError::internal(error.to_string()))?;
-                    Ok(signer.issue(subject, Duration::from_secs(12 * 3600)))
+                    Ok(signer.issue(subject, Duration::from_hours(12)))
                 }
             })
             // Signing in is how a native client gets its token; it carries

@@ -239,17 +239,16 @@ impl TuiModel {
         for node in snapshot.nodes() {
             if let Some(rendered) =
                 rendered_value(node.kind, node.text.as_ref(), node.control.as_ref())
+                && self.rendered_values.get(&node.id) != Some(&rendered)
             {
-                if self.rendered_values.get(&node.id) != Some(&rendered) {
-                    let widget = self.widgets.entry(node.id).or_default();
-                    if self.rendered_values.contains_key(&node.id) {
-                        widget.edit.clamp(&rendered);
-                    } else {
-                        widget.edit = Edit::at_end(&rendered);
-                    }
-                    self.native_values.insert(node.id, rendered.clone());
-                    self.rendered_values.insert(node.id, rendered);
+                let widget = self.widgets.entry(node.id).or_default();
+                if self.rendered_values.contains_key(&node.id) {
+                    widget.edit.clamp(&rendered);
+                } else {
+                    widget.edit = Edit::at_end(&rendered);
                 }
+                self.native_values.insert(node.id, rendered.clone());
+                self.rendered_values.insert(node.id, rendered);
             }
         }
         let extents: HashMap<NodeId, ExtentCache> = snapshot
@@ -265,11 +264,11 @@ impl TuiModel {
         );
         let mut layout =
             LayoutEngine::new().layout_result_with(&snapshot, inner, measurer, &extents);
-        if let Some(root) = snapshot.ordered_nodes().first().map(|node| node.id) {
-            if let Some(rect) = layout.rects.get_mut(&root) {
-                rect.x += safe_area.left(direction);
-                rect.y += safe_area.top;
-            }
+        if let Some(root) = snapshot.ordered_nodes().first().map(|node| node.id)
+            && let Some(rect) = layout.rects.get_mut(&root)
+        {
+            rect.x += safe_area.left(direction);
+            rect.y += safe_area.top;
         }
         let accessibility = AccessibilityTree::from_snapshot(&snapshot);
         // The terminal does not mirror; this backend places the mirrored
@@ -459,12 +458,11 @@ impl TuiModel {
     }
 
     pub(crate) fn set_focused(&mut self, id: Option<NodeId>) {
-        if self.focused != id {
-            if let Some(previous) = self.focused {
-                if let Some(widget) = self.widgets.get_mut(&previous) {
-                    widget.open = false;
-                }
-            }
+        if self.focused != id
+            && let Some(previous) = self.focused
+            && let Some(widget) = self.widgets.get_mut(&previous)
+        {
+            widget.open = false;
         }
         self.focused = id;
     }

@@ -280,12 +280,11 @@ impl Component for RadioGroup {
         Node::column("group", [])
     }
     fn update(&mut self, event: Event) {
-        if let Event::Toggled { target, on: true } = event {
-            if let Some(index) = (0..self.props.options.len())
+        if let Event::Toggled { target, on: true } = event
+            && let Some(index) = (0..self.props.options.len())
                 .find(|index| target == NodeId::from_key(&format!("option-{index}")))
-            {
-                self.props.selected.set(index);
-            }
+        {
+            self.props.selected.set(index);
         }
     }
     fn render(&mut self, context: &mut ComponentContext<'_, ()>) -> Node {
@@ -1352,12 +1351,11 @@ impl Component for AdaptiveNavigation {
         Node::column("navigation", [])
     }
     fn update(&mut self, event: Event) {
-        if let Event::Click { target } = event {
-            if let Some(index) = (0..self.props.destinations.len())
+        if let Event::Click { target } = event
+            && let Some(index) = (0..self.props.destinations.len())
                 .find(|index| target == NodeId::from_key(&format!("destination-{index}")))
-            {
-                self.props.selected.set(index);
-            }
+        {
+            self.props.selected.set(index);
         }
     }
     fn render(&mut self, context: &mut ComponentContext<'_, ()>) -> Node {

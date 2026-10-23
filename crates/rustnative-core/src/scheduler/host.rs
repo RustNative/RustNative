@@ -384,7 +384,7 @@ mod tests {
         let executor = HostExecutor::new(Arc::new(ManualClock::new()));
         let dropped = Arc::new(AtomicBool::new(false));
         let flag = Flag(Arc::clone(&dropped));
-        let delay = executor.sleep(Duration::from_secs(3600));
+        let delay = executor.sleep(Duration::from_hours(1));
         executor.spawn(Box::pin(async move {
             delay.await;
             drop(flag);

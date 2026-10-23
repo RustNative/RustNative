@@ -73,10 +73,10 @@ impl Component for Shell {
 fn text(tree: &ComponentTree, key: &str) -> String {
     let mut found = String::new();
     tree.view().visit(&mut |node, _, _| {
-        if node.id().local_key().as_deref() == Some(key) {
-            if let Node::Label(label) = node {
-                label.text().clone_into(&mut found);
-            }
+        if node.id().local_key().as_deref() == Some(key)
+            && let Node::Label(label) = node
+        {
+            label.text().clone_into(&mut found);
         }
     });
     found

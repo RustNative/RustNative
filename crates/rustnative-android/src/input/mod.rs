@@ -254,10 +254,10 @@ mod platform {
         if let Some(view) = target {
             call_static(Class::Input, "show", "(Landroid/view/View;)V", &[Arg::Obj(&view)])?;
             runtime.input.keyboard_shown = true;
-        } else if std::mem::take(&mut runtime.input.keyboard_shown) {
-            if let Some(root) = &runtime.root {
-                call_static(Class::Input, "hide", "(Landroid/view/View;)V", &[Arg::Obj(root)])?;
-            }
+        } else if std::mem::take(&mut runtime.input.keyboard_shown)
+            && let Some(root) = &runtime.root
+        {
+            call_static(Class::Input, "hide", "(Landroid/view/View;)V", &[Arg::Obj(root)])?;
         }
         Ok(())
     }

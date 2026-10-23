@@ -41,10 +41,10 @@ impl Application {
     /// The address cannot be bound.
     pub fn enable_inspection(&mut self, bind: Option<SocketAddr>) -> io::Result<Endpoint> {
         // Already listening where asked: the same endpoint.
-        if let Some(server) = &self.inspection.server {
-            if bind.is_none_or(|bind| bind == server.endpoint().addr) {
-                return Ok(server.endpoint().clone());
-            }
+        if let Some(server) = &self.inspection.server
+            && bind.is_none_or(|bind| bind == server.endpoint().addr)
+        {
+            return Ok(server.endpoint().clone());
         }
         let bind = bind.unwrap_or_else(|| SocketAddr::from(([127, 0, 0, 1], 0)));
         let wake: Arc<dyn Fn() + Send + Sync> = self.scheduler().host_waker();

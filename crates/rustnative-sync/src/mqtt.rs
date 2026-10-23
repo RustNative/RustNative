@@ -379,7 +379,7 @@ async fn connection(broker: Broker, stream: TcpStream, limits: MqttLimits) {
         return;
     }
     let timeout = if keep_alive == 0 {
-        Duration::from_secs(86_400)
+        Duration::from_hours(24)
     } else {
         Duration::from_secs(u64::from(keep_alive)) * 3 / 2
     };
@@ -424,11 +424,10 @@ async fn connection(broker: Broker, stream: TcpStream, limits: MqttLimits) {
                     Packet::Disconnect => { graceful = true; break }
                     _ => None,
                 };
-                if let Some(reply) = reply {
-                    if writer.write_all(&reply.encode()).await.is_err() {
+                if let Some(reply) = reply
+                    && writer.write_all(&reply.encode()).await.is_err() {
                         break;
                     }
-                }
             }
         }
     }
@@ -500,10 +499,10 @@ impl MqttClient {
                     Packet::PubRec(id) => Some(Packet::PubRel(id)),
                     _ => None,
                 };
-                if let Some(reply) = reply {
-                    if responder.lock().await.write_all(&reply.encode()).await.is_err() {
-                        break;
-                    }
+                if let Some(reply) = reply
+                    && responder.lock().await.write_all(&reply.encode()).await.is_err()
+                {
+                    break;
                 }
             }
         });

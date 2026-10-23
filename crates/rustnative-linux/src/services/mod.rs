@@ -80,6 +80,6 @@ where
         let _ = reply.send(work());
     });
     answer
-        .recv_timeout(std::time::Duration::from_secs(60))
+        .recv_timeout(std::time::Duration::from_mins(1))
         .map_err(|_| ServiceError::new("the GTK main loop is not running, or did not answer"))?
 }

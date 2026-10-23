@@ -52,10 +52,10 @@ fn label(application: &Application, key: &str) -> String {
     let mut text = String::new();
     let id = rustnative_core::NodeId::from_key(key);
     application.view().visit(&mut |node, _, _| {
-        if let Node::Label(label) = node {
-            if label.id() == id {
-                label.text().clone_into(&mut text);
-            }
+        if let Node::Label(label) = node
+            && label.id() == id
+        {
+            label.text().clone_into(&mut text);
         }
     });
     text

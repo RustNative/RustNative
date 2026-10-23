@@ -179,11 +179,11 @@ jobs:
           script: ANDROID_NDK_HOME="$ANDROID_NDK_LATEST_HOME" tools/android-device-test.sh && ANDROID_NDK_HOME="$ANDROID_NDK_LATEST_HOME" cargo run --release -p rustnative-cli -- bench --target android --check --unpaced-display
 
   msrv:
-    name: MSRV (1.85)
+    name: MSRV (1.91)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: dtolnay/rust-toolchain@1.85
+      - uses: dtolnay/rust-toolchain@1.91
       - uses: Swatinem/rust-cache@v2
       - name: GTK 4 and libsoup 3 (the Linux backend's libraries)
         run: sudo apt-get update && sudo apt-get install -y libgtk-4-dev libsoup-3.0-dev

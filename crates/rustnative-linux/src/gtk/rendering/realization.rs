@@ -359,12 +359,12 @@ impl Renderer {
 
     fn reparent(&mut self, id: NodeId, parent: Option<NodeId>, window_root: &RnLayout) {
         let content = self.content_of(parent, window_root);
-        if let Some(object) = self.registry.get(id) {
-            if object.widget.parent().as_ref() != Some(content.upcast_ref()) {
-                unparent(&object.widget);
-                content.append(&object.widget);
-                self.placed.remove(&id);
-            }
+        if let Some(object) = self.registry.get(id)
+            && object.widget.parent().as_ref() != Some(content.upcast_ref())
+        {
+            unparent(&object.widget);
+            content.append(&object.widget);
+            self.placed.remove(&id);
         }
     }
 

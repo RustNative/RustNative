@@ -113,7 +113,7 @@ fn click_tab(harness: &mut NativeHarness, tabs: HWND, index: usize) {
     // rectangle in the control's client coordinates.
     let found = unsafe { SendMessageW(tabs, TCM_GETITEMRECT, index, (&raw mut item) as isize) };
     assert!(found != 0, "tab {index} exists");
-    let (x, y) = ((item.left + item.right) / 2, (item.top + item.bottom) / 2);
+    let (x, y) = (i32::midpoint(item.left, item.right), i32::midpoint(item.top, item.bottom));
     let point = (isize::try_from(y).unwrap() << 16) | isize::try_from(x).unwrap();
     harness.post(tabs, WM_LBUTTONDOWN, 1, point);
     harness.post(tabs, WM_LBUTTONUP, 0, point);

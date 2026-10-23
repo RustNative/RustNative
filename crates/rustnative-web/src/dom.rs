@@ -1081,10 +1081,11 @@ impl<'a> Realizer<'a> {
                 element.set("aria-level", level.to_string());
             }
         }
-        if let Some(name) = info.name_hint() {
-            if visible_text != Some(name) && element.tag != "img" {
-                element.set("aria-label", name);
-            }
+        if let Some(name) = info.name_hint()
+            && visible_text != Some(name)
+            && element.tag != "img"
+        {
+            element.set("aria-label", name);
         }
         if let Some(description) = info.description_hint() {
             element.set("aria-description", description);
@@ -1119,17 +1120,17 @@ impl<'a> Realizer<'a> {
         }
         let native_check =
             element.tag == "input" && matches!(element.get("type"), Some("checkbox" | "radio"));
-        if let Some(checked) = info.checked_state() {
-            if !native_check {
-                element.set(
-                    "aria-checked",
-                    match checked {
-                        CheckedState::Checked => "true",
-                        CheckedState::Unchecked => "false",
-                        CheckedState::Mixed => "mixed",
-                    },
-                );
-            }
+        if let Some(checked) = info.checked_state()
+            && !native_check
+        {
+            element.set(
+                "aria-checked",
+                match checked {
+                    CheckedState::Checked => "true",
+                    CheckedState::Unchecked => "false",
+                    CheckedState::Mixed => "mixed",
+                },
+            );
         }
         if let Some(expanded) = info.expanded_state() {
             element.set("aria-expanded", expanded.to_string());

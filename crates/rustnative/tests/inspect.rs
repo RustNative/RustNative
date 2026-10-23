@@ -59,7 +59,7 @@ fn inspect(app: &mut Application, args: &[&str]) -> Output {
         .args(["inspect", "--addr", &endpoint.addr.to_string(), "--token", &endpoint.token])
         .args(args);
     let child = std::thread::spawn(move || command.output().unwrap());
-    let deadline = Instant::now() + Duration::from_secs(60);
+    let deadline = Instant::now() + Duration::from_mins(1);
     while !child.is_finished() {
         app.poll_inspection(&NoBackend);
         assert!(Instant::now() < deadline, "the client did not finish");

@@ -170,10 +170,10 @@ pub fn key_of(id: crate::identity::NodeId) -> String {
 #[must_use]
 pub fn node_id(key: &str) -> crate::identity::NodeId {
     use crate::identity::{ComponentId, NodeId};
-    if let Some((owner, local)) = key.split_once('~') {
-        if let Ok(owner) = owner.parse::<u64>() {
-            return NodeId::scoped(ComponentId::from_raw(owner), NodeId::from_key(local));
-        }
+    if let Some((owner, local)) = key.split_once('~')
+        && let Ok(owner) = owner.parse::<u64>()
+    {
+        return NodeId::scoped(ComponentId::from_raw(owner), NodeId::from_key(local));
     }
     NodeId::from_key(key)
 }

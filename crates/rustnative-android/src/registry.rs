@@ -203,16 +203,17 @@ impl WindowRegistry {
             .get(&window)
             .and_then(|runtime| runtime.root.as_ref())
             .map(crate::rendering::controls::frame);
-        if let Some([_, _, width, height]) = root_frame {
-            if width > 0 && height > 0 {
-                self.resized(window, width, height)?;
-            }
+        if let Some([_, _, width, height]) = root_frame
+            && width > 0
+            && height > 0
+        {
+            self.resized(window, width, height)?;
         }
         self.render(window)?;
-        if let Some(intent) = intent {
-            if window == WindowId::PRIMARY {
-                self.intent(window, intent)?;
-            }
+        if let Some(intent) = intent
+            && window == WindowId::PRIMARY
+        {
+            self.intent(window, intent)?;
         }
         self.after_change(window)
     }
@@ -600,11 +601,10 @@ impl WindowRegistry {
 
     /// Lays `window` out again at its current size.
     pub(crate) fn relayout(&mut self, window: WindowId) -> Result<(), Error> {
-        if let Some(runtime) = self.windows.get_mut(&window) {
-            if let (Some(renderer), Some(root)) = (runtime.renderer.as_mut(), runtime.root.clone())
-            {
-                renderer.relayout(&root, runtime.size)?;
-            }
+        if let Some(runtime) = self.windows.get_mut(&window)
+            && let (Some(renderer), Some(root)) = (runtime.renderer.as_mut(), runtime.root.clone())
+        {
+            renderer.relayout(&root, runtime.size)?;
         }
         self.report_container_sizes(window)?;
         crate::animation::after_render(self, window)
@@ -633,12 +633,10 @@ impl WindowRegistry {
             });
             if let (Some((tree, theme, direction)), Some(runtime)) =
                 (refreshed, self.windows.get_mut(&window))
-            {
-                if let (Some(renderer), Some(root)) =
+                && let (Some(renderer), Some(root)) =
                     (runtime.renderer.as_mut(), runtime.root.clone())
-                {
-                    renderer.render(&tree, &theme, direction, &root, runtime.size)?;
-                }
+            {
+                renderer.render(&tree, &theme, direction, &root, runtime.size)?;
             }
         }
         Ok(())

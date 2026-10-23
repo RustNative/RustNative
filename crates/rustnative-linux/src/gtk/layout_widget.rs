@@ -101,10 +101,10 @@ mod imp {
         }
 
         fn size_allocate(&self, width: i32, height: i32, _baseline: i32) {
-            if self.last_size.replace((width, height)) != (width, height) {
-                if let Some(callback) = self.on_resize.borrow().as_ref() {
-                    callback(width, height);
-                }
+            if self.last_size.replace((width, height)) != (width, height)
+                && let Some(callback) = self.on_resize.borrow().as_ref()
+            {
+                callback(width, height);
             }
             if let Some(callback) = self.on_allocate.borrow().as_ref() {
                 callback(width, height);

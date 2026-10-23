@@ -81,7 +81,7 @@ fn todos_query() -> Query<Vec<String>> {
     .empty_when(Vec::is_empty)
     .retries(3, Duration::from_millis(100))
     .stale_time(Duration::from_secs(10))
-    .retain_time(Duration::from_secs(60))
+    .retain_time(Duration::from_mins(1))
     .revalidate(Revalidate {
         on_mount: true,
         on_focus: true,

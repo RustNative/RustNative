@@ -205,11 +205,11 @@ impl GestureRecognizer {
     /// Advances time to `now` (on the same clock as the pointer
     /// timestamps), recognizing a long press whose threshold has passed.
     pub fn tick(&mut self, now: Duration) -> Vec<Gesture> {
-        if let State::Pressed { id, start, since } = self.state {
-            if now.saturating_sub(since) >= self.config.long_press {
-                self.state = State::LongPressed { id };
-                return vec![Gesture::LongPress { position: start }];
-            }
+        if let State::Pressed { id, start, since } = self.state
+            && now.saturating_sub(since) >= self.config.long_press
+        {
+            self.state = State::LongPressed { id };
+            return vec![Gesture::LongPress { position: start }];
         }
         Vec::new()
     }

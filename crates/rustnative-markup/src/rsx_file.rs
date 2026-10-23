@@ -244,25 +244,27 @@ impl Scanner<'_> {
         let mut index = 0;
         while index < tokens.len() {
             let token = &tokens[index];
-            if let TokenTree::Punct(punct) = token {
-                if punct.as_char() == '<' && prev != Prev::Other && starts_element(&tokens[index..])
-                {
-                    match crate::rsx_scan::match_element(&tokens[index..]) {
-                        Ok(element) => {
-                            let consumed = element.len;
-                            let site_context = if element.has_component {
-                                match context {
-                                    FnContext::One(name) => Some(name.clone()),
-                                    FnContext::None => {
-                                        self.error(
+            if let TokenTree::Punct(punct) = token
+                && punct.as_char() == '<'
+                && prev != Prev::Other
+                && starts_element(&tokens[index..])
+            {
+                match crate::rsx_scan::match_element(&tokens[index..]) {
+                    Ok(element) => {
+                        let consumed = element.len;
+                        let site_context = if element.has_component {
+                            match context {
+                                FnContext::One(name) => Some(name.clone()),
+                                FnContext::None => {
+                                    self.error(
                                             element.open,
                                             "a component element needs a `ComponentContext`, and the enclosing \
                                              function has no such parameter; write `rsx!(in context, …)` instead",
                                         );
-                                        None
-                                    }
-                                    FnContext::Ambiguous(names) => {
-                                        self.error(
+                                    None
+                                }
+                                FnContext::Ambiguous(names) => {
+                                    self.error(
                                             element.open,
                                             format!(
                                                 "the enclosing function has more than one `ComponentContext` \
@@ -270,31 +272,30 @@ impl Scanner<'_> {
                                                 names.join(", ")
                                             ),
                                         );
-                                        None
-                                    }
+                                    None
                                 }
-                            } else {
-                                None
-                            };
-                            self.sites.push(Site {
-                                start: element.open.byte_range().start,
-                                end: element.close.byte_range().end,
-                                context: site_context,
-                            });
-                            // The Rust inside the element — attribute values,
-                            // braced children, conditions — is `.rsx` Rust
-                            // too, and may hold markup of its own.
-                            for stream in element.rust {
-                                self.scan(stream, context);
                             }
-                            index += consumed.max(1);
-                            prev = Prev::Other;
-                            continue;
+                        } else {
+                            None
+                        };
+                        self.sites.push(Site {
+                            start: element.open.byte_range().start,
+                            end: element.close.byte_range().end,
+                            context: site_context,
+                        });
+                        // The Rust inside the element — attribute values,
+                        // braced children, conditions — is `.rsx` Rust
+                        // too, and may hold markup of its own.
+                        for stream in element.rust {
+                            self.scan(stream, context);
                         }
-                        Err(error) => {
-                            self.error(error.span, error.message);
-                            return;
-                        }
+                        index += consumed.max(1);
+                        prev = Prev::Other;
+                        continue;
+                    }
+                    Err(error) => {
+                        self.error(error.span, error.message);
+                        return;
                     }
                 }
             }

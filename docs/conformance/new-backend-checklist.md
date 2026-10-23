@@ -67,5 +67,13 @@ on the Web: the rows marked `—`, among them the browser's safe-area insets,
 gesture arbitration against the browser's own (`touch-action`), and runtime
 token switches without a reload. Owed by every backend once Milestone 67 lands:
 rows 23–25, which no backend satisfies yet; on Windows, row 25 is where
-Milestone 69's composition prototype is recorded, and row 21's unit mapping
-gains its per-monitor scaling there too.
+Milestone 69's composition is recorded, and row 21's unit mapping gains its
+per-monitor scaling there too.
+
+The Windows column is the common controls' today. The Windows backend has three
+control sets — WinUI 3 by default, WinUI 2 and the common controls as launch-time
+fallbacks (`PLAN.md` Milestone 71) — and each is a column of its own, as iOS and
+iPadOS are: the WinUI 3 and WinUI 2 columns are added with that milestone, every
+row answered and tested under each set, and the common controls' column stays in
+CI so the last fallback never falls behind. Each column is run on x86_64 and on
+ARM64 (Milestone 72).

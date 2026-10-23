@@ -7,7 +7,7 @@ members = [
 
 [workspace.package]
 edition = "2024"
-rust-version = "1.85"
+rust-version = "1.91"
 license = "MIT OR Apache-2.0"
 description = "A Rust-first, native-control-oriented cross-platform application framework"
 repository = "https://github.com/RustNative/RustNative"

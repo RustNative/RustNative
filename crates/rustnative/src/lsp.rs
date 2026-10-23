@@ -97,14 +97,13 @@ fn percent_decode(text: &str) -> String {
     let mut out = Vec::with_capacity(bytes.len());
     let mut index = 0;
     while index < bytes.len() {
-        if bytes[index] == b'%' {
-            if let Some(byte) =
+        if bytes[index] == b'%'
+            && let Some(byte) =
                 text.get(index + 1..index + 3).and_then(|hex| u8::from_str_radix(hex, 16).ok())
-            {
-                out.push(byte);
-                index += 3;
-                continue;
-            }
+        {
+            out.push(byte);
+            index += 3;
+            continue;
         }
         out.push(bytes[index]);
         index += 1;
@@ -137,10 +136,10 @@ fn lowered_path(source: &Path) -> PathBuf {
             let build = profile.path().join("build");
             for package in std::fs::read_dir(&build).into_iter().flatten().flatten() {
                 let candidate = package.path().join("out").join("rsx").join(&relative);
-                if let Ok(modified) = candidate.metadata().and_then(|meta| meta.modified()) {
-                    if newest.as_ref().is_none_or(|(time, _)| modified > *time) {
-                        newest = Some((modified, candidate));
-                    }
+                if let Ok(modified) = candidate.metadata().and_then(|meta| meta.modified())
+                    && newest.as_ref().is_none_or(|(time, _)| modified > *time)
+                {
+                    newest = Some((modified, candidate));
                 }
             }
         }
@@ -227,12 +226,12 @@ impl State {
         }) else {
             // A `.rs` document: forwarded as it is, unless it asks about
             // markup or a class string the proxy answers itself.
-            if let Some(uri) = message.pointer("/params/textDocument/uri").and_then(Value::as_str) {
-                if let Some(result) = self.assist(uri, &method, &message, false) {
-                    return Routed::Client(
-                        json!({ "jsonrpc": "2.0", "id": message["id"], "result": result }),
-                    );
-                }
+            if let Some(uri) = message.pointer("/params/textDocument/uri").and_then(Value::as_str)
+                && let Some(result) = self.assist(uri, &method, &message, false)
+            {
+                return Routed::Client(
+                    json!({ "jsonrpc": "2.0", "id": message["id"], "result": result }),
+                );
             }
             return Routed::Server(message);
         };
@@ -558,10 +557,10 @@ fn apply_change(text: &mut String, range: &Value, new_text: &str) {
     };
     if let (Some(start), Some(end)) =
         (range.get("start").and_then(offset), range.get("end").and_then(offset))
+        && start <= end
+        && end <= text.len()
     {
-        if start <= end && end <= text.len() {
-            text.replace_range(start..end, new_text);
-        }
+        text.replace_range(start..end, new_text);
     }
 }
 

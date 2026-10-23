@@ -153,7 +153,7 @@ impl ImageLoader {
         http: Arc<dyn HttpService>,
         decoder: Arc<dyn ImageDecoder>,
     ) -> Self {
-        Self { client, http, decoder, disk: None, retain: Duration::from_secs(60) }
+        Self { client, http, decoder, disk: None, retain: Duration::from_mins(1) }
     }
 
     /// Keeps fetched bytes in `directory` too (on Windows, conventionally

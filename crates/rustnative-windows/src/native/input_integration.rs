@@ -231,7 +231,7 @@ fn screen_rect(hwnd: HWND) -> RECT {
 
 fn screen_center(hwnd: HWND) -> POINT {
     let rect = screen_rect(hwnd);
-    POINT { x: (rect.left + rect.right) / 2, y: (rect.top + rect.bottom) / 2 }
+    POINT { x: i32::midpoint(rect.left, rect.right), y: i32::midpoint(rect.top, rect.bottom) }
 }
 
 fn wheel_wparam(delta: i16) -> WPARAM {

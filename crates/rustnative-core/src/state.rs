@@ -321,10 +321,10 @@ impl<I: PartialEq + Clone, O: Clone> Derived<I, O> {
 
     /// The value for `input`: the cached one when `input` equals the last.
     pub fn get(&self, input: &I) -> O {
-        if let Some((seen, output)) = &*self.cache.borrow() {
-            if seen == input {
-                return output.clone();
-            }
+        if let Some((seen, output)) = &*self.cache.borrow()
+            && seen == input
+        {
+            return output.clone();
         }
         let output = (self.compute)(input);
         self.computations.set(self.computations.get() + 1);

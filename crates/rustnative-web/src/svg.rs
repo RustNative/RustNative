@@ -183,10 +183,10 @@ pub fn draw_list(list: &DrawList) -> Element {
                 stack.push(Element::new("g").attr("opacity", number(opacity.get())));
             }
             DrawCommand::Pop => {
-                if stack.len() > 1 {
-                    if let Some(closed) = stack.pop() {
-                        push(&mut stack, closed);
-                    }
+                if stack.len() > 1
+                    && let Some(closed) = stack.pop()
+                {
+                    push(&mut stack, closed);
                 }
             }
             DrawCommand::HitRegion(id, area) => {

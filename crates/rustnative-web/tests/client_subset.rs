@@ -311,10 +311,10 @@ pub mod numbers {
                             }
                         }
                     }
-                    if let Some(point) = self.points.first() {
-                        if point.x > 0 {
-                            self.log.push(format!("first point {}", point.x));
-                        }
+                    if let Some(point) = self.points.first()
+                        && point.x > 0
+                    {
+                        self.log.push(format!("first point {}", point.x));
                     }
                     self.log.push(format!("{total} {found} {label} {grade} {left} {right}"));
                 }
@@ -603,10 +603,10 @@ fn native<S: ClientLogic + std::panic::UnwindSafe>(
         let services = Services::default();
         let mut replies = Vec::new();
         for effect in messages {
-            if let Some(task) = effect.perform(&services) {
-                if let Some(message) = ready(task) {
-                    replies.push(message);
-                }
+            if let Some(task) = effect.perform(&services)
+                && let Some(message) = ready(task)
+            {
+                replies.push(message);
             }
         }
         let mut after = Vec::new();

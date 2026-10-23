@@ -19,7 +19,8 @@ tree, reach the same API, and cost the same at runtime. See
 
 ## Current status
 
-The working backends are Windows/Win32, Linux (GTK 4 on Wayland and X11; see
+The working backends are Windows (a Win32 shell realizing the tree with the
+common controls, on x86_64), Linux (GTK 4 on Wayland and X11; see
 [`docs/linux.md`](docs/linux.md)), Android (platform `View`s, verified on a
 phone and an emulator; see [`docs/android.md`](docs/android.md)), and the Web
 (semantic HTML and CSS, in the browser, on a server, as a function, or on an
@@ -32,7 +33,10 @@ services, and components ask for *capabilities*
 platform-independent, so macOS, iOS, iPadOS, and embedded targets are
 added as separate adapters, each planned to the same depth: native host
 objects, native measurement, native input, native accessibility, its own
-toolchain and packaging.
+toolchain and packaging. Windows grows in two directions planned to the same
+depth: its control sets — WinUI 3 by default, with WinUI 2 and the common
+controls as launch-time fallbacks (`PLAN.md` Milestone 71) — and a native ARM64
+build beside x86_64 (Milestone 72).
 
 Two notes on what "planned" means here. macOS, iOS, and iPadOS are fully planned platforms that this project has no hardware to build or verify on yet, so their milestones are specified and designed for but not started — order follows hardware, not priority. And a backend advertises a capability only once it genuinely realizes it, so "planned" never reaches an application as a claim of support.
 
@@ -347,7 +351,7 @@ contract it is held to.
 | `rustnative-build` | build-script helpers: resources and manifests, `compile_rsx()`, `compile_styles()`, `compile_messages()`, Android project files |
 | `rustnative-host` | the native backend for the target being compiled, and its default services — the one place a platform is named |
 | `rustnative-update` | the signed update manifest, its verifier, and the update decision (rollout, pinning, payload compatibility, expiry) every self-updating host shares |
-| `rustnative-windows` | the Win32 backend: HWNDs, common controls, UI Automation, Direct2D canvases, WinHTTP, crash capture, installing signed updates |
+| `rustnative-windows` | the Windows backend: the Win32 shell (windows, message loop, DPI, services) with the common controls as its realization today and WinUI 3 and WinUI 2 planned beside them (Milestone 71), UI Automation, Direct2D canvases, WinHTTP, crash capture, installing signed updates |
 | `rustnative-linux` | the GTK 4 backend behind a toolkit seam: Wayland and X11, AT-SPI2, the desktop portals, libsoup, packaging for three distribution families |
 | `rustnative-android` | the Android backend: platform `View`s over one JNI module, `AccessibilityNodeInfo`, the activity lifecycle, the Android services and surfaces |
 | `rustnative-web`, `rustnative-webgen`, `rustnative-web-macros` | the Web backend: the DOM mapping, CSS, the browser runtime, client components compiled to JavaScript, WebAssembly subtrees |
@@ -886,10 +890,12 @@ condition the core resolves, with no matching step.
 Styles are capability-checked per host, like everything else here. Each backend
 answers, per property, whether it realizes, approximates, or cannot express it
 (`Platform::style_capabilities`), and records how it maps units
-(`Platform::unit_mapping`). Windows realizes colours, fonts, layout, and
-opacity; approximates a container's border (a one-pixel frame) and corner
-radius (a window region) while native controls keep their system shape; and
-cannot draw shadows. The headless backend, being a model, realizes everything.
+(`Platform::unit_mapping`). Windows, under the common controls built today,
+realizes colours, fonts, layout, and opacity; approximates a container's border
+(a one-pixel frame) and corner radius (a window region) while native controls
+keep their system shape; and cannot draw shadows. Under WinUI 3, its planned
+default control set (Milestone 71), shadows, anti-aliased corners, and the rest
+of the extended range are realized through the host's own composition. The headless backend, being a model, realizes everything.
 `BUILD_STATUS.md` records the tables.
 
 The vocabulary is not cut down to what every host shares, because that would
@@ -912,12 +918,19 @@ application declares (`[style] targets` in `rustnative.toml`) are all checked at
 build time, so an unguarded property one of them cannot realize still fails the
 build, naming that target. Structural variants such as `odd:` and `*:` are
 resolved by the core from the reconciler's own child lists. Relationships on
-another node's state (`group-hover:`, `peer-checked:`), container queries, and
-raw host styling are specified as typed relationships and a single-host escape
-hatch (Milestone 68) and are optional: a component already passes its state to
-its children. `docs/styling.md` is the reference, including what the range
-looks like on each host and what bounds it on Windows (Milestone 69: scaling
-first, then composition for the boxes the framework owns).
+another node's state (`group-hover:`, `peer-checked:`, `has-*`) and container
+queries are typed relationships the core resolves by a bounded lookup
+(Milestone 68); raw host styling is a single-host escape hatch, the one part
+taken up only on demand. The vocabulary is Tailwind CSS v4 taken whole
+(Milestone 73): every upstream utility, variant, modifier, and directive is
+compiled or refused by name, the pin follows the current upstream release, and
+the compiled declarations are checked against a corpus generated from
+upstream's own compiler — with no selector, no cascade, and no JavaScript
+toolchain in any build. Under WinUI 3, the Windows default (Milestone 71), the
+range reaches as far as the host composes: shadows, 3D transforms, filters,
+backdrop filters, masks, and compositor-thread motion. `docs/styling.md` is the
+reference, including what the range looks like on each host and control set
+(Milestone 69: scaling first, then composition).
 
 ## Advanced input
 
@@ -1465,8 +1478,9 @@ cargo test --workspace -- --ignored
 The complete master roadmap—including completed milestones, architectural invariants, and all planned future stages—is maintained in [`PLAN.md`](PLAN.md).
 
 Milestones 25–32, 34, 35, and 38 are complete, and so is the Web track (Web milestones A–K).
-What remains is the rest of the platform matrix — macOS, iOS,
-iPadOS, and embedded — plus the
+What remains is the rest of the platform matrix — the Windows control sets
+(WinUI 3 by default, WinUI 2 and the common controls as fallbacks; Milestone 71)
+and Windows on ARM64 (Milestone 72), macOS, iOS, iPadOS, and embedded — plus the
 core work those targets share: a `no_std`-capable core subset, an executor
 seam for single-threaded hosts, and time from the host clock rather than
 `std::time::Instant`. The markup syntax and the style spellings are core work of
@@ -1483,7 +1497,7 @@ samples in the pointer model, and an overlay window mode) need no Apple
 hardware and can land on the shipped backends first.
 
 Interleaved with the backends, `PLAN.md` section 11 carries the
-production-parity milestones (39–69) in four tiers and an optional band:
+production-parity milestones (39–73) in four tiers and an optional band:
 
 - **Tier 0 (53, 58, 39, 40), before the second backend exists** — the markup
   syntax, so that every later example, template, guide, doc test, and
@@ -1535,9 +1549,13 @@ production-parity milestones (39–69) in four tiers and an optional band:
   classification and data export). Two more complete it: Milestone 67, the
   extended style range (guards, declared targets, gradients, transforms,
   effects, motion, text, control parts, and structural variants, each answered
-  by every backend); and Milestone 69, Windows scale and composition
-  (per-monitor scaling first, then host composition for the boxes the
-  framework owns, and the control-set decision named with its criteria).
+  by every backend); Milestone 68, relational styling and container queries as
+  typed relationships the core resolves; Milestone 73, Tailwind CSS complete —
+  the whole upstream vocabulary compiled or refused by name, current with
+  upstream, proven against a corpus from upstream's own compiler, and realized
+  under WinUI 3 as far as the host composes; and Milestone 69, Windows scale and
+  composition (per-monitor scaling first, then composition through each control
+  set's own visual layer).
 - **Tier 3 (49–52, 55–57), with and after the Web track** — the server
   application model, deployment and post-ship updates, observability and
   compliance, the stability policy, ecosystem contract, and documentation that
@@ -1549,11 +1567,10 @@ production-parity milestones (39–69) in four tiers and an optional band:
   analytics, privacy-safe diagnostics); and reach (managed fleets, desktop
   shell integration, delta updates over metered networks, and the field set for
   devices — time and calibration, support bundles, provisioning).
-- **Optional (68), on demand** — relational styling on another node's state,
-  container queries, generated content, and single-host style passthrough.
-  Each is specified as a typed relationship or an explicit escape hatch, and
-  each is something the framework already covers another way, so it is built
-  when applications ask for it; the framework is complete without it.
+- **Optional, on demand** — single-host style passthrough (the last part of
+  Milestone 68): host styling with no typed equivalent, outside the equivalence
+  suite by definition, built when applications ask for it; the framework is
+  complete without it.
 
 They come out of the standing analysis in
 [`docs/ecosystem-analysis/`](docs/ecosystem-analysis/), which examines the

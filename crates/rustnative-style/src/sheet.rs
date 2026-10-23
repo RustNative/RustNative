@@ -239,11 +239,11 @@ impl Parser<'_> {
         self.position = end;
         // A block that runs off the end of the file (half-typed in an
         // editor) is an error, not a block.
-        if let Some(open) = brace {
-            if !self.text[..end].ends_with('}') {
-                self.errors.push(StyleError::new("this `{` is never closed", open..open + 1));
-                return None;
-            }
+        if let Some(open) = brace
+            && !self.text[..end].ends_with('}')
+        {
+            self.errors.push(StyleError::new("this `{` is never closed", open..open + 1));
+            return None;
         }
         let statement = &self.text[start..end];
         let range = start..end;

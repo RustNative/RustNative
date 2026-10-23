@@ -164,7 +164,7 @@ fn the_local_control_api_answers_only_this_user_s_cli() {
     let token_file = runtime.join("rustnative").join(format!("deploy-{control}.token"));
     let started = Instant::now();
     while !token_file.is_file() || TcpStream::connect(("127.0.0.1", control)).is_err() {
-        assert!(started.elapsed() < Duration::from_secs(60), "the deployment did not start");
+        assert!(started.elapsed() < Duration::from_mins(1), "the deployment did not start");
         std::thread::sleep(Duration::from_millis(50));
     }
     #[cfg(unix)]

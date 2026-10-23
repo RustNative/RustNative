@@ -115,10 +115,8 @@ impl HttpService for MockHttp {
             .expected
             .front()
             .is_some_and(|next| next.method == *request.method() && next.url == request.url());
-        if matches {
-            if let Some(next) = state.expected.pop_front() {
-                return next.response;
-            }
+        if matches && let Some(next) = state.expected.pop_front() {
+            return next.response;
         }
         let description = format!("unexpected {} {}", request.method().as_str(), request.url());
         state.unexpected.push(description.clone());

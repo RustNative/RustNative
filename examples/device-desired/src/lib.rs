@@ -91,10 +91,10 @@ pub async fn device_session(
             burst.push(more);
         }
         for message in burst {
-            if let Ok(desired) = decode::<Config>(&message.payload) {
-                if newest.as_ref().is_none_or(|current| desired.version > current.version) {
-                    newest = Some(desired);
-                }
+            if let Ok(desired) = decode::<Config>(&message.payload)
+                && newest.as_ref().is_none_or(|current| desired.version > current.version)
+            {
+                newest = Some(desired);
             }
         }
         if let Some(desired) = newest.take() {

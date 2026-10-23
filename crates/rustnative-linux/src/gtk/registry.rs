@@ -594,19 +594,18 @@ impl WindowRegistry {
         let window = runtime.window.take();
         runtime.menu = None;
         if let Some(window) = window {
-            if id == WindowId::PRIMARY {
-                if let Some(store) = self
+            if id == WindowId::PRIMARY
+                && let Some(store) = self
                     .with_application(|application| application.services().state_store().cloned())
-                {
-                    super::lifecycle::save_placement(&window, store.as_ref());
-                }
+            {
+                super::lifecycle::save_placement(&window, store.as_ref());
             }
             window.destroy();
         }
-        if let Some(parent) = modal_parent.and_then(|parent| self.windows.get(&parent)) {
-            if let Some(window) = &parent.window {
-                window.set_sensitive(true);
-            }
+        if let Some(parent) = modal_parent.and_then(|parent| self.windows.get(&parent))
+            && let Some(window) = &parent.window
+        {
+            window.set_sensitive(true);
         }
     }
 

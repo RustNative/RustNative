@@ -410,10 +410,10 @@ impl Renderer {
         let Self { virtual_lists, snapshot, .. } = self;
         let offsets = virtual_lists.resolve_anchors(|node| index_of(snapshot, node));
         for (id, offset) in offsets {
-            if self.scroll.scroll_to(id, offset) {
-                if let Some(rect) = self.layout.get(&id).copied() {
-                    self.scroll.apply(id, &self.registry, rect);
-                }
+            if self.scroll.scroll_to(id, offset)
+                && let Some(rect) = self.layout.get(&id).copied()
+            {
+                self.scroll.apply(id, &self.registry, rect);
             }
         }
     }
@@ -458,10 +458,10 @@ impl Renderer {
     pub(crate) fn scrollable_ancestor(&self, hwnd: HWND) -> Option<NodeId> {
         let mut current = hwnd;
         while !current.is_null() {
-            if let Some(id) = self.registry.id_for_hwnd(current) {
-                if self.overflow_of(id) == Some(Overflow::Scroll) {
-                    return Some(id);
-                }
+            if let Some(id) = self.registry.id_for_hwnd(current)
+                && self.overflow_of(id) == Some(Overflow::Scroll)
+            {
+                return Some(id);
             }
             // SAFETY: `current` was just checked non-null and is a live
             // HWND (either the caller's starting handle or a value

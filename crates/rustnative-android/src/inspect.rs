@@ -170,15 +170,13 @@ pub(crate) fn poll(registry: &mut WindowRegistry, window: WindowId) -> bool {
         if let Err(error) = sync_overlay(runtime, list.as_ref()) {
             crate::log::warn(&format!("the inspection overlay: {error}"));
         }
-        if quit {
-            if let Some(activity) = &runtime.activity {
-                crate::jni_host::best_effort(
-                    Class::Bridge,
-                    "finish",
-                    "(Landroid/app/Activity;)V",
-                    &[Arg::Obj(activity)],
-                );
-            }
+        if quit && let Some(activity) = &runtime.activity {
+            crate::jni_host::best_effort(
+                Class::Bridge,
+                "finish",
+                "(Landroid/app/Activity;)V",
+                &[Arg::Obj(activity)],
+            );
         }
     }
     answered

@@ -32,11 +32,11 @@ pub mod stepper {
 
     impl Stepper {
         pub fn update(&mut self, event: Event, fx: &mut Effects<()>) {
-            if let Event::Click { target } = event {
-                if target == NodeId::from_key("up") {
-                    self.count += 1;
-                    fx.publish("changed", &self.count);
-                }
+            if let Event::Click { target } = event
+                && target == NodeId::from_key("up")
+            {
+                self.count += 1;
+                fx.publish("changed", &self.count);
             }
         }
 

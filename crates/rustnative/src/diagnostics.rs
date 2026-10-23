@@ -57,12 +57,12 @@ pub fn remap_rendered(rendered: &str, root: &Path) -> String {
             out.push(line.to_owned());
             continue;
         };
-        if let Some((gutter, number, _lowered_text)) = parse_code_line(line) {
-            if let Some(source) = source_lines.get(number.saturating_sub(1)) {
-                last_line_number = Some(number);
-                out.push(format!("{gutter}{number} | {source}"));
-                continue;
-            }
+        if let Some((gutter, number, _lowered_text)) = parse_code_line(line)
+            && let Some(source) = source_lines.get(number.saturating_sub(1))
+        {
+            last_line_number = Some(number);
+            out.push(format!("{gutter}{number} | {source}"));
+            continue;
         }
         if let (Some(number), Some((gutter, markers))) = (last_line_number, parse_annotation(line))
         {

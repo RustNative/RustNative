@@ -227,12 +227,12 @@ fn literals(root: &Path, allow: &[String]) -> Result<Vec<(PathBuf, usize, String
                 // Skip the key argument: up to the first top-level comma.
                 let Some(comma) = rest.find(',') else { continue };
                 let after = rest[comma + 1..].trim_start();
-                if let Some(literal) = after.strip_prefix('"') {
-                    if let Some(end) = literal.find('"') {
-                        let value = &literal[..end];
-                        if worth(value) {
-                            found.push((relative.clone(), line_of(&text, start), value.to_owned()));
-                        }
+                if let Some(literal) = after.strip_prefix('"')
+                    && let Some(end) = literal.find('"')
+                {
+                    let value = &literal[..end];
+                    if worth(value) {
+                        found.push((relative.clone(), line_of(&text, start), value.to_owned()));
                     }
                 }
             }

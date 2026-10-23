@@ -129,10 +129,10 @@ impl WindowRegistry {
                     );
                 }
                 AnimationRequest::Cancel { node, property } => {
-                    if let Some(id) = runtime.animation.timeline.running_id(node, property) {
-                        if let Some(frame) = runtime.animation.timeline.cancel(id) {
-                            runtime.renderer.apply_animation_frame(&frame, &runtime.root);
-                        }
+                    if let Some(id) = runtime.animation.timeline.running_id(node, property)
+                        && let Some(frame) = runtime.animation.timeline.cancel(id)
+                    {
+                        runtime.renderer.apply_animation_frame(&frame, &runtime.root);
                     }
                 }
                 AnimationRequest::CancelOwner(owner) => {

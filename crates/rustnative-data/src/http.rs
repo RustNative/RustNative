@@ -276,10 +276,10 @@ impl Interceptor for ResponseCache {
             None => request,
         };
         let response = next.run(request).await?;
-        if response.status() == 304 {
-            if let Some((_, cached)) = cached {
-                return Ok(cached);
-            }
+        if response.status() == 304
+            && let Some((_, cached)) = cached
+        {
+            return Ok(cached);
         }
         let etag = response
             .headers()

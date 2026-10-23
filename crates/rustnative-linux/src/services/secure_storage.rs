@@ -34,7 +34,7 @@ const PROMPT_INTERFACE: &str = "org.freedesktop.Secret.Prompt";
 /// How long a call may take; a prompt waits for the person instead.
 const CALL_TIMEOUT_MS: i32 = 10_000;
 /// How long a prompt may wait for the person.
-const PROMPT_TIMEOUT: Duration = Duration::from_secs(300);
+const PROMPT_TIMEOUT: Duration = Duration::from_mins(5);
 
 type Secret = (glib::variant::ObjectPath, Vec<u8>, Vec<u8>, String);
 

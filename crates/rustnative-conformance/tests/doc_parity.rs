@@ -70,15 +70,15 @@ fn sections(text: &str) -> Vec<Section> {
         if line.starts_with('#') {
             sections.push(Section { heading: line.to_owned(), ..Section::default() });
         }
-        if line.contains("<!-- single-syntax:") {
-            if let Some(current) = sections.last_mut() {
-                current.exempt = true;
-            }
+        if line.contains("<!-- single-syntax:")
+            && let Some(current) = sections.last_mut()
+        {
+            current.exempt = true;
         }
-        if line.contains("<!-- single-spelling:") {
-            if let Some(current) = sections.last_mut() {
-                current.style_exempt = true;
-            }
+        if line.contains("<!-- single-spelling:")
+            && let Some(current) = sections.last_mut()
+        {
+            current.style_exempt = true;
         }
     }
     sections

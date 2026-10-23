@@ -83,10 +83,10 @@ fn the_view_shows_the_previous_matches_while_it_updates() {
         .map(|tree| {
             let mut found = String::new();
             tree.view().visit(&mut |node, _, _| {
-                if let rustnative_core::Node::Label(label) = node {
-                    if label.text().contains("rows match") {
-                        found = label.text().to_owned();
-                    }
+                if let rustnative_core::Node::Label(label) = node
+                    && label.text().contains("rows match")
+                {
+                    found = label.text().to_owned();
                 }
             });
             found

@@ -277,10 +277,10 @@ pub(crate) fn apply_class(widget: &gtk::Widget, class: Option<&str>) {
             widget.remove_css_class(existing);
         }
     }
-    if let Some(class) = class {
-        if !widget.has_css_class(class) {
-            widget.add_css_class(class);
-        }
+    if let Some(class) = class
+        && !widget.has_css_class(class)
+    {
+        widget.add_css_class(class);
     }
 }
 

@@ -423,7 +423,7 @@ async fn sign_in(
 #[must_use]
 pub fn app(data: Data, key: [u8; 32]) -> ServerApp {
     let (before, after) =
-        Sessions::new(&Secret::new(key), std::time::Duration::from_secs(12 * 3600)).middleware();
+        Sessions::new(&Secret::new(key), std::time::Duration::from_hours(12)).middleware();
     let add_data = data.clone();
     ServerApp::new()
         .state(data)

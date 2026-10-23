@@ -43,19 +43,15 @@ impl Cx<'_> {
                     return Ok((Some(format!("{value} === null")), Vec::new()));
                 }
                 // A unit variant brought in by `use`.
-                if binding.subpat.is_none() {
-                    if let Ty::Adt(adt) = ty {
-                        if let Some(def) = self.module.enums.get(adt) {
-                            if def.variants.iter().any(|(variant, shape)| {
-                                *variant == name && matches!(shape, Shape::Unit)
-                            }) {
-                                return Ok((
-                                    Some(format!("{value} === {}", string(&name))),
-                                    Vec::new(),
-                                ));
-                            }
-                        }
-                    }
+                if binding.subpat.is_none()
+                    && let Ty::Adt(adt) = ty
+                    && let Some(def) = self.module.enums.get(adt)
+                    && def
+                        .variants
+                        .iter()
+                        .any(|(variant, shape)| *variant == name && matches!(shape, Shape::Unit))
+                {
+                    return Ok((Some(format!("{value} === {}", string(&name))), Vec::new()));
                 }
                 let mut bindings = vec![(name, value.to_owned(), ty.clone())];
                 let mut test = None;
@@ -157,10 +153,10 @@ impl Cx<'_> {
             let owner = path.segments[path.segments.len() - 2].ident.to_string();
             let owner =
                 if owner == "Self" { self.self_ty.clone().unwrap_or_default() } else { owner };
-            if let Some(def) = self.module.enums.get(&owner) {
-                if !def.variants.iter().any(|(variant, _)| *variant == name) {
-                    return self.fail(span, &format!("`{owner}::{name}`"), "no such variant");
-                }
+            if let Some(def) = self.module.enums.get(&owner)
+                && !def.variants.iter().any(|(variant, _)| *variant == name)
+            {
+                return self.fail(span, &format!("`{owner}::{name}`"), "no such variant");
             }
             // Module and framework unit variants alike are their names.
             return Ok((Some(format!("{value} === {}", string(&name))), Vec::new()));

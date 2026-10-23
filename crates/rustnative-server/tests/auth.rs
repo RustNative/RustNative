@@ -54,7 +54,7 @@ async fn admin() -> &'static str {
 
 fn service(signer: TokenSigner) -> AppService {
     let (before, after) =
-        Sessions::new(&Secret::new([7; 32]), Duration::from_secs(3600)).middleware();
+        Sessions::new(&Secret::new([7; 32]), Duration::from_hours(1)).middleware();
     ServerApp::new()
         .before(before)
         .after(after)
@@ -119,7 +119,7 @@ async fn a_session_signs_in_and_policies_guard_routes() {
 async fn bearer_tokens_carry_a_principal() {
     let signer = signer();
     let admin = serde_json::to_string(&User { name: "Grace".into(), admin: true }).unwrap();
-    let token = signer.issue(admin, Duration::from_secs(60));
+    let token = signer.issue(admin, Duration::from_mins(1));
     let service = service(signer.clone());
     let response =
         get_with(&service, "/admin", Some(("authorization", format!("Bearer {token}")))).await;
@@ -134,7 +134,7 @@ async fn bearer_tokens_carry_a_principal() {
 
 #[test]
 fn the_route_listing_names_each_routes_access() {
-    let (before, _) = Sessions::new(&Secret::new([1; 32]), Duration::from_secs(60)).middleware();
+    let (before, _) = Sessions::new(&Secret::new([1; 32]), Duration::from_mins(1)).middleware();
     let app = ServerApp::new()
         .before(before)
         .route("/me", get(me).signed_in::<User>())
@@ -166,13 +166,13 @@ fn session_cookie(response: &http::Response<Bytes>) -> Option<String> {
 
 #[tokio::test]
 async fn a_rotated_key_keeps_sessions_and_reseals_them() {
-    let old = Sessions::new(&Secret::new([1; 32]), Duration::from_secs(3600));
+    let old = Sessions::new(&Secret::new([1; 32]), Duration::from_hours(1));
     let signed_in = session_service(old)
         .handle(Request::post("/sign-in").body(Bytes::new()).unwrap(), None)
         .await;
     let cookie = session_cookie(&signed_in).unwrap();
 
-    let rotated = Sessions::new(&Secret::new([2; 32]), Duration::from_secs(3600))
+    let rotated = Sessions::new(&Secret::new([2; 32]), Duration::from_hours(1))
         .with_previous_keys(&[Secret::new([1; 32])]);
     let service = session_service(rotated);
     let answered = get_with(&service, "/me", Some(("cookie", cookie.clone()))).await;
@@ -181,7 +181,7 @@ async fn a_rotated_key_keeps_sessions_and_reseals_them() {
     assert_ne!(resealed, cookie);
 
     let without_old =
-        session_service(Sessions::new(&Secret::new([2; 32]), Duration::from_secs(3600)));
+        session_service(Sessions::new(&Secret::new([2; 32]), Duration::from_hours(1)));
     assert_eq!(
         get_with(&without_old, "/me", Some(("cookie", cookie))).await.status(),
         StatusCode::UNAUTHORIZED
@@ -196,7 +196,7 @@ async fn a_rotated_key_keeps_sessions_and_reseals_them() {
 async fn a_revoked_session_opens_as_none() {
     let revoked = std::sync::Arc::new(std::sync::Mutex::new(Vec::<String>::new()));
     let check = revoked.clone();
-    let sessions = Sessions::new(&Secret::new([3; 32]), Duration::from_secs(3600))
+    let sessions = Sessions::new(&Secret::new([3; 32]), Duration::from_hours(1))
         .with_revocation(std::sync::Arc::new(move |info| check.lock().unwrap().contains(&info.id)));
     let service = session_service(sessions);
     let signed_in =
@@ -210,14 +210,15 @@ async fn a_revoked_session_opens_as_none() {
     // Revoke every session there is: the record names ids, which only the
     // server could learn from a cookie it opened.
     let id = {
-        let probe = Sessions::new(&Secret::new([3; 32]), Duration::from_secs(3600))
-            .with_revocation(std::sync::Arc::new({
+        let probe = Sessions::new(&Secret::new([3; 32]), Duration::from_hours(1)).with_revocation(
+            std::sync::Arc::new({
                 let revoked = revoked.clone();
                 move |info| {
                     revoked.lock().unwrap().push(info.id.clone());
                     false
                 }
-            }));
+            }),
+        );
         let _ = get_with(&session_service(probe), "/me", Some(("cookie", cookie.clone()))).await;
         revoked.lock().unwrap().last().cloned().unwrap()
     };

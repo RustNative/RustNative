@@ -797,10 +797,10 @@ impl<T: Terminal> Session<T> {
                         );
                     }
                     AnimationRequest::Cancel { node, property } => {
-                        if let Some(running) = timeline.running_id(node, property) {
-                            if let Some(frame) = timeline.cancel(running) {
-                                apply_frame(overrides, &frame);
-                            }
+                        if let Some(running) = timeline.running_id(node, property)
+                            && let Some(frame) = timeline.cancel(running)
+                        {
+                            apply_frame(overrides, &frame);
                         }
                     }
                     AnimationRequest::CancelOwner(owner) => {
@@ -837,22 +837,22 @@ impl<T: Terminal> Session<T> {
             let after = transitioned_values(model, &theme);
             let timeline = self.timelines.entry(id).or_default();
             for ((node, property), (to, transition)) in &after {
-                if let Some((from, _)) = before.get(&(*node, *property)) {
-                    if from != to {
-                        let shown = self
-                            .animated
-                            .get(&id)
-                            .and_then(|values| values.get(&(*node, *property)))
-                            .copied();
-                        timeline.transition(
-                            *node,
-                            *property,
-                            shown.unwrap_or(*from),
-                            *to,
-                            *transition,
-                            now,
-                        );
-                    }
+                if let Some((from, _)) = before.get(&(*node, *property))
+                    && from != to
+                {
+                    let shown = self
+                        .animated
+                        .get(&id)
+                        .and_then(|values| values.get(&(*node, *property)))
+                        .copied();
+                    timeline.transition(
+                        *node,
+                        *property,
+                        shown.unwrap_or(*from),
+                        *to,
+                        *transition,
+                        now,
+                    );
                 }
             }
             let live: Vec<NodeId> = model.nodes().map(|node| node.id).collect();
@@ -1010,12 +1010,12 @@ impl<T: Terminal> Session<T> {
         if sync {
             self.encoder.raw(seq::BEGIN_SYNC);
         }
-        if let (Some(id), Some(title)) = (top, title) {
-            if self.titles.get(&id) != Some(&title) {
-                self.titles.clear();
-                self.titles.insert(id, title.clone());
-                self.encoder.raw(&seq::title(&title));
-            }
+        if let (Some(id), Some(title)) = (top, title)
+            && self.titles.get(&id) != Some(&title)
+        {
+            self.titles.clear();
+            self.titles.insert(id, title.clone());
+            self.encoder.raw(&seq::title(&title));
         }
         let cells = if self.full_redraw {
             self.stats.full_redraws += 1;
@@ -1130,12 +1130,11 @@ impl<T: Terminal> Session<T> {
         }
         let Some((window, focused)) = self.top() else { return };
         // An open select's list takes its keys first.
-        if let Some(target) = focused {
-            if self.models.get(&window).is_some_and(|model| model.widget(target).open)
-                && self.popup_key(window, target, key)
-            {
-                return;
-            }
+        if let Some(target) = focused
+            && self.models.get(&window).is_some_and(|model| model.widget(target).open)
+            && self.popup_key(window, target, key)
+        {
+            return;
         }
         let modifiers = key.modifiers;
         if key.code == KeyCode::Tab && !modifiers.ctrl && !modifiers.alt {
@@ -1153,10 +1152,13 @@ impl<T: Terminal> Session<T> {
         self.dispatch(window, Event::KeyDown { target: focused, key: key.code, modifiers });
         let handled = focused.is_some_and(|target| self.widget_key(window, target, key));
         if !handled {
-            if let Some(text) = &key.text {
-                if !modifiers.ctrl && !modifiers.alt && !modifiers.meta && text != "\t" {
-                    self.dispatch(window, Event::TextInput { target: focused, text: text.clone() });
-                }
+            if let Some(text) = &key.text
+                && !modifiers.ctrl
+                && !modifiers.alt
+                && !modifiers.meta
+                && text != "\t"
+            {
+                self.dispatch(window, Event::TextInput { target: focused, text: text.clone() });
             }
             let ctrl_only = modifiers.ctrl && !modifiers.alt && !modifiers.shift && !modifiers.meta;
             match key.code {
@@ -1359,13 +1361,13 @@ impl<T: Terminal> Session<T> {
                     KeyCode::Home => Some(0),
                     KeyCode::End => count.checked_sub(1),
                     KeyCode::Space | KeyCode::Enter => {
-                        if let Some(index) = cursor.filter(|index| *index < count) {
-                            if Some(index) != *selected {
-                                self.dispatch(
-                                    window,
-                                    Event::SelectionChanged { target, index: Some(index) },
-                                );
-                            }
+                        if let Some(index) = cursor.filter(|index| *index < count)
+                            && Some(index) != *selected
+                        {
+                            self.dispatch(
+                                window,
+                                Event::SelectionChanged { target, index: Some(index) },
+                            );
                         }
                         return true;
                     }
@@ -1545,14 +1547,12 @@ impl<T: Terminal> Session<T> {
             MouseButton::Other(_) => None,
         };
         // An open select's list is hit first.
-        if let Some(focused) = self.models.get(&window).and_then(TuiModel::focused) {
-            if self.models.get(&window).is_some_and(|model| model.widget(focused).open) {
-                if let MouseKind::Down(_) | MouseKind::Wheel(..) = mouse.kind {
-                    if self.popup_mouse(window, focused, &mouse) {
-                        return;
-                    }
-                }
-            }
+        if let Some(focused) = self.models.get(&window).and_then(TuiModel::focused)
+            && self.models.get(&window).is_some_and(|model| model.widget(focused).open)
+            && let MouseKind::Down(_) | MouseKind::Wheel(..) = mouse.kind
+            && self.popup_mouse(window, focused, &mouse)
+        {
+            return;
         }
         let hit = self.models.get(&window).and_then(|model| model.hit_test(x, y));
         match mouse.kind {
@@ -1625,10 +1625,10 @@ impl<T: Terminal> Session<T> {
                             .is_some_and(|node| node.accessibility.is_focusable() && !node.disabled)
                     })
                 });
-                if pressed == MouseButton::Left {
-                    if let Some(focus) = focus {
-                        self.move_focus(window, Some(focus));
-                    }
+                if pressed == MouseButton::Left
+                    && let Some(focus) = focus
+                {
+                    self.move_focus(window, Some(focus));
                 }
                 self.press = Some(Press { window, node: target, button: pressed });
                 self.last_press_column = Some(x);
@@ -1714,10 +1714,10 @@ impl<T: Terminal> Session<T> {
                     }
                     self.dirty = true;
                 }
-                if let Some(target) = hit.and_then(|hit| self.pointer_target(window, hit)) {
-                    if let Some(event) = self.pointer_event(window, target, &mouse, None) {
-                        self.dispatch(window, Event::PointerMove { target, pointer: event });
-                    }
+                if let Some(target) = hit.and_then(|hit| self.pointer_target(window, hit))
+                    && let Some(event) = self.pointer_event(window, target, &mouse, None)
+                {
+                    self.dispatch(window, Event::PointerMove { target, pointer: event });
                 }
             }
         }
@@ -1740,13 +1740,12 @@ impl<T: Terminal> Session<T> {
     }
 
     fn close_popups(&mut self, window: WindowId) {
-        if let Some(model) = self.models.get_mut(&window) {
-            if let Some(focused) = model.focused() {
-                if model.widget(focused).open {
-                    model.widget_mut(focused).open = false;
-                    self.dirty = true;
-                }
-            }
+        if let Some(model) = self.models.get_mut(&window)
+            && let Some(focused) = model.focused()
+            && model.widget(focused).open
+        {
+            model.widget_mut(focused).open = false;
+            self.dirty = true;
         }
     }
 
@@ -1865,16 +1864,16 @@ impl<T: Terminal> Session<T> {
             }
             _ => {}
         }
-        if node.kind == NodeKind::TabBar && !drag {
-            if let Some(tabs) = &node.tabs {
-                let spans = paint::tab_spans(tabs.labels(), self.width);
-                if let Some(index) =
-                    spans.iter().position(|(start, end)| column >= *start && column < *end)
-                {
-                    if index != tabs.selected() {
-                        self.dispatch(window, Event::TabSelected { target, index });
-                    }
-                }
+        if node.kind == NodeKind::TabBar
+            && !drag
+            && let Some(tabs) = &node.tabs
+        {
+            let spans = paint::tab_spans(tabs.labels(), self.width);
+            if let Some(index) =
+                spans.iter().position(|(start, end)| column >= *start && column < *end)
+                && index != tabs.selected()
+            {
+                self.dispatch(window, Event::TabSelected { target, index });
             }
         }
     }

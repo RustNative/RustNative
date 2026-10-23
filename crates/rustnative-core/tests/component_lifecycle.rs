@@ -91,10 +91,10 @@ fn label_text(node: &Node, key: &str) -> Option<String> {
     let target = NodeId::from_key(key);
     let mut found = None;
     node.visit(&mut |n, _, _| {
-        if n.id() == target {
-            if let Node::Label(label) = n {
-                found = Some(label.text().to_string());
-            }
+        if n.id() == target
+            && let Node::Label(label) = n
+        {
+            found = Some(label.text().to_string());
         }
     });
     found

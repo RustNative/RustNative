@@ -80,10 +80,10 @@ pub mod count {
     impl Count {
         pub fn update(&mut self, event: Event, fx: &mut Effects<()>) {
             let _ = fx;
-            if let Event::Click { target } = event {
-                if target == NodeId::from_key("more") {
-                    self.count += 1;
-                }
+            if let Event::Click { target } = event
+                && target == NodeId::from_key("more")
+            {
+                self.count += 1;
             }
         }
 

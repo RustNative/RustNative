@@ -75,7 +75,7 @@ impl Default for Security {
     fn default() -> Self {
         Self {
             body_limit: 1024 * 1024,
-            rate_limit: Some((120, Duration::from_secs(60))),
+            rate_limit: Some((120, Duration::from_mins(1))),
             csrf: true,
             hsts: true,
             cross_origin_isolation: false,
@@ -416,7 +416,7 @@ mod tests {
     #[test]
     fn refilled_buckets_are_dropped_before_any_amnesty() {
         let limiter = RateLimiter::default();
-        let limit = (1, Duration::from_secs(3600));
+        let limit = (1, Duration::from_hours(1));
         assert!(limiter.take("busy", limit).is_ok());
         assert!(limiter.take("busy", limit).is_err());
         {

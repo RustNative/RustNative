@@ -258,10 +258,10 @@ fn apply_normal(
             }
         }
         StyleProperty::AlignItems => {
-            if let StyleValue::Keyword(keyword) = value {
-                if let Some(alignment) = alignment(*keyword) {
-                    node.with_container_fields(|_, _, align_items, _| *align_items = alignment);
-                }
+            if let StyleValue::Keyword(keyword) = value
+                && let Some(alignment) = alignment(*keyword)
+            {
+                node.with_container_fields(|_, _, align_items, _| *align_items = alignment);
             }
         }
         StyleProperty::AlignSelf => {

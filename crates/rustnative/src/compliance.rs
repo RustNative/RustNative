@@ -142,10 +142,10 @@ fn rust_files(directory: &Path, out: &mut Vec<(String, String)>) {
             if path.file_name().is_some_and(|name| name != "target") {
                 rust_files(&path, out);
             }
-        } else if path.extension().is_some_and(|extension| extension == "rs") {
-            if let Ok(text) = std::fs::read_to_string(&path) {
-                out.push((path.display().to_string(), text));
-            }
+        } else if path.extension().is_some_and(|extension| extension == "rs")
+            && let Ok(text) = std::fs::read_to_string(&path)
+        {
+            out.push((path.display().to_string(), text));
         }
     }
 }

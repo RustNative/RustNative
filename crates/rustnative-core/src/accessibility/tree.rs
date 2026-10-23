@@ -200,12 +200,11 @@ impl AccessibilityTree {
         if let Some(name) = node.info.name_hint() {
             return Some(name.to_owned());
         }
-        if depth < MAX_LABEL_HOPS {
-            if let Some(label) = self.resolve(id, Relation::LabelledBy).first() {
-                if let Some(name) = self.name_with_depth(*label, depth + 1) {
-                    return Some(name);
-                }
-            }
+        if depth < MAX_LABEL_HOPS
+            && let Some(label) = self.resolve(id, Relation::LabelledBy).first()
+            && let Some(name) = self.name_with_depth(*label, depth + 1)
+        {
+            return Some(name);
         }
         node.text.clone().filter(|text| !text.is_empty())
     }

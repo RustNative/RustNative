@@ -78,10 +78,10 @@ impl Component for Screen {
         Node::column("screen", [])
     }
     fn update(&mut self, event: Event) {
-        if let Event::TextChanged { target, value } = event {
-            if target == NodeId::from_key("name") {
-                self.name = value;
-            }
+        if let Event::TextChanged { target, value } = event
+            && target == NodeId::from_key("name")
+        {
+            self.name = value;
         }
     }
     fn render(&mut self, context: &mut ComponentContext<'_, ()>) -> Node {

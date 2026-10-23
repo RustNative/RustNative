@@ -312,7 +312,7 @@ fn an_event_handler_failure_is_contained_and_retried_by_hand() {
 
     // Isolated: no restart however long we wait.
     executor.run_until_stalled();
-    executor.advance(Duration::from_secs(60));
+    executor.advance(Duration::from_mins(1));
     tree.pump_tasks();
     assert_eq!(labels(&tree)[1], "the handler failed");
 

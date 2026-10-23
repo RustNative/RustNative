@@ -222,9 +222,7 @@ fn wheel(harness: &mut NativeHarness, notches: i32) {
     let lparam = ((((y as u32) & 0xFFFF) << 16) | ((x as u32) & 0xFFFF)) as isize;
     // A scroll *down* is a negative `WHEEL_DELTA`, carried as a signed
     // 16-bit value in the high word of `wParam`.
-    // -120 as a 16-bit two's-complement value (`i16::cast_unsigned` is
-    // newer than this crate's MSRV).
-    let wparam = (u32::from(0xFF88u16) << 16) as usize;
+    let wparam = (u32::from((-120i16).cast_unsigned()) << 16) as usize;
     let window = harness.hwnd(WindowId::PRIMARY);
     for _ in 0..notches {
         // Posted, not sent: wheel routing happens in the loop's

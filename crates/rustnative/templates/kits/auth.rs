@@ -124,8 +124,7 @@ async fn me(Principal(account): Principal<Account>) -> Json<Account> {
 /// `key` (32 bytes from your secrets, never from source).
 #[must_use]
 pub fn routes(app: ServerApp, db: &Db, key: [u8; 32]) -> ServerApp {
-    let (before, after) =
-        Sessions::new(&Secret::new(key), Duration::from_secs(12 * 3600)).middleware();
+    let (before, after) = Sessions::new(&Secret::new(key), Duration::from_hours(12)).middleware();
     app.state(db.clone())
         .before(before)
         .after(after)

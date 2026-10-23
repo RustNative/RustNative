@@ -131,10 +131,10 @@ impl TextProfile {
     /// The first character that is not.
     pub fn check(&self, text: &str) -> Result<(), UnsupportedText> {
         for (offset, character) in text.char_indices() {
-            if let Some(script) = Script::of(character) {
-                if !self.supports(script) {
-                    return Err(UnsupportedText { character, script, offset });
-                }
+            if let Some(script) = Script::of(character)
+                && !self.supports(script)
+            {
+                return Err(UnsupportedText { character, script, offset });
             }
         }
         Ok(())

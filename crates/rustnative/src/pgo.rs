@@ -17,7 +17,7 @@ use crate::error::{Error, Result};
 use crate::project::Project;
 
 /// How long the scripted startup may take before it is abandoned.
-const STARTUP_TIMEOUT: Duration = Duration::from_secs(120);
+const STARTUP_TIMEOUT: Duration = Duration::from_mins(2);
 
 fn tool_output(tool: &'static str, command: &mut Command) -> Result<String> {
     let output = command.output().map_err(|cause| Error::ToolMissing {

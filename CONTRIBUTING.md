@@ -21,7 +21,7 @@ cargo audit
 
 Run them with the newest stable toolchain as well as the one installed
 (`cargo +<newest> clippy …`): CI uses the newest stable, and a new release's
-lints reach CI first. The MSRV is checked with `cargo +1.85 check
+lints reach CI first. The MSRV is checked with `cargo +1.91 check
 --workspace --all-targets`.
 
 Each backend is verified on its own host:
@@ -56,7 +56,11 @@ GTK backend's own tests (`--exclude rustnative-linux`); run them through
   backend. Never tell two targets apart by `cfg` when they share a compiler
   target — iOS and iPadOS share `target_os = "ios"` and one universal binary,
   so the choice between them is made once at launch and everything downstream
-  asks the backend it was handed (`PLAN.md` Milestone 70).
+  asks the backend it was handed (`PLAN.md` Milestone 70). The same holds for
+  the Windows control sets — WinUI 3, then WinUI 2, then the common controls —
+  chosen once at launch and asked of the backend, never of a `cfg`
+  (`PLAN.md` Milestone 71). Style a XAML control through its own properties and
+  theme resources; never replace its template.
 - Keep the two authoring syntaxes equal (`PLAN.md` 2.9). A new node kind or
   `with_*` modifier lands with its builder form, its markup element or
   attribute, and an equivalence case asserting that both produce equal `Node`

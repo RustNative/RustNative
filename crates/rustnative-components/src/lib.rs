@@ -56,11 +56,11 @@ pub fn with_roles(theme: rustnative_core::Theme) -> rustnative_core::Theme {
     let mut tokens = theme.tokens().clone();
     let mut added = Vec::new();
     for role in ROLES {
-        if tokens.get(role).is_none() {
-            if let Some(value) = defaults.tokens().get(role) {
-                tokens.insert(role, value.clone());
-                added.push(role);
-            }
+        if tokens.get(role).is_none()
+            && let Some(value) = defaults.tokens().get(role)
+        {
+            tokens.insert(role, value.clone());
+            added.push(role);
         }
     }
     // A default role that follows the host keeps following it.

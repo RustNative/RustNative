@@ -144,10 +144,10 @@ impl Updater {
 /// The pointers cannot be written.
 pub fn activate(root: &Path, version: &str) -> Result<(), UpdateError> {
     std::fs::create_dir_all(root).map_err(io)?;
-    if let Ok(current) = std::fs::read_to_string(root.join("current")) {
-        if current.trim() != version {
-            write_atomically(&root.join("previous"), current.trim().as_bytes())?;
-        }
+    if let Ok(current) = std::fs::read_to_string(root.join("current"))
+        && current.trim() != version
+    {
+        write_atomically(&root.join("previous"), current.trim().as_bytes())?;
     }
     let _ = std::fs::remove_file(root.join("failures"));
     write_atomically(&root.join("current"), version.as_bytes())
@@ -262,13 +262,13 @@ impl Launcher {
             .unwrap_or(0)
             + 1;
         std::fs::write(self.root.join("failures"), failures.to_string()).map_err(io)?;
-        if failures >= 2 {
-            if let Ok(previous) = std::fs::read_to_string(self.root.join("previous")) {
-                let previous = previous.trim().to_owned();
-                write_atomically(&self.root.join("current"), previous.as_bytes())?;
-                let _ = std::fs::remove_file(self.root.join("failures"));
-                return Ok(Launch::RolledBack { from: version, to: previous });
-            }
+        if failures >= 2
+            && let Ok(previous) = std::fs::read_to_string(self.root.join("previous"))
+        {
+            let previous = previous.trim().to_owned();
+            write_atomically(&self.root.join("current"), previous.as_bytes())?;
+            let _ = std::fs::remove_file(self.root.join("failures"));
+            return Ok(Launch::RolledBack { from: version, to: previous });
         }
         Ok(Launch::Ran { version, healthy })
     }

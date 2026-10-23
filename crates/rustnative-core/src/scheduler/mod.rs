@@ -62,7 +62,7 @@ impl TaskId {
     )]
     fn next(counter: &AtomicU64) -> Self {
         // A compare-exchange loop rather than `fetch_update`, which Rust 1.99
-        // deprecates in favour of `try_update` — a name the 1.85 floor does
+        // deprecates in favour of `try_update` — a name the 1.91 floor does
         // not have.
         let mut current = counter.load(Ordering::Relaxed);
         loop {

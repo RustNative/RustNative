@@ -156,10 +156,10 @@ fn vocabulary(path: Option<&Path>) -> Result<Vocabulary, String> {
     let Some(path) = path else { return Ok(Vocabulary::defaults()) };
     let modified = std::fs::metadata(path).and_then(|metadata| metadata.modified()).ok();
     let mut cache = CACHE.lock().unwrap_or_else(PoisonError::into_inner);
-    if let Some((stamp, vocabulary)) = cache.get(path) {
-        if *stamp == modified {
-            return vocabulary.clone();
-        }
+    if let Some((stamp, vocabulary)) = cache.get(path)
+        && *stamp == modified
+    {
+        return vocabulary.clone();
     }
     let loaded = std::fs::read_to_string(path)
         .map_err(|cause| format!("reading {}: {cause}", path.display()))

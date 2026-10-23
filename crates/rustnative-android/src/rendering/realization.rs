@@ -394,28 +394,28 @@ impl Renderer {
         })?;
         controls::set_enabled(&view, !node.disabled)?;
         self.apply_opacity(node.id)?;
-        if let Some(object) = self.registry.get_mut(node.id) {
-            if object.cursor != node.cursor {
-                object.cursor = node.cursor;
-                call_static(
-                    Class::Views,
-                    "setCursor",
-                    "(Landroid/view/View;I)V",
-                    &[Arg::Obj(&view), Arg::Int(node.cursor.map_or(0, crate::input::pointer_icon))],
-                )?;
-            }
+        if let Some(object) = self.registry.get_mut(node.id)
+            && object.cursor != node.cursor
+        {
+            object.cursor = node.cursor;
+            call_static(
+                Class::Views,
+                "setCursor",
+                "(Landroid/view/View;I)V",
+                &[Arg::Obj(&view), Arg::Int(node.cursor.map_or(0, crate::input::pointer_icon))],
+            )?;
         }
         let wants_drop = node.input.wants_drop();
-        if let Some(object) = self.registry.get_mut(node.id) {
-            if object.drop != wants_drop {
-                object.drop = wants_drop;
-                call_static(
-                    Class::Views,
-                    "setDropTarget",
-                    "(Landroid/view/View;Z)V",
-                    &[Arg::Obj(&view), Arg::Bool(wants_drop)],
-                )?;
-            }
+        if let Some(object) = self.registry.get_mut(node.id)
+            && object.drop != wants_drop
+        {
+            object.drop = wants_drop;
+            call_static(
+                Class::Views,
+                "setDropTarget",
+                "(Landroid/view/View;Z)V",
+                &[Arg::Obj(&view), Arg::Bool(wants_drop)],
+            )?;
         }
         if matches!(node.kind, NodeKind::Column | NodeKind::Row)
             && java_kind == crate::protocol::CONTAINER
@@ -480,11 +480,11 @@ impl Renderer {
             size.height.saturating_sub(u32::try_from(area.vertical().max(0)).unwrap_or(0)),
         );
         let mut output = self.lay_out_in(inner);
-        if let Some(root) = self.snapshot.ordered_nodes().first().map(|node| node.id) {
-            if let Some(rect) = output.rects.get_mut(&root) {
-                rect.x += area.left(self.direction);
-                rect.y += area.top;
-            }
+        if let Some(root) = self.snapshot.ordered_nodes().first().map(|node| node.id)
+            && let Some(rect) = output.rects.get_mut(&root)
+        {
+            rect.x += area.left(self.direction);
+            rect.y += area.top;
         }
         output
     }

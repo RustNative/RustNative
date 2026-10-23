@@ -147,10 +147,10 @@ impl Component for Editor {
             Event::TextChanged { target, value } if target == NodeId::from_key("text") => {
                 let mut doc = self.current();
                 apply_edit(&mut doc.text, &self.text, &value, &self.clock);
-                if let Ok(mut docs) = self.docs.try_lock() {
-                    if let Err(error) = docs.put(&doc) {
-                        self.status = format!("Not saved: {error}");
-                    }
+                if let Ok(mut docs) = self.docs.try_lock()
+                    && let Err(error) = docs.put(&doc)
+                {
+                    self.status = format!("Not saved: {error}");
                 }
                 self.text = value;
             }

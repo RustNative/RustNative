@@ -99,17 +99,16 @@ where
 
     fn render(&mut self, context: &mut ComponentContext<'_, ()>) -> Node {
         let node = context.child_with_props::<C, _>("live", self.props.props.clone(), C::new);
-        if let Some(render) = context.services().extension::<ServerRender>() {
-            if let (Some(owner), Ok(state)) =
+        if let Some(render) = context.services().extension::<ServerRender>()
+            && let (Some(owner), Ok(state)) =
                 (node.id().owner(), serde_json::to_value(&self.props.props))
-            {
-                render.register(Island {
-                    owner,
-                    kind: IslandKind::Live { url: self.props.url.clone(), then: self.props.then },
-                    state,
-                    persist: false,
-                });
-            }
+        {
+            render.register(Island {
+                owner,
+                kind: IslandKind::Live { url: self.props.url.clone(), then: self.props.then },
+                state,
+                persist: false,
+            });
         }
         node
     }

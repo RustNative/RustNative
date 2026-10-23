@@ -156,12 +156,12 @@ impl Vocabulary {
             return;
         }
         let value = type_token(&token.name, &token.value);
-        if value.is_none() {
-            if let Some(kind) = token_kind(&token.name) {
-                let reason = parse_value(kind, &token.value).err().unwrap_or_default();
-                errors.push(StyleError::new(format!("`--{}`: {reason}", token.name), token.range));
-                return;
-            }
+        if value.is_none()
+            && let Some(kind) = token_kind(&token.name)
+        {
+            let reason = parse_value(kind, &token.value).err().unwrap_or_default();
+            errors.push(StyleError::new(format!("`--{}`: {reason}", token.name), token.range));
+            return;
         }
         self.project_tokens.retain(|name| *name != token.name);
         self.project_tokens.push(token.name.clone());
@@ -662,10 +662,10 @@ impl Vocabulary {
             if self.tokens.contains_key(&format!("text-{value}")) {
                 return one(P::FontSize, StyleValue::Token(format!("text-{value}").into()));
             }
-            if let Some(arbitrary) = bracketed(value) {
-                if let Ok(StyleValue::Length(length)) = parse_value(ValueKind::Length, &arbitrary) {
-                    return one(P::FontSize, StyleValue::Length(length));
-                }
+            if let Some(arbitrary) = bracketed(value)
+                && let Ok(StyleValue::Length(length)) = parse_value(ValueKind::Length, &arbitrary)
+            {
+                return one(P::FontSize, StyleValue::Length(length));
             }
             return self.color_utility(utility, P::Foreground, value);
         }

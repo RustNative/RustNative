@@ -224,32 +224,28 @@ fn queue_info_changes(
     if old.description_hint() != new.description_hint() {
         changed(UIA_HelpTextPropertyId, text(old.description_hint()), text(new.description_hint()));
     }
-    if old.checked_state() != new.checked_state() {
-        if let (Some(before), Some(after)) = (old.checked_state(), new.checked_state()) {
-            changed(
-                UIA_ToggleToggleStatePropertyId,
-                VARIANT::from(properties::toggle_state(before).0),
-                VARIANT::from(properties::toggle_state(after).0),
-            );
-        }
+    if old.checked_state() != new.checked_state()
+        && let (Some(before), Some(after)) = (old.checked_state(), new.checked_state())
+    {
+        changed(
+            UIA_ToggleToggleStatePropertyId,
+            VARIANT::from(properties::toggle_state(before).0),
+            VARIANT::from(properties::toggle_state(after).0),
+        );
     }
-    if let (Some(before), Some(after)) = (old.expanded_state(), new.expanded_state()) {
-        if before != after {
-            changed(
-                UIA_ExpandCollapseExpandCollapseStatePropertyId,
-                VARIANT::from(properties::expand_collapse_state(before).0),
-                VARIANT::from(properties::expand_collapse_state(after).0),
-            );
-        }
+    if let (Some(before), Some(after)) = (old.expanded_state(), new.expanded_state())
+        && before != after
+    {
+        changed(
+            UIA_ExpandCollapseExpandCollapseStatePropertyId,
+            VARIANT::from(properties::expand_collapse_state(before).0),
+            VARIANT::from(properties::expand_collapse_state(after).0),
+        );
     }
-    if let (Some(before), Some(after)) = (old.selected_state(), new.selected_state()) {
-        if before != after {
-            changed(
-                UIA_SelectionItemIsSelectedPropertyId,
-                VARIANT::from(before),
-                VARIANT::from(after),
-            );
-        }
+    if let (Some(before), Some(after)) = (old.selected_state(), new.selected_state())
+        && before != after
+    {
+        changed(UIA_SelectionItemIsSelectedPropertyId, VARIANT::from(before), VARIANT::from(after));
     }
     let value_changed = old.value() != new.value();
     match (old.value(), new.value()) {
@@ -300,16 +296,16 @@ fn diff_elements(
         pending.push(Pending::ChildrenInvalidated(host));
     }
     for (id, after) in &new {
-        if let Some(before) = old.get(id) {
-            if before.info() != after.info() {
-                queue_info_changes(
-                    pending,
-                    host.with_element(Some(*id)),
-                    (before.info(), before.info().name_hint()),
-                    (after.info(), after.info().name_hint()),
-                    true,
-                );
-            }
+        if let Some(before) = old.get(id)
+            && before.info() != after.info()
+        {
+            queue_info_changes(
+                pending,
+                host.with_element(Some(*id)),
+                (before.info(), before.info().name_hint()),
+                (after.info(), after.info().name_hint()),
+                true,
+            );
         }
     }
 }
