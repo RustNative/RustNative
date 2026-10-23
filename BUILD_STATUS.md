@@ -14,7 +14,19 @@ the standard in `PLAN.md` section 8 and
 backend's planned control sets (WinUI 3 by default, WinUI 2 as the first
 fallback; the common controls built today are the last; Milestone 71) and its
 native ARM64 build (Milestone 72). Everything verified on Windows so far ran
-under the common controls on x86_64. The 2026-10-12
+under the common controls on x86_64.
+
+**Rust 1.91 floor (2026-10-23).** `rust-version` is 1.91, the release that made
+`aarch64-pc-windows-msvc` Tier 1 (`PLAN.md` Milestone 72); the CI `msrv` job,
+the project templates, and `doctor` follow it. The lints the higher floor
+enables were fixed across the workspace. Verified on Linux: `cargo +1.91 check
+--workspace --all-targets`; clippy 1.97 `-D warnings` on the workspace, on
+`--target x86_64-pc-windows-msvc` for every crate whose C dependencies build
+from Linux, and on `--target aarch64-linux-android`; `cargo test --workspace`
+(excluding the GTK backend) with 1226 passed — the two terminal-panic cases in
+`rustnative-tui/tests/real_terminal.rs` fail identically on the commit before
+the change in that container's pty and are not attributed to it. Owed: the
+Windows job on real Windows. The 2026-10-12
 whole-framework review and the fixes it led to are the second entry below; the
 terminal backend is the first.
 
